@@ -1,4 +1,11 @@
-import { Config, KnowledgeState, type GithubPullPayload, type JobMessage } from "@bb/types";
+import {
+  Config,
+  KnowledgeState,
+  isFullCommitHash,
+  resolveIndexedCommit,
+  type GithubPullPayload,
+  type JobMessage,
+} from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { getKnowledge, recordProcessingStats, setKnowledgeCommit, setKnowledgeState } from "@bb/mongo";
 import { setKnowledgeStateInGraph, snapshotFilesToVersion, type NodeScope } from "@bb/neo4j";
@@ -25,8 +32,6 @@ import {
   buildFileAnalysisUserPrompt,
 } from "src/strategies/flat-folder/prompts/file-analysis.ts";
 
-const COMMIT_HASH_RE = /^[0-9a-f]{40}$/u;
-
 function resolveOrgId(payload: { orgId?: string }): string {
   if (typeof payload.orgId === "string" && payload.orgId.length > 0) {
     return payload.orgId;
@@ -36,7 +41,7 @@ function resolveOrgId(payload: { orgId?: string }): string {
 
 export async function runPull(msg: JobMessage<GithubPullPayload>): Promise<void> {
   const { knowledgeId } = msg.payload;
-  if (msg.payload.targetCommitHash !== undefined && !COMMIT_HASH_RE.test(msg.payload.targetCommitHash)) {
+  if (msg.payload.targetCommitHash !== undefined && !isFullCommitHash(msg.payload.targetCommitHash)) {
     throw new IngestError(
       knowledgeId,
       `targetCommitHash must be a 40-character hex SHA, got: ${msg.payload.targetCommitHash}`,
@@ -50,8 +55,8 @@ export async function runPull(msg: JobMessage<GithubPullPayload>): Promise<void>
   if (knowledge.source.kind !== "github") {
     throw new IngestError(knowledgeId, `pull is only supported for github knowledge (kind=${knowledge.source.kind})`);
   }
-  const currentCommit = knowledge.source.commitId ?? "";
-  if (currentCommit.length === 0) {
+  const currentCommit = resolveIndexedCommit(knowledge.source);
+  if (currentCommit === undefined) {
     throw new IngestError(
       knowledgeId,
       "pull requires a previously-indexed commit; this knowledge has no commitId. Run github_index first.",
@@ -81,10 +86,10 @@ export async function runPull(msg: JobMessage<GithubPullPayload>): Promise<void>
     await syncRepository(cloneOpts);
 
     const branchHead = await readHeadCommitHash(repoDir);
-    if (branchHead === "unknown") {
+    if (!isFullCommitHash(branchHead)) {
       throw new IngestError(knowledgeId, "could not resolve branch HEAD after clone");
     }
-    const targetCommit = msg.payload.targetCommitHash ?? branchHead;
+    const targetCommit = (msg.payload.targetCommitHash ?? branchHead).toLowerCase();
 
     if (targetCommit === currentCommit) {
       logger.info(`pull: ${knowledgeId} already at ${targetCommit.slice(0, 12)}; no-op`);

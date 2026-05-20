@@ -1,5 +1,6 @@
 import type { Request, Response, Router } from "express";
 import express from "express";
+import { isFullCommitHash, resolveIndexedCommit } from "@bb/types";
 import { getKnowledge } from "@bb/mongo";
 import { enqueueGithubPull } from "@bb/queue";
 import { fetchLatestCommitHash } from "@bb/ingest-github";
@@ -16,8 +17,6 @@ interface PullResponse {
   noOp?: boolean;
   commitHash?: string;
 }
-
-const COMMIT_HASH_RE = /^[0-9a-f]{40}$/u;
 
 /**
  * `POST /api/v1/github/pull` — re-index a github knowledge to a specific commit
@@ -46,7 +45,7 @@ export function buildGithubPullRoute(): Router {
     const gitToken = typeof body.gitToken === "string" && body.gitToken.length > 0 ? body.gitToken : undefined;
     const suppliedTarget =
       typeof body.targetCommitHash === "string" && body.targetCommitHash.length > 0 ? body.targetCommitHash : undefined;
-    if (suppliedTarget !== undefined && !COMMIT_HASH_RE.test(suppliedTarget)) {
+    if (suppliedTarget !== undefined && !isFullCommitHash(suppliedTarget)) {
       res.status(400).json({
         error: "invalid targetCommitHash",
         message: "targetCommitHash must be a 40-character hex SHA",
@@ -63,7 +62,8 @@ export function buildGithubPullRoute(): Router {
       res.status(422).json({ error: `pull is only supported for github knowledge (kind=${knowledge.source.kind})` });
       return;
     }
-    if (knowledge.source.commitId === undefined || knowledge.source.commitId.length === 0) {
+    const currentCommit = resolveIndexedCommit(knowledge.source);
+    if (currentCommit === undefined) {
       res.status(422).json({
         error: "knowledge not yet indexed",
         message: "pull requires a previously-indexed commit; this knowledge has no commitId. Run github_index first.",
@@ -72,19 +72,19 @@ export function buildGithubPullRoute(): Router {
     }
 
     const branch = knowledge.source.branch ?? "main";
-    let targetCommit = suppliedTarget;
+    let targetCommit = suppliedTarget?.toLowerCase();
     if (targetCommit === undefined) {
       try {
         const head = await fetchLatestCommitHash(knowledge.source.repoUrl, branch, gitToken);
-        if (head !== null && COMMIT_HASH_RE.test(head)) {
-          targetCommit = head;
+        if (isFullCommitHash(head)) {
+          targetCommit = head.toLowerCase();
         }
       } catch {
         // Transient API failure; leave target unset and let the worker resolve via git rev-parse.
       }
     }
 
-    if (targetCommit !== undefined && targetCommit === knowledge.source.commitId) {
+    if (targetCommit !== undefined && targetCommit === currentCommit) {
       const response: PullResponse = { knowledgeId, noOp: true, commitHash: targetCommit };
       res.status(200).json(response);
       return;

@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { Config } from "@bb/types";
+import { Config, normalizeCommitHashes, resolveIndexedCommit, type KnowledgeSource } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { ensureServerRunning, ServerStartTimeoutError } from "./serverSpawn.ts";
 import { getJson, HttpClientError } from "./httpClient.ts";
@@ -7,9 +7,7 @@ import { createSpinner, error } from "./output.ts";
 
 interface RepoEntry {
   knowledgeId: string;
-  source:
-    | { kind: "github"; repoUrl: string; branch?: string; commitId?: string; commitHashes?: string[] }
-    | { kind: "local"; sourcePath: string };
+  source: KnowledgeSource;
   state: string;
   createdAt: string;
   updatedAt: string;
@@ -62,7 +60,7 @@ async function runLs(): Promise<void> {
 }
 
 function renderTable(repos: RepoEntry[]): void {
-  const headers = ["ID", "SOURCE", "STATE", "UPDATED", "HEAD", "COMMITS", "FILES"];
+  const headers = ["ID", "SOURCE", "STATE", "UPDATED", "COMMIT", "COMMITS", "FILES"];
   const rows = repos.map((r) => [
     `${r.knowledgeId.slice(0, 8)}…`,
     formatSource(r.source),
@@ -86,17 +84,18 @@ function formatHead(source: RepoEntry["source"]): string {
   if (source.kind !== "github") {
     return "-";
   }
-  if (source.commitId === undefined || source.commitId.length === 0) {
+  const commitId = resolveIndexedCommit(source);
+  if (commitId === undefined) {
     return "-";
   }
-  return source.commitId.slice(0, 8);
+  return commitId.slice(0, 8);
 }
 
 function formatCommits(source: RepoEntry["source"]): string {
   if (source.kind !== "github") {
     return "-";
   }
-  return String(source.commitHashes?.length ?? 0);
+  return String(normalizeCommitHashes(source.commitHashes).length);
 }
 
 function formatSource(source: RepoEntry["source"]): string {
