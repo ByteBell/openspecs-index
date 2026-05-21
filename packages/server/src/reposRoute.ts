@@ -1,6 +1,7 @@
 import type { Request, Response, Router } from "express";
 import express from "express";
 import { getKnowledge, listKnowledge } from "@bb/mongo";
+import { getLegacyInfo, normalizeRepoSource } from "./knowledgeSourcePresenter.ts";
 
 export function buildReposRoute(): Router {
   const router = express.Router();
@@ -8,7 +9,7 @@ export function buildReposRoute(): Router {
     const entries = await listKnowledge();
     const repos = entries.map((e) => ({
       knowledgeId: e.knowledgeId,
-      source: e.source,
+      source: normalizeRepoSource(e.source, getLegacyInfo(e)),
       state: e.status.state,
       createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : new Date(e.createdAt).toISOString(),
       updatedAt: e.updatedAt instanceof Date ? e.updatedAt.toISOString() : new Date(e.updatedAt).toISOString(),
@@ -30,7 +31,7 @@ export function buildReposRoute(): Router {
     }
     res.status(200).json({
       knowledgeId: entry.knowledgeId,
-      source: entry.source,
+      source: normalizeRepoSource(entry.source, getLegacyInfo(entry)),
       state: entry.status.state,
       createdAt:
         entry.createdAt instanceof Date ? entry.createdAt.toISOString() : new Date(entry.createdAt).toISOString(),

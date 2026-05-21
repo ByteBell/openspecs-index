@@ -1,5 +1,6 @@
 import React from "react";
 import { render } from "ink";
+import { normalizeCommitHashes, resolveIndexedCommit, type KnowledgeSource } from "@bb/types";
 import { getJson } from "./httpClient.ts";
 import {
   RepoSelector,
@@ -26,9 +27,7 @@ import {
 
 export interface RepoListEntry {
   knowledgeId: string;
-  source:
-    | { kind: "github"; repoUrl: string; branch?: string; commitId?: string; commitHashes?: string[] }
-    | { kind: "local"; sourcePath: string };
+  source: KnowledgeSource;
   state: string;
   createdAt: string;
   updatedAt: string;
@@ -107,12 +106,10 @@ function formatDetail(repo: RepoListEntry): string {
   if (repo.source.kind !== "github") {
     return `${repo.state}  ${idChunk}  ${repo.fileCount} files`;
   }
-  const head =
-    repo.source.commitId !== undefined && repo.source.commitId.length > 0
-      ? `head=${repo.source.commitId.slice(0, 8)}`
-      : "head=-";
-  const commits = `${repo.source.commitHashes?.length ?? 0} commits`;
-  return `${repo.state}  ${idChunk}  ${head}  ${commits}  ${repo.fileCount} files`;
+  const commitId = resolveIndexedCommit(repo.source);
+  const commit = commitId !== undefined ? `commit=${commitId.slice(0, 8)}` : "commit=-";
+  const commits = `${normalizeCommitHashes(repo.source.commitHashes).length} commits`;
+  return `${repo.state}  ${idChunk}  ${commit}  ${commits}  ${repo.fileCount} files`;
 }
 
 function formatSourceLabel(source: RepoListEntry["source"]): string {

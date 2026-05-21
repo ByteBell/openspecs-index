@@ -1,4 +1,10 @@
-import { KnowledgeState, type KnowledgeDoc } from "@bb/types";
+import {
+  KnowledgeState,
+  isFullCommitHash,
+  normalizeCommitHashes,
+  type KnowledgeDoc,
+  type KnowledgeSource,
+} from "@bb/types";
 import { KnowledgeNotFoundError } from "@bb/errors";
 import { _getDb } from "./client.ts";
 import { Collections } from "./collections.ts";
@@ -20,20 +26,24 @@ export async function setKnowledgeState(knowledgeId: string, state: KnowledgeSta
 
 /**
  * Records that this knowledge is now indexed at `commitHash`. Sets it as the
- * current head pointer (`source.commitId`) and appends to the deduped history
+ * current indexed commit pointer (`source.commitId`) and appends to the deduped history
  * array (`source.commitHashes`). Idempotent: re-recording the same commit is
  * a no-op except for the `updatedAt` bump.
  *
  * Throws `KnowledgeNotFoundError` if the document doesn't exist.
  */
 export async function setKnowledgeCommit(knowledgeId: string, commitHash: string): Promise<void> {
+  if (!isFullCommitHash(commitHash)) {
+    throw new Error(`invalid commit hash for knowledge ${knowledgeId}: ${commitHash}`);
+  }
+  const normalizedCommitHash = commitHash.toLowerCase();
   const result = await _getDb()
     .collection(Collections.Knowledge)
     .updateOne(
       { knowledgeId },
       {
-        $set: { "source.commitId": commitHash, updatedAt: new Date() },
-        $addToSet: { "source.commitHashes": commitHash },
+        $set: { "source.commitId": normalizedCommitHash, updatedAt: new Date() },
+        $addToSet: { "source.commitHashes": normalizedCommitHash },
       },
     );
   if (result.matchedCount === 0) {
@@ -61,13 +71,14 @@ export async function updateKnowledgeProgress(
 
 export async function upsertKnowledge(doc: Omit<KnowledgeDoc, "updatedAt"> & { updatedAt?: Date }): Promise<void> {
   const now = new Date();
+  const source = normalizeKnowledgeSourceForWrite(doc.knowledgeId, doc.source);
   await _getDb()
     .collection(Collections.Knowledge)
     .updateOne(
       { knowledgeId: doc.knowledgeId },
       {
         $set: {
-          source: doc.source,
+          source,
           status: doc.status,
           updatedAt: doc.updatedAt ?? now,
         },
@@ -78,6 +89,23 @@ export async function upsertKnowledge(doc: Omit<KnowledgeDoc, "updatedAt"> & { u
       },
       { upsert: true },
     );
+}
+
+function normalizeKnowledgeSourceForWrite(knowledgeId: string, source: KnowledgeSource): KnowledgeSource {
+  if (source.kind !== "github") {
+    return source;
+  }
+  if (source.commitId !== undefined && !isFullCommitHash(source.commitId)) {
+    throw new Error(`invalid commit hash for knowledge ${knowledgeId}: ${source.commitId}`);
+  }
+  const commitHashes = normalizeCommitHashes(source.commitHashes);
+  return {
+    kind: "github",
+    repoUrl: source.repoUrl,
+    ...(source.branch !== undefined ? { branch: source.branch } : {}),
+    ...(source.commitId !== undefined ? { commitId: source.commitId.toLowerCase() } : {}),
+    ...(commitHashes.length > 0 ? { commitHashes } : {}),
+  };
 }
 
 export interface DeleteKnowledgeResult {

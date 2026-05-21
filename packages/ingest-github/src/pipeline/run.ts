@@ -1,4 +1,4 @@
-import { Config, KnowledgeState, type GithubIndexPayload, type LocalIngestPayload } from "@bb/types";
+import { Config, KnowledgeState, isFullCommitHash, type GithubIndexPayload, type LocalIngestPayload } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { recordProcessingStats, setKnowledgeCommit, setKnowledgeState } from "@bb/mongo";
 import { setKnowledgeStateInGraph } from "@bb/neo4j";
@@ -88,6 +88,10 @@ async function runGithub(
       }
       source = createDiskSourceReader({ repoDir, commitHash });
     }
+    if (!isFullCommitHash(commitHash)) {
+      throw new IngestError(knowledgeId, `resolved HEAD is not a full commit hash: ${commitHash}`);
+    }
+    commitHash = commitHash.toLowerCase();
 
     const metaPaths = metaPathsFor(knowledgeId);
     await ensureMetaDirs(metaPaths);
