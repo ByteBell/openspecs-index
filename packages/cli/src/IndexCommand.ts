@@ -83,6 +83,11 @@ interface RepoStatus {
   fileCount: number;
   totalFiles?: number;
   processedFiles?: number;
+  failure?: {
+    reason: string;
+    category: string;
+    detail?: string;
+  };
 }
 
 async function pollJobStatus(knowledgeId: string, jobId: string): Promise<void> {
@@ -113,11 +118,19 @@ async function pollJobStatus(knowledgeId: string, jobId: string): Promise<void> 
         return;
       }
       if (status.state === "FAILED") {
+        const failMsg = `Indexing failed for ${knowledgeId}`;
         if (bar) {
-          bar.stop(false, `Indexing failed for ${knowledgeId}`);
+          bar.stop(false, failMsg);
         } else {
-          spinner.stop(false, `Indexing failed for ${knowledgeId}`);
+          spinner.stop(false, failMsg);
         }
+        if (status.failure?.reason !== undefined) {
+          error(`Reason: ${status.failure.reason}`);
+        }
+        if (status.failure?.detail !== undefined) {
+          error(`Detail: ${status.failure.detail}`);
+        }
+        process.exitCode = 1;
         return;
       }
     } catch (cause: unknown) {
