@@ -108,7 +108,7 @@ function firstNavigable(items: MenuItem[]): number {
 }
 
 export interface TinkerMenuProps {
-  onDone: (result: { saved: boolean }) => void;
+  onDone: (result: { saved: boolean; command?: string }) => void;
 }
 
 export function TinkerMenu({ onDone }: TinkerMenuProps): ReactElement {
@@ -169,7 +169,7 @@ export function TinkerMenu({ onDone }: TinkerMenuProps): ReactElement {
       }
       if (key.escape) {
         exit();
-        onDone({ saved: false });
+        onDone({ saved: false, command: undefined });
         return;
       }
       if (key.return) {
@@ -178,8 +178,11 @@ export function TinkerMenu({ onDone }: TinkerMenuProps): ReactElement {
           return;
         }
         if (item.kind === "command") {
+          if (Object.keys(dirty).length > 0) {
+            handleSave();
+          }
           exit();
-          onDone({ saved: false });
+          onDone({ saved: false, command: item.label.split(" ")[0] });
           return;
         }
         if (item.kind === "config") {
@@ -200,7 +203,7 @@ export function TinkerMenu({ onDone }: TinkerMenuProps): ReactElement {
             return;
           }
           exit();
-          onDone({ saved: false });
+          onDone({ saved: false, command: undefined });
           return;
         }
       }
