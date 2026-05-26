@@ -11,6 +11,10 @@ services:
       MONGO_INITDB_DATABASE: bytebell
     networks:
       - bytebell
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
     healthcheck:
       test:
         - CMD-SHELL
@@ -35,6 +39,10 @@ services:
       NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
     networks:
       - bytebell
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null 2>&1"]
       interval: 5s
@@ -53,6 +61,10 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     networks:
       - bytebell
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

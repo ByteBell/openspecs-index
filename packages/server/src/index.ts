@@ -2,7 +2,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import express from "express";
-import { Config, type Config as ConfigEnum } from "@bb/types";
+import { Config } from "@bb/types";
 import { getBytebellHome, getConfigValue, HINTS } from "@bb/config";
 import { connectMongo } from "@bb/mongo";
 import { connectRedis } from "@bb/redis";
@@ -13,23 +13,42 @@ import { ServerConfigError } from "@bb/errors";
 import { registerRoutes } from "./routes.ts";
 import { installShutdownHandlers } from "./shutdown.ts";
 
-const REQUIRED: ConfigEnum[] = [
+const INFRA_REQUIRED: Config[] = [
   Config.MongoUri,
   Config.RedisUrl,
   Config.Neo4jUri,
   Config.Neo4jUser,
   Config.Neo4jPassword,
-  Config.OpenrouterApiKey,
 ];
 
 function checkRequiredConfig(): void {
   const missing: string[] = [];
   const hints: string[] = [];
-  for (const key of REQUIRED) {
+  for (const key of INFRA_REQUIRED) {
     const value = getConfigValue(key);
     if (typeof value === "string" && value.length === 0) {
       missing.push(key);
       hints.push(HINTS[key]);
+    }
+  }
+  const llmProvider = getConfigValue(Config.LlmProvider);
+  if (llmProvider === "openrouter" || llmProvider.length === 0) {
+    const apiKey = getConfigValue(Config.OpenrouterApiKey);
+    if (apiKey.length === 0) {
+      missing.push(Config.OpenrouterApiKey);
+      hints.push(HINTS[Config.OpenrouterApiKey]);
+    }
+    const model = getConfigValue(Config.OpenrouterModel);
+    if (model.length === 0) {
+      missing.push(Config.OpenrouterModel);
+      hints.push(HINTS[Config.OpenrouterModel]);
+    }
+  }
+  if (llmProvider === "ollama") {
+    const ollamaModel = getConfigValue(Config.OllamaModel);
+    if (ollamaModel.length === 0) {
+      missing.push(Config.OllamaModel);
+      hints.push(HINTS[Config.OllamaModel]);
     }
   }
   if (missing.length > 0) {

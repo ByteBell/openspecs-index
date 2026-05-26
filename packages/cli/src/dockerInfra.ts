@@ -19,7 +19,7 @@ export class DockerNotFoundError extends Error {
 export class DockerComposeError extends Error {
   override readonly name = "DockerComposeError";
   constructor(stage: string, exitCode: number, stderr: string) {
-    super(`docker compose ${stage} failed (exit ${exitCode}): ${stderr.trim() || "no stderr"}`);
+    super(`compose ${stage} failed (exit ${exitCode}): ${stderr.trim() || "no stderr"}`);
   }
 }
 
@@ -27,7 +27,7 @@ export class DockerHealthTimeoutError extends Error {
   override readonly name = "DockerHealthTimeoutError";
   constructor(unhealthy: ServiceName[]) {
     super(
-      `services not healthy after ${COMPOSE_HEALTH_TIMEOUT_MS / 1000}s: ${unhealthy.join(", ")}. Inspect with \`docker compose -f infra/docker/docker-compose.yml logs\`.`,
+      `services not healthy after ${COMPOSE_HEALTH_TIMEOUT_MS / 1000}s: ${unhealthy.join(", ")}. Inspect with \`docker-compose -f infra/docker/docker-compose.yml logs\`.`,
     );
   }
 }
@@ -57,9 +57,78 @@ function envFilePath(): string {
   return path.resolve(path.dirname(composeFilePath()), ".env");
 }
 
+let composeBinary: "docker" | "docker-compose" | null = null;
+
+async function resolveComposeBinary(): Promise<"docker" | "docker-compose"> {
+  if (composeBinary !== null) {
+    return composeBinary;
+  }
+  const fromPlugin = await runRawCheck(["docker", "compose", "version"]);
+  if (fromPlugin) {
+    composeBinary = "docker";
+    return composeBinary;
+  }
+  const fromStandalone = await runRawCheck(["docker-compose", "version"]);
+  if (fromStandalone) {
+    composeBinary = "docker-compose";
+    return composeBinary;
+  }
+  composeBinary = "docker";
+  return composeBinary;
+}
+
+function runRawCheck(args: string[]): Promise<boolean> {
+  const binary = args[0];
+  if (binary === undefined) {
+    return Promise.resolve(false);
+  }
+  return new Promise((resolve) => {
+    const child = spawn(binary, args.slice(1), { stdio: "ignore" });
+    child.on("exit", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
+  });
+}
+
+async function runCompose(
+  args: string[],
+  stage: string,
+  inheritStdout: boolean,
+): Promise<{ stdout: string; stderr: string }> {
+  const binary = await resolveComposeBinary();
+  const allArgs = binary === "docker" ? ["compose", ...args] : args;
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, allArgs, {
+      stdio: ["ignore", inheritStdout ? "inherit" : "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (cause: Error & { code?: string }) => {
+      if (cause.code === "ENOENT") {
+        reject(new DockerNotFoundError());
+        return;
+      }
+      reject(cause);
+    });
+    child.on("exit", (code) => {
+      const exit = typeof code === "number" ? code : 0;
+      if (exit === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+      reject(new DockerComposeError(stage, exit, stderr));
+    });
+  });
+}
+
 export async function up(opts: UpOptions): Promise<UpResult> {
   await writeEnvFile(opts.neo4jPassword);
-  await runDocker(["compose", "-f", composeFilePath(), "up", "-d"], "up", true);
+  await runCompose(["-f", composeFilePath(), "up", "-d"], "up", true);
 
   const unhealthy = await waitUntilHealthy(opts.onProgress);
   if (unhealthy.length > 0) {
@@ -123,7 +192,7 @@ function formatProgress(status: StatusSummary): string {
 }
 
 async function psSnapshot(): Promise<ComposePsRow[]> {
-  const { stdout } = await runDocker(["compose", "-f", composeFilePath(), "ps", "--format", "json"], "ps", false);
+  const { stdout } = await runCompose(["-f", composeFilePath(), "ps", "--format", "json"], "ps", false);
   return parsePsOutput(stdout);
 }
 
@@ -164,42 +233,6 @@ function coerceRow(value: unknown): ComposePsRow {
     out.State = obj["State"];
   }
   return out;
-}
-
-interface DockerRunResult {
-  stdout: string;
-  stderr: string;
-}
-
-async function runDocker(args: string[], stage: string, inheritStdout: boolean): Promise<DockerRunResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("docker", args, {
-      stdio: ["ignore", inheritStdout ? "inherit" : "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf8");
-    });
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf8");
-    });
-    child.on("error", (cause: Error & { code?: string }) => {
-      if (cause.code === "ENOENT") {
-        reject(new DockerNotFoundError());
-        return;
-      }
-      reject(cause);
-    });
-    child.on("exit", (code) => {
-      const exit = typeof code === "number" ? code : 0;
-      if (exit === 0) {
-        resolve({ stdout, stderr });
-        return;
-      }
-      reject(new DockerComposeError(stage, exit, stderr));
-    });
-  });
 }
 
 function sleep(ms: number): Promise<void> {

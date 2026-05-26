@@ -6,6 +6,9 @@ export { Config };
 export const LOG_LEVELS = ["error", "warn", "info", "http", "verbose", "debug", "silly"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+export const LLM_PROVIDERS = ["openrouter", "ollama"] as const;
+export type LlmProvider = (typeof LLM_PROVIDERS)[number];
+
 const concurrencySchema = z
   .object({
     github: z.number().int().positive().default(2),
@@ -26,6 +29,9 @@ export const configSchema = z
     openrouter_fallback_model_2: z.string().default("minimax/minimax-m2.7"),
     openrouter_fallback_model_3: z.string().default("moonshotai/kimi-k2.5"),
     openrouter_fallback_model_4: z.string().default("x-ai/grok-4.3"),
+    llm_provider: z.enum(LLM_PROVIDERS).default("openrouter"),
+    ollama_base_url: z.string().default("http://localhost:11434/v1"),
+    ollama_model: z.string().default("llama3.1"),
     concurrency: concurrencySchema.default({ github: 2 }),
     log_level: z.enum(LOG_LEVELS).default("info"),
     log_retention_days: z.number().int().positive().default(14),
@@ -50,6 +56,9 @@ export type ConfigValueMap = {
   [Config.OpenrouterFallbackModel2]: string;
   [Config.OpenrouterFallbackModel3]: string;
   [Config.OpenrouterFallbackModel4]: string;
+  [Config.LlmProvider]: LlmProvider;
+  [Config.OllamaBaseUrl]: string;
+  [Config.OllamaModel]: string;
   [Config.ConcurrencyGithub]: number;
   [Config.LogLevel]: LogLevel;
   [Config.LogRetentionDays]: number;
@@ -64,7 +73,7 @@ export const REQUIRED_KEYS: readonly Config[] = [
   Config.Neo4jUser,
   Config.Neo4jPassword,
   Config.RedisUrl,
-  Config.OpenrouterApiKey,
+  Config.LlmProvider,
 ];
 
 export const HINTS: Readonly<Record<Config, string>> = {
@@ -80,6 +89,9 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.OpenrouterFallbackModel2]: "bytebell set openrouter-fallback-model-2 <model-id>",
   [Config.OpenrouterFallbackModel3]: "bytebell set openrouter-fallback-model-3 <model-id>",
   [Config.OpenrouterFallbackModel4]: "bytebell set openrouter-fallback-model-4 <model-id>",
+  [Config.LlmProvider]: "bytebell set llm-provider <openrouter|ollama>",
+  [Config.OllamaBaseUrl]: "bytebell set ollama-base-url <url>",
+  [Config.OllamaModel]: "bytebell set ollama-model <model-id>",
   [Config.ConcurrencyGithub]: "bytebell set concurrency.github <n>",
   [Config.LogLevel]: "bytebell set log-level <error|warn|info|debug>",
   [Config.LogRetentionDays]: "bytebell set log-retention-days <n>",
@@ -112,6 +124,12 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg.openrouter_fallback_model_3 as ConfigValue<K>;
     case Config.OpenrouterFallbackModel4:
       return cfg.openrouter_fallback_model_4 as ConfigValue<K>;
+    case Config.LlmProvider:
+      return cfg.llm_provider as ConfigValue<K>;
+    case Config.OllamaBaseUrl:
+      return cfg.ollama_base_url as ConfigValue<K>;
+    case Config.OllamaModel:
+      return cfg.ollama_model as ConfigValue<K>;
     case Config.ConcurrencyGithub:
       return cfg.concurrency.github as ConfigValue<K>;
     case Config.LogLevel:
@@ -149,6 +167,12 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, openrouter_fallback_model_3: value as string };
     case Config.OpenrouterFallbackModel4:
       return { ...cfg, openrouter_fallback_model_4: value as string };
+    case Config.LlmProvider:
+      return { ...cfg, llm_provider: value as LlmProvider };
+    case Config.OllamaBaseUrl:
+      return { ...cfg, ollama_base_url: value as string };
+    case Config.OllamaModel:
+      return { ...cfg, ollama_model: value as string };
     case Config.ConcurrencyGithub:
       return { ...cfg, concurrency: { ...cfg.concurrency, github: value as number } };
     case Config.LogLevel:

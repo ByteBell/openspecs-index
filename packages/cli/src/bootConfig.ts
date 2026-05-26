@@ -55,11 +55,19 @@ export interface PreflightResult {
 
 export function checkPreflight(): PreflightResult {
   const missing: PreflightResult["missing"] = [];
-  if (readString(Config.OpenrouterApiKey).length === 0) {
-    missing.push({ configKey: Config.OpenrouterApiKey, hintKey: "openrouter-api-key" });
+  const llmProvider = readString(Config.LlmProvider);
+  if (llmProvider === "openrouter" || llmProvider.length === 0) {
+    if (readString(Config.OpenrouterApiKey).length === 0) {
+      missing.push({ configKey: Config.OpenrouterApiKey, hintKey: "openrouter-api-key" });
+    }
+    if (readString(Config.OpenrouterModel).length === 0) {
+      missing.push({ configKey: Config.OpenrouterModel, hintKey: "openrouter-model" });
+    }
   }
-  if (readString(Config.OpenrouterModel).length === 0) {
-    missing.push({ configKey: Config.OpenrouterModel, hintKey: "openrouter-model" });
+  if (llmProvider === "ollama") {
+    if (readString(Config.OllamaModel).length === 0) {
+      missing.push({ configKey: Config.OllamaModel, hintKey: "ollama-model" });
+    }
   }
   return { ok: missing.length === 0, missing };
 }

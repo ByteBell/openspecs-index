@@ -24,18 +24,18 @@ export interface AskLlmResult {
   usage: AskLlmUsage;
 }
 
-interface OpenRouterMessage {
+interface ChatMessage {
   role: "system" | "user";
   content: string;
 }
 
-interface OpenRouterRequest {
+interface ChatRequest {
   model: string;
+  messages: ChatMessage[];
   models?: string[];
-  messages: OpenRouterMessage[];
 }
 
-interface OpenRouterResponse {
+interface ChatResponse {
   model?: string;
   choices?: Array<{ message?: { content?: string } }>;
   usage?: {
@@ -44,24 +44,79 @@ interface OpenRouterResponse {
   };
 }
 
-export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<AskLlmResult> {
-  const apiKey = getConfigValue(Config.OpenrouterApiKey);
-  if (apiKey.length === 0) {
-    throw new LlmConfigError("bytebell keys set");
+type LlmProvider = "openrouter" | "ollama";
+
+function resolveProvider(): LlmProvider {
+  try {
+    return getConfigValue(Config.LlmProvider);
+  } catch {
+    return "openrouter";
   }
-  const model = opts.model ?? getConfigValue(Config.OpenrouterModel);
+}
+
+function resolveEndpoint(provider: LlmProvider, baseUrl: string): string {
+  if (provider === "ollama") {
+    const trimmed = baseUrl.replace(/\/+$/u, "");
+    return `${trimmed}/chat/completions`;
+  }
+  return OPENROUTER_URL;
+}
+
+function resolveHeaders(provider: LlmProvider, apiKey: string): Record<string, string> {
+  if (provider === "ollama") {
+    return { "Content-Type": "application/json" };
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+}
+
+function resolveModel(provider: LlmProvider, opts: AskLlmOptions): string {
+  if (opts.model !== undefined) {
+    return opts.model;
+  }
+  if (provider === "ollama") {
+    return getConfigValue(Config.OllamaModel);
+  }
+  return getConfigValue(Config.OpenrouterModel);
+}
+
+function resolveFallbackChain(provider: LlmProvider, opts: AskLlmOptions): string[] {
+  if (provider === "ollama") {
+    return [];
+  }
   const fallbackSlots = opts.fallbackModels ?? [
     getConfigValue(Config.OpenrouterFallbackModel1),
     getConfigValue(Config.OpenrouterFallbackModel2),
     getConfigValue(Config.OpenrouterFallbackModel3),
     getConfigValue(Config.OpenrouterFallbackModel4),
   ];
-  const chain = [model, ...fallbackSlots].filter((m) => m.length > 0);
+  return fallbackSlots.filter((m) => m.length > 0);
+}
+
+function buildModelChain(provider: LlmProvider, model: string, fallbacks: string[]): string[] {
+  if (provider === "ollama") {
+    return [model];
+  }
+  const chain = [model, ...fallbacks];
   const uniqueChain = [...new Set(chain)];
-  // OpenRouter rejects `models: [...]` arrays with more than 3 entries (HTTP 400
-  // "models array must have 3 items or fewer"). The four fallback slots remain
-  // configurable; we send the primary plus the first 2 non-empty fallbacks.
-  const cappedChain = uniqueChain.slice(0, 3);
+  return uniqueChain.slice(0, 3);
+}
+
+export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<AskLlmResult> {
+  const provider = resolveProvider();
+
+  if (provider === "openrouter") {
+    const apiKey = getConfigValue(Config.OpenrouterApiKey);
+    if (apiKey.length === 0) {
+      throw new LlmConfigError("bytebell keys set");
+    }
+  }
+
+  const model = resolveModel(provider, opts);
+  const fallbacks = resolveFallbackChain(provider, opts);
+  const modelChain = buildModelChain(provider, model, fallbacks);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   const cacheOn = isCacheEnabled();
@@ -69,7 +124,7 @@ export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<
     ? computeCacheKey({
         prompt,
         systemPrompt: opts.systemPrompt ?? null,
-        modelChain: cappedChain,
+        modelChain,
       })
     : null;
   if (cacheOn && cacheKey !== null) {
@@ -83,46 +138,51 @@ export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<
     console.info(`[LLM CACHE MISS] key=${cacheKey.slice(0, 8)}`);
   }
 
-  const messages: OpenRouterMessage[] = [];
+  const messages: ChatMessage[] = [];
   if (opts.systemPrompt !== undefined) {
     messages.push({ role: "system", content: opts.systemPrompt });
   }
   messages.push({ role: "user", content: prompt });
 
-  const body: OpenRouterRequest =
-    cappedChain.length > 1 ? { model, models: cappedChain, messages } : { model, messages };
+  const body: ChatRequest = { model, messages };
+  if (provider === "openrouter" && modelChain.length > 1) {
+    body.models = modelChain;
+  }
+
+  const baseUrl = getConfigValue(Config.OllamaBaseUrl);
+  const endpoint = resolveEndpoint(provider, baseUrl);
+  const apiKey = provider === "openrouter" ? getConfigValue(Config.OpenrouterApiKey) : "";
+  const headers = resolveHeaders(provider, apiKey);
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let response: Response;
   try {
-    response = await fetch(OPENROUTER_URL, {
+    response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (cause: unknown) {
     if (cause instanceof Error && cause.name === "AbortError") {
-      throw new LlmError(`OpenRouter request timed out after ${timeoutMs}ms`, cause);
+      throw new LlmError(`${provider} request timed out after ${timeoutMs}ms`, cause);
     }
-    throw new LlmError("OpenRouter request failed", cause);
+    throw new LlmError(`${provider} request failed`, cause);
   } finally {
     clearTimeout(timer);
   }
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new LlmError(`OpenRouter HTTP ${response.status}: ${text.slice(0, 500)}`);
+    throw new LlmError(`${provider} HTTP ${response.status}: ${text.slice(0, 500)}`);
   }
 
-  const json = (await response.json()) as OpenRouterResponse;
+  const json = (await response.json()) as ChatResponse;
   const content = json.choices?.[0]?.message?.content;
   if (typeof content !== "string" || content.length === 0) {
-    throw new LlmError("OpenRouter returned empty completion");
+    throw new LlmError(`${provider} returned empty completion`);
   }
   const result: AskLlmResult = {
     content,
@@ -136,7 +196,7 @@ export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<
     void recordDecision(cacheKey, {
       content: result.content,
       usage: result.usage,
-      modelChain: cappedChain,
+      modelChain,
     });
   }
   return result;

@@ -11,6 +11,7 @@ import { buildShutdownCommand } from "./ShutdownCommand.ts";
 import { buildDeleteCommand } from "./DeleteCommand.ts";
 import { buildStatsCommand } from "./StatsCommand.ts";
 import { buildMcpCommand } from "./McpCommand.ts";
+import { buildTinkerCommand } from "./TinkerCommand.ts";
 import { error } from "./output.ts";
 
 const VERSION = "0.0.0";
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
   program.addCommand(buildDeleteCommand());
   program.addCommand(buildStatsCommand());
   program.addCommand(buildMcpCommand());
+  program.addCommand(buildTinkerCommand());
   await program.parseAsync(process.argv);
 }
 

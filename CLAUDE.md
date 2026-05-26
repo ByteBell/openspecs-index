@@ -9,9 +9,9 @@
 It ships two binaries from a single workspace:
 
 - **`bytebell-server`** — a single Express daemon hosting ingestion routes (`/api/v1/...`), the MCP transport (`/mcp`, HTTP + SSE), and BullMQ workers in-process.
-- **`bytebell`** — an Ink/React TUI driven by commander subcommands (`boot`, `index`, `ingest`, `ls`, `delete`, `set`, `server`, `shutdown`, `stats`). Interactive only — no `-p` / headless mode.
+- **`bytebell`** — an Ink/React TUI driven by commander subcommands (`boot`, `index`, `ingest`, `ls`, `delete`, `set`, `server`, `shutdown`, `stats`, `tinker`). Interactive only — no `-p` / headless mode.
 
-The system is **BYO-infra** (the user runs Mongo, Neo4j, Redis). Everything is single-tenant with a hardcoded `orgId="local"`. There is no auth, no users, no orgs, and the local server makes no outbound calls except to OpenRouter for LLM completions.
+The system is **BYO-infra** (the user runs Mongo, Neo4j, Redis). Everything is single-tenant with a hardcoded `orgId="local"`. There is no auth, no users, no orgs, and the local server makes no outbound calls except to the configured LLM provider (OpenRouter or local Ollama) for completions.
 
 The repository is licensed under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) at the repo root. Commercial use requires a separate license; there is no in-process license-gating.
 
@@ -43,7 +43,7 @@ TUI / HTTP client → Express (bytebell-server) → BullMQ (in-process) → Inge
 - **Queue**: BullMQ (Redis-backed, in-process workers)
 - **Cache + State**: Redis (BYO)
 - **Local persistence**: `~/.bytebell/` (config, logs)
-- **LLM Provider**: **OpenRouter only**
+- **LLM Provider**: **OpenRouter** (cloud) or **Ollama** (local) — configurable via `llm_provider`
 - **Logging**: Winston (file + stdout)
 - **Secret storage**: plaintext in `~/.bytebell/config.json` (mode `0600`). OS-keychain integration is not implemented.
 - **Package manager**: Bun (workspaces)
@@ -154,7 +154,8 @@ The `~/.bytebell/` directory is the **single source of truth** for runtime confi
 ```
 ~/.bytebell/
   config.json           server_port, mongo_uri, neo4j_uri/user/password,
-                        redis_url, openrouter_api_key, openrouter_model,
+                        redis_url, llm_provider, openrouter_api_key, openrouter_model,
+                        ollama_base_url, ollama_model,
                         concurrency.github, log_level, log_retention_days
                         (mode 0600; openrouter_api_key stored in plaintext)
   install_id            UUID generated on first run (local-only, never transmitted)
@@ -165,7 +166,7 @@ The `~/.bytebell/` directory is the **single source of truth** for runtime confi
   pid                   running server PID
 ```
 
-There is no OS-keychain integration; `openrouter_api_key` lives in plaintext in `config.json` (mode `0600`).
+There is no OS-keychain integration; `openrouter_api_key` lives in plaintext in `config.json` (mode `0600`). When `llm_provider` is set to `"ollama"`, no API key is required and LLM calls go to the local Ollama instance at the configured `ollama_base_url` (default `http://localhost:11434/v1`).
 
 - `bytebell set <key> <value>` is the only sanctioned write path to `config.json`. Manual edits work but are not advertised.
 
@@ -273,10 +274,12 @@ If a piece of infra is missing from `config.json`, the server prints the exact `
 
 ## Rule of LLM Provider
 
-**OpenRouter only.** No direct Anthropic / OpenAI / Gemini / Bedrock keys. All LLM calls flow through `@bb/llm`, which:
+**OpenRouter or Ollama.** All LLM calls flow through `@bb/llm`, which dispatches based on `Config.LlmProvider`:
 
-- Wraps every OpenRouter call
-- Computes per-call cost via `estimateCostUsd()` against live OpenRouter pricing for the `bytebell stats` view
+- **`openrouter`** (default): POSTs to `https://openrouter.ai/api/v1/chat/completions` with the user's API key and model chain. Computes per-call cost via `estimateCostUsd()` against live OpenRouter pricing for the `bytebell stats` view. Requires `openrouter_api_key` and `openrouter_model`.
+- **`ollama`**: POSTs to the OpenAI-compatible `/chat/completions` endpoint on the local Ollama server (default `http://localhost:11434/v1`). No auth header. No fallback chain. Uses `ollama_model` (default `llama3.1`). Cost estimation is not available for Ollama.
+
+No direct Anthropic / OpenAI / Gemini / Bedrock keys — use OpenRouter as the cloud gateway or Ollama for fully local operation.
 
 LLM outputs are probabilistic. They must be:
 
@@ -284,7 +287,7 @@ LLM outputs are probabilistic. They must be:
 - Normalized before persistence
 - Never written directly to a domain store
 
-The user-facing model list is curated (5–10 top models). `bytebell models set` validates against OpenRouter on the fly.
+The user-facing model list is curated (5–10 top models). `bytebell models set` validates against OpenRouter on the fly. `bytebell tinker` provides an interactive UI to switch providers and configure keys/URLs.
 
 ---
 
@@ -301,7 +304,7 @@ The repository is licensed under **AGPL-3.0 with an additional non-commercial us
 
 ## Rule of No Outbound Calls
 
-The local server makes no outbound network calls except to OpenRouter for LLM completions. There is no telemetry, no analytics, no license-issuance call, no auto-update probe.
+The local server makes no outbound network calls except to the configured LLM provider (OpenRouter or Ollama) for completions. There is no telemetry, no analytics, no license-issuance call, no auto-update probe.
 
 - Do not add a `@bb/telemetry` package, a `telemetry-buffer.ndjson`, a `https://*.bytebell.ai` endpoint call, or any background HTTP shipper.
 - If observability requirements change in the future, raise the proposal explicitly — do not add a phone-home flow as a side effect of another feature.
@@ -415,7 +418,7 @@ Design for:
 
 - **Clarity over cleverness**
 - **Explicit ownership** — every behavior has exactly one home package
-- **Local-first** — no hidden cloud dependencies; OpenRouter is the only outbound call
+- **Local-first** — no hidden cloud dependencies; LLM calls go to OpenRouter or a local Ollama instance
 - **Deterministic pipelines** over heuristics
 - **Recoverability** over performance shortcuts
 - **Auditability** — every LLM-derived fact is traceable to its source via structured logs and token-usage records in Mongo

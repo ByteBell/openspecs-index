@@ -21,8 +21,27 @@ export async function gitClone(opts: CloneOptions): Promise<void> {
   }
   try {
     await exec("git", ["clone", "--depth=1", "--single-branch", "--branch", opts.branch, authedUrl, opts.destDir]);
-  } catch (cause: unknown) {
-    throw new GitCloneError(opts.repoUrl, cause);
+  } catch (firstCause: unknown) {
+    const detected = await resolveDefaultBranch(authedUrl);
+    if (detected !== null && detected !== opts.branch) {
+      try {
+        await exec("git", ["clone", "--depth=1", "--single-branch", "--branch", detected, authedUrl, opts.destDir]);
+        return;
+      } catch {
+        throw new GitCloneError(opts.repoUrl, firstCause);
+      }
+    }
+    throw new GitCloneError(opts.repoUrl, firstCause);
+  }
+}
+
+export async function resolveDefaultBranch(authedUrl: string): Promise<string | null> {
+  try {
+    const { stdout } = await exec("git", ["ls-remote", "--symref", authedUrl, "HEAD"]);
+    const match = stdout.match(/ref:\s+refs\/heads\/(\S+)/u);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
   }
 }
 

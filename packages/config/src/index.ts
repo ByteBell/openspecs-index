@@ -1,5 +1,5 @@
-export { LOG_LEVELS, HINTS } from "./schema.ts";
-export type { BytebellConfig, ConfigValue, ConfigValueMap, LogLevel } from "./schema.ts";
+export { LOG_LEVELS, LLM_PROVIDERS, HINTS } from "./schema.ts";
+export type { BytebellConfig, ConfigValue, ConfigValueMap, LogLevel, LlmProvider } from "./schema.ts";
 
 export { loadConfig, getConfigValue, isConfigComplete } from "./loader.ts";
 export type { ConfigCompletenessResult } from "./loader.ts";

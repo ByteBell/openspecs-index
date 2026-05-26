@@ -43,6 +43,23 @@ export function isConfigComplete(): ConfigCompletenessResult {
       missing.push(key);
     }
   }
+  const llmProvider = readField(cfg, Config.LlmProvider) as string;
+  if (llmProvider === "openrouter" || llmProvider.length === 0) {
+    const apiKey = readField(cfg, Config.OpenrouterApiKey) as string;
+    if (apiKey.length === 0) {
+      missing.push(Config.OpenrouterApiKey);
+    }
+    const model = readField(cfg, Config.OpenrouterModel) as string;
+    if (model.length === 0) {
+      missing.push(Config.OpenrouterModel);
+    }
+  }
+  if (llmProvider === "ollama") {
+    const ollamaModel = readField(cfg, Config.OllamaModel) as string;
+    if (ollamaModel.length === 0) {
+      missing.push(Config.OllamaModel);
+    }
+  }
   if (missing.length === 0) {
     return { ok: true };
   }
