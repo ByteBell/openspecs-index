@@ -60,6 +60,19 @@ services:
       retries: 12
       start_period: 5s
 
+  ladybug-explorer:
+    image: ghcr.io/ladybugdb/explorer:latest
+    container_name: bytebell-ladybug-explorer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /Users/zeta/.bytebell:/database
+    environment:
+      - LBUG_FILE=ladybug.lbug
+    networks:
+      - bytebell
+
 networks:
   bytebell:
     name: bytebell

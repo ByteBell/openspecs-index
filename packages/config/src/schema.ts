@@ -66,6 +66,7 @@ export const configSchema = z
     "enrichment.wall.time.ms.per.file": z.number().int().positive().default(400000),
     "enrichment.concurrency": z.number().int().positive().default(16),
     "enrichment.max.tool.result.chars": z.number().int().positive().default(20000),
+    ladybug_path: z.string().default(""),
   })
   .strict();
 
@@ -120,6 +121,7 @@ export type ConfigValueMap = {
   [Config.EnrichmentWallTimeMsPerFile]: number;
   [Config.EnrichmentConcurrency]: number;
   [Config.EnrichmentMaxToolResultChars]: number;
+  [Config.LadybugPath]: string;
 };
 
 export type ConfigValue<K extends Config> = ConfigValueMap[K];
@@ -188,6 +190,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.EnrichmentWallTimeMsPerFile]: "bytebell set enrichment.wall.time.ms.per.file <ms>",
   [Config.EnrichmentConcurrency]: "bytebell set enrichment.concurrency <n>",
   [Config.EnrichmentMaxToolResultChars]: "bytebell set enrichment.max.tool.result.chars <n>",
+  [Config.LadybugPath]: "bytebell set ladybug-path <path>",
 };
 
 export { readField, writeField } from "./schema-fields.ts";

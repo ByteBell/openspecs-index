@@ -6,6 +6,7 @@ import { connectGraph, indexesGraph } from "@bb/graph-db";
 import "@bb/mongo";
 import "@bb/sqlite";
 import "@bb/neo4j";
+import "@bb/ladybug";
 
 export interface BootstrapRuntimeOptions {
   config: unknown;

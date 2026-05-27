@@ -45,6 +45,7 @@ export enum Config {
   EnrichmentWallTimeMsPerFile = "enrichment.wall.time.ms.per.file",
   EnrichmentConcurrency = "enrichment.concurrency",
   EnrichmentMaxToolResultChars = "enrichment.max.tool.result.chars",
+  LadybugPath = "ladybug_path",
 }
 
 export enum DbProviderType {

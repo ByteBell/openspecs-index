@@ -3,9 +3,8 @@ import { logger } from "@bb/logger";
 import { filesGraph, foldersGraph, repoGraph, indexesGraph } from "@bb/graph-db";
 import { rawDb } from "@bb/db";
 import type { GithubIndexPayload } from "@bb/types";
-import type { NodeScope } from "@bb/graph-core";
+import type { NodeScope, UpsertFileNodeInput } from "@bb/graph-core";
 import type { MetaPaths } from "#src/types/meta-paths.ts";
-import type { CondensedFileAnalysis } from "#src/types/condensed-file-analysis.ts";
 import { throwIfCancelled } from "#src/pipeline/cancellation.ts";
 import type { DiffResult } from "#src/pipeline/git-diff.ts";
 import { readCondensed } from "#src/strategies/flat-folder/big-file/storage.ts";
@@ -99,60 +98,63 @@ export async function storePullAnalysis(input: StorePullInput): Promise<StorePul
     ...input.diff.modified,
     ...input.diff.renamed.map((r) => r.newPath),
   ];
-  const seen = new Set<string>();
-  for (const relativePath of upsertPaths) {
-    if (seen.has(relativePath)) {
-      continue;
-    }
-    seen.add(relativePath);
-    throwIfCancelled(input.scope.knowledgeId);
+  async function* yieldFiles() {
+    const seen = new Set<string>();
+    for (const relativePath of upsertPaths) {
+      if (seen.has(relativePath)) {
+        continue;
+      }
+      seen.add(relativePath);
+      throwIfCancelled(input.scope.knowledgeId);
 
-    const condensed = await readCondensed(input.metaPaths, relativePath);
-    if (condensed === null) {
-      logger.warn(`pull-store: condensed analysis missing for ${relativePath}; skipping file upsert`);
-      continue;
-    }
+      const condensed = await readCondensed(input.metaPaths, relativePath);
+      if (condensed === null) {
+        logger.warn(`pull-store: condensed analysis missing for ${relativePath}; skipping file upsert`);
+        continue;
+      }
 
-    const folderPath = directFolderOf(relativePath);
-    if (!folderPaths.has(folderPath)) {
-      await foldersGraph.upsertFolderNode({
-        scope: input.scope,
+      const folderPath = directFolderOf(relativePath);
+      if (!folderPaths.has(folderPath)) {
+        await foldersGraph.upsertFolderNode({
+          scope: input.scope,
+          folderPath,
+          summary: emptyFolderPayload(),
+        });
+        folderPaths.add(folderPath);
+        foldersUpserted += 1;
+      }
+
+      const upsertInput: UpsertFileNodeInput = {
+        orgId: input.scope.orgId,
+        knowledgeId: input.scope.knowledgeId,
+        repoId: input.scope.repoId,
+        relativePath: condensed.relativePath,
         folderPath,
-        summary: emptyFolderPayload(),
-      });
-      folderPaths.add(folderPath);
-      foldersUpserted += 1;
+        language: condensed.language.length > 0 ? condensed.language : languageFromPath(condensed.relativePath),
+        sha: condensed.sha256,
+        sizeBytes: condensed.sizeBytes,
+        analysis: condensed.analysis,
+        isBigFile: condensed.isBigFile,
+        totalChunks: condensed.totalChunks,
+        totalTokenCount: condensed.totalTokenCount,
+      };
+      filesUpserted += 1;
+      yield upsertInput;
     }
+  }
 
-    await upsertFileNodeFromCondensed(input.scope, folderPath, condensed);
-    filesUpserted += 1;
+  if (typeof filesGraph.bulkUpsertFiles === "function") {
+    await filesGraph.bulkUpsertFiles(input.scope.knowledgeId, yieldFiles());
+  } else {
+    for await (const f of yieldFiles()) {
+      await filesGraph.upsertFileNode(f);
+    }
   }
 
   logger.info(
     `pull-store done: filesUpserted=${filesUpserted} filesDeleted=${filesDeleted} foldersUpserted=${foldersUpserted} repoUpserted=${repoUpserted}`,
   );
   return { filesUpserted, filesDeleted, foldersUpserted, repoUpserted };
-}
-
-async function upsertFileNodeFromCondensed(
-  scope: NodeScope,
-  folderPath: string,
-  file: CondensedFileAnalysis,
-): Promise<void> {
-  await filesGraph.upsertFileNode({
-    orgId: scope.orgId,
-    knowledgeId: scope.knowledgeId,
-    repoId: scope.repoId,
-    relativePath: file.relativePath,
-    folderPath,
-    language: file.language.length > 0 ? file.language : languageFromPath(file.relativePath),
-    sha: file.sha256,
-    sizeBytes: file.sizeBytes,
-    analysis: file.analysis,
-    isBigFile: file.isBigFile,
-    totalChunks: file.totalChunks,
-    totalTokenCount: file.totalTokenCount,
-  });
 }
 
 function shapeFolderPayload(folder: FolderSummary): {

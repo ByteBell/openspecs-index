@@ -52,12 +52,39 @@ export const filesGraph: IGraphFileRepository = {
   upsertFileNode: (...args) => getGraph().files.upsertFileNode(...args),
   deleteFileNodes: (...args) => getGraph().files.deleteFileNodes(...args),
   snapshotFilesToVersion: (...args) => getGraph().files.snapshotFilesToVersion(...args),
-  upsertFileNodesBatch: (...args) => getGraph().files.upsertFileNodesBatch(...args),
+  upsertFileNodesBatch: async (inputs) => {
+    const f = getGraph().files;
+    if (f.upsertFileNodesBatch) {
+      await f.upsertFileNodesBatch(inputs);
+    } else {
+      for (const input of inputs) {
+        await f.upsertFileNode(input);
+      }
+    }
+  },
+  bulkUpsertFiles: async (knowledgeId, fileStream) => {
+    const f = getGraph().files;
+    if (f.bulkUpsertFiles) {
+      return f.bulkUpsertFiles(knowledgeId, fileStream);
+    }
+    for await (const input of fileStream) {
+      await f.upsertFileNode(input);
+    }
+  },
 };
 
 export const foldersGraph: IGraphFolderRepository = {
   upsertFolderNode: (...args) => getGraph().folders.upsertFolderNode(...args),
-  upsertFolderNodesBatch: (...args) => getGraph().folders.upsertFolderNodesBatch(...args),
+  upsertFolderNodesBatch: async (inputs) => {
+    const f = getGraph().folders;
+    if (f.upsertFolderNodesBatch) {
+      await f.upsertFolderNodesBatch(inputs);
+    } else {
+      for (const input of inputs) {
+        await f.upsertFolderNode(input);
+      }
+    }
+  },
 };
 
 export const repoGraph: IGraphRepoRepository = {

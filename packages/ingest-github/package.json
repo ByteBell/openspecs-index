@@ -25,6 +25,7 @@
     "@bb/mongo": "workspace:*",
     "@bb/sqlite": "workspace:*",
     "@bb/neo4j": "workspace:*",
+    "@bb/ladybug": "workspace:*",
     "@bb/queue": "workspace:*",
     "@bb/db-core": "workspace:*",
     "@bb/graph-core": "workspace:*",
