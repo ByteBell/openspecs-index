@@ -101,6 +101,12 @@ async function runGithub(
         repo: parsed.repo,
         commitHash,
       };
+      // The strategy phases write into the commit-scoped meta tree
+      // (`meta-output/scan-manifest.json`, file/folder analysis dirs, etc.).
+      // The default-clone branch below ensures this tree via
+      // `ensureCommitDirs`; the source-factory branch must do the same or the
+      // first `writeFile` blows up with ENOENT.
+      await ensureCommitDirs(location);
       logger.info(`pipeline/run: source factory wired (knowledgeId=${knowledgeId}, commit=${commitHash.slice(0, 12)})`);
     } else {
       // Resolve the HEAD commit SHA before cloning so we can clone *directly*

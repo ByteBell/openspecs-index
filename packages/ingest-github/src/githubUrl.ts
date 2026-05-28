@@ -18,7 +18,15 @@ export interface ParsedRepo {
 }
 
 /**
- * Parses `https://github.com/{owner}/{repo}(/tree/{branch})?` → `{owner, repo, branch?}`.
+ * Parses `https://<host>/{owner}/{repo}(/tree/{branch})?` → `{owner, repo, branch?}`.
+ *
+ * Host-agnostic: the path-segment logic works the same for github.com,
+ * gitlab.com, bitbucket.org, and self-hosted forges. Enterprise wrappers
+ * reuse this pipeline for non-GitHub providers via an injected SourceFactory;
+ * gating on hostname would force every wrapper to invent a URL-substitution
+ * dance just to satisfy the parser. The `/tree/{branch}` suffix is
+ * GitHub-specific syntax — it remains opt-in (matches when present, ignored
+ * when absent). GitLab/Bitbucket payloads carry `branch` as a separate field.
  */
 export function parseGithubRepo(repoUrl: string): ParsedRepo | null {
   if (!repoUrl) {
@@ -26,9 +34,6 @@ export function parseGithubRepo(repoUrl: string): ParsedRepo | null {
   }
   try {
     const url = new URL(repoUrl);
-    if (!url.hostname.endsWith("github.com")) {
-      return null;
-    }
     const segments = url.pathname.split("/").filter((s) => s.length > 0);
     if (segments.length < 2) {
       return null;
