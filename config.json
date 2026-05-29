@@ -1,0 +1,22 @@
+{
+  "server_port": 8080,
+  "mongo_uri": "mongodb://127.0.0.1:27017/bytebell",
+  "neo4j_uri": "bolt://127.0.0.1:7687",
+  "neo4j_user": "neo4j",
+  "neo4j_password": "wHApYmktGiIDv9XUkxEajJ-5FctInu_N",
+  "redis_url": "redis://127.0.0.1:6379",
+  "openrouter_api_key": "$(cat openrouter.pem)",
+  "openrouter_model": "deepseek/deepseek-v4-flash",
+  "openrouter_fallback_model_1": "qwen/qwen3.5-flash-02-23",
+  "openrouter_fallback_model_2": "minimax/minimax-m2.7",
+  "openrouter_fallback_model_3": "moonshotai/kimi-k2.5",
+  "openrouter_fallback_model_4": "x-ai/grok-4.3",
+  "llm_provider": "openrouter",
+  "ollama_model": "llama3.1:8b",
+  "concurrency": {
+    "github": 2
+  },
+  "log_level": "info",
+  "log_retention_days": 14,
+  "llm_cache_enabled": true
+}

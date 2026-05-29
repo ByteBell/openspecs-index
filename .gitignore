@@ -7,7 +7,7 @@ node_modules/
 # Bun
 bun.lockb
 .bun/
-config.json
+*.pem
 
 # Build artifacts
 dist/
