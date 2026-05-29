@@ -3,9 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "bin": {
-    "bytebell": "./packages/cli/src/index.ts"
-  },
   "workspaces": [
     "packages/*"
   ],

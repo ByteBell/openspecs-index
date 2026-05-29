@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only WITH non-commercial-clause
+
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -38,8 +40,16 @@ function isAlreadyLinked(): boolean {
     const stat = fs.lstatSync(existing);
     if (stat.isSymbolicLink()) {
       const linkTarget = fs.realpathSync(existing);
+
+      // Get the path to the CLI entry to derive the wrapper path
       const cliEntry = resolveCliEntry();
-      return linkTarget === cliEntry;
+
+      // Calculate the wrapper path exactly as it is done in ensureGlobalLink
+      const wrapperDir = path.resolve(path.dirname(cliEntry), "..", "bin");
+      const wrapperPath = path.join(wrapperDir, "bytebell");
+
+      // Check if the symlink points to the wrapper script
+      return linkTarget === wrapperPath;
     }
     return false;
   } catch {

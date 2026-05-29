@@ -7,6 +7,7 @@ node_modules/
 # Bun
 bun.lockb
 .bun/
+config.json
 
 # Build artifacts
 dist/
@@ -25,7 +26,6 @@ __tests__
 .env.*.local
 *.pem
 *.key
-config.json
 
 # Logs
 logs/

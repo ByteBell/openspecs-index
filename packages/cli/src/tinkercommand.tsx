@@ -3,26 +3,20 @@ import { useState } from "react";
 import { Command } from "commander";
 import { render, Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
-import { execSync, spawnSync } from "child_process";
+import { execFileSync, spawnSync } from "child_process";
 import { COMMANDS_LIST, TinkerParamScreen } from "./TinkerParamScreen.tsx";
-
 type Screen = "menu" | "paramInput";
-
 const TinkerUI = () => {
   const [screen, setScreen] = useState<Screen>("menu");
   const [activePanel, setActivePanel] = useState<"commands" | "config" | "actions">("commands");
   const [lastTopPanel, setLastTopPanel] = useState<"commands" | "config">("commands");
-
   const [cmdIndex, setCmdIndex] = useState(0);
-
   const [configFocus, setConfigFocus] = useState<"provider" | "input">("provider");
   const [apiMode, setApiMode] = useState<"openrouter" | "local">("openrouter");
   const [apiKey, setApiKey] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
   const [saveMessage, setSaveMessage] = useState("");
-
   const [actionFocus, setActionFocus] = useState<"leave" | "save">("save");
-
   const selectedCmd = COMMANDS_LIST[cmdIndex] as (typeof COMMANDS_LIST)[number];
 
   useInput((input, key) => {
@@ -109,12 +103,13 @@ const TinkerUI = () => {
 
   const saveConfigState = () => {
     try {
-      execSync(`bytebell set llm-provider "${apiMode === "local" ? "ollama" : "openrouter"}"`);
+      // Pass arguments as a distinct array instead of a single parsed string
+      execFileSync("bytebell", ["set", "llm-provider", apiMode === "local" ? "ollama" : "openrouter"]);
 
       if (apiMode === "openrouter" && apiKey.length > 0) {
-        execSync(`bytebell set openrouter-api-key "${apiKey}"`);
+        execFileSync("bytebell", ["set", "openrouter-api-key", apiKey]);
       } else if (apiMode === "local" && ollamaUrl.length > 0) {
-        execSync(`bytebell set ollama-url "${ollamaUrl}"`);
+        execFileSync("bytebell", ["set", "ollama-url", ollamaUrl]);
       }
 
       setSaveMessage("✓ Settings saved!");
