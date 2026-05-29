@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getJson } from "./httpClient.ts";
 import { info, table, error } from "./output.ts";
+import { runMcpInstall } from "./mcpInstall.ts";
 
 interface McpStats {
   global: {
@@ -22,6 +23,13 @@ interface McpStats {
 
 export function buildMcpCommand(): Command {
   const mcp = new Command("mcp").description("Manage and view MCP usage");
+
+  mcp
+    .command("install")
+    .description("Detect installed coding tools and register the bytebell MCP endpoint in their config.")
+    .action(async () => {
+      await runMcpInstall();
+    });
 
   mcp
     .command("stats")
