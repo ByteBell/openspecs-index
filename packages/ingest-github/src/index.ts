@@ -136,7 +136,14 @@ export { runPull } from "./pipeline/pull.ts";
 // builder; the knowledgeId-keyed helpers (`metaRootFor`, `businessContextDir`,
 // `orgRegistryDir`) are async — they look up `KnowledgeDoc` from Mongo to
 // derive the `RepoLocation` before resolving the path.
-export { pathsFor, orgsRoot, metaRootFor, businessContextDir, orgRegistryDir } from "./pipeline/paths.ts";
+export {
+  pathsFor,
+  orgsRoot,
+  ensureCommitDirs,
+  metaRootFor,
+  businessContextDir,
+  orgRegistryDir,
+} from "./pipeline/paths.ts";
 export type { RepoLocation } from "./pipeline/paths.ts";
 export type { IngestRunnerDeps, IngestRunnerInput } from "./types/ingest-runner.ts";
 export type { IngestStrategy, StrategyInput, StrategyResult, StrategyContext } from "./types/strategy.ts";

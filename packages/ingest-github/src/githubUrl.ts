@@ -19,6 +19,15 @@ export interface ParsedRepo {
 
 /**
  * Parses `https://github.com/{owner}/{repo}(/tree/{branch})?` → `{owner, repo, branch?}`.
+ *
+ * Also accepts `gitlab.com` URLs of the form
+ * `https://gitlab.com/{owner}/{repo}` so the runner can build a kube-v2
+ * `RepoLocation` for GitLab knowledges that route through this pipeline via
+ * an injected `SourceFactory`. The kernel `RepoLocation` only has a `github`
+ * provider variant today, so GitLab projects share the github path segment.
+ * Subgroup gitlab URLs (`group/sub/project`) collapse to `{ owner: group,
+ * repo: sub }` here — downstream consumers that need the full namespace
+ * should derive it themselves; the GitLab source-factory does this.
  */
 export function parseGithubRepo(repoUrl: string): ParsedRepo | null {
   if (!repoUrl) {
@@ -26,7 +35,7 @@ export function parseGithubRepo(repoUrl: string): ParsedRepo | null {
   }
   try {
     const url = new URL(repoUrl);
-    if (!url.hostname.endsWith("github.com")) {
+    if (!url.hostname.endsWith("github.com") && !url.hostname.endsWith("gitlab.com")) {
       return null;
     }
     const segments = url.pathname.split("/").filter((s) => s.length > 0);

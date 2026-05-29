@@ -18,7 +18,12 @@ Domain.
   `llmCallContext` to `askJsonLLM` so per-job LLM credential overrides
   reach OpenRouter. Also exports `shapeAnalysis` (raw JSON →
   `FileAnalysis`, tolerates missing keys) and `languageFromPath`
-  (extension-based fallback when the LLM omits `language`).
+  (extension-based fallback when the LLM omits `language`). `shapeAnalysis`
+  delegates section extraction to `pickSections`, which now also pulls
+  `start_line` / `end_line` (also tolerates camelCase `startLine` /
+  `endLine`) when the LLM provides them — both are optional integers that
+  fail closed (`undefined`) if missing, non-integer, or non-positive so an
+  older model that omits them still yields a valid `FileAnalysisSection`.
 - `index.ts` — barrel.
 
 ## Invariants

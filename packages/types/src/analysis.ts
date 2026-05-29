@@ -1,6 +1,10 @@
 export interface FileAnalysisSection {
   name: string;
   description: string;
+  /** 1-indexed inclusive start line, when the LLM has provided it. */
+  start_line?: number;
+  /** 1-indexed inclusive end line, when the LLM has provided it. */
+  end_line?: number;
 }
 
 export interface FileAnalysis {

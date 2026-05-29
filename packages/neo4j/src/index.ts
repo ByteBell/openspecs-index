@@ -30,3 +30,13 @@ export type { SnapshotFilesInput } from "./fileVersions.ts";
 export { upsertConcept, attachFileToConcept, upsertTestsEdge } from "./concepts.ts";
 export { upsertContract, attachFileToContract } from "./contracts.ts";
 export { upsertGuidepost, attachGuidepost } from "./guideposts.ts";
+
+// Legacy snake_case mirror — feeds the chat-mcp reader. The primary :Repo /
+// :Folder / :File / :FileVersion writers also write :RepoSummary /
+// :FolderNode / :FileNode / (FileVersion snake props) and the OrgKeyword
+// search graph atomically per upsert; the helpers below are for one-off
+// recounts at the end of an ingestion run.
+export {
+  recomputeOrgKeywordCountersForKnowledge,
+  recomputeOrgKeywordCountersForOrg,
+} from "./legacyOrgKeywordMirror.ts";

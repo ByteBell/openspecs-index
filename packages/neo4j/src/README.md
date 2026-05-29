@@ -32,6 +32,18 @@ package-level contract; this file documents how the source tree is split.
   label+property), logs the skip to stderr, and continues with the
   remaining statements. Operators must drop conflicting plain indexes
   manually if uniqueness guarantees matter.
+- **[flatFolderIndexes.ts](flatFolderIndexes.ts)** —
+  `ensureFlatFolderIndexes()` covers both the new-schema
+  (`:Repo / :Folder`) constraints and the legacy snake_case mirror
+  constraints (`:FileNode(knowledge_id, relative_path)`,
+  `:FolderNode(knowledge_id, relative_path)`,
+  `:RepoSummary(knowledge_id, org_id, branch_name)`,
+  `:OrgKeyword(keyword, type, org_id)`). Fulltext indexes follow the
+  same pattern: new-schema (`idx_repo_purpose_summary_ft`,
+  `idx_folder_purpose_summary_ft`) **plus** the three legacy fulltext
+  indexes the chat-mcp reader queries (`idx_filenode_ft`,
+  `idx_fileversion_ft`, `idx_orgkeyword_ft`). Same `IF NOT EXISTS` +
+  "already exists" tolerance as `ensureKnowledgeIndexes`.
 - **[knowledge.ts](knowledge.ts)** — `upsertKnowledgeNode(doc)` MERGEs
   a `:Knowledge` node by `knowledgeId`, setting `sourceKind / sourceUrl /
 branch / repoName / state / createdAt / updatedAt` (createdAt only on
@@ -41,7 +53,8 @@ branch / repoName / state / createdAt / updatedAt` (createdAt only on
   yields too few segments. `setKnowledgeStateInGraph(knowledgeId, state)`
   is a state-only update used by the worker on each transition.
 - **[files.ts](files.ts)** — `upsertFileNode(input)` is the per-file
-  write. Performs five sequential operations:
+  write. Performs these sequential operations in one atomic Cypher
+  statement (single-shot) or one transaction (batched):
   1. MERGE `:File {knowledgeId, relativePath}`, SET its scalar +
      list props, MERGE the `:HAS_FILE` rel from the parent
      `:Knowledge`. The list props persist the extended `FileAnalysis`
@@ -50,19 +63,30 @@ branch / repoName / state / createdAt / updatedAt` (createdAt only on
      `sideEffects`, `configDependencies`, `integrationSurface`,
      `contractsProvided`, `contractsConsumed`, plus the two
      position-aligned arrays `sectionNames` / `sectionDescriptions`
-     (the flat representation of `FileAnalysis.sectionMap`, since
-     Neo4j list properties can't hold objects). Empty arrays are
-     written when the analysis omits a field — the property is always
-     present so Cypher queries needn't branch on existence.
-  2. DELETE all existing `:HAS_KEYWORD / :HAS_CLASS / :HAS_FUNCTION /
+     and the JSON-stringified `sectionsJson` (carries the full
+     `{name, description, start_line?, end_line?}` shape).
+  2. Legacy mirror — same statement also MERGEs
+     `:FileNode {knowledge_id, relative_path}` with snake_case props
+     (full descriptive set + `section_map` = `sectionsJson`,
+     `node_id = knowledgeId::relativePath`, `name = basename(path)`,
+     `org_id` carried through) and the `:Knowledge -[:HAS_FILE]->
+:FileNode` rel.
+  3. If `parentFolderPath(relativePath)` is non-null, MERGE
+     `:FolderNode -[:CONTAINS_FILE]-> :FileNode` (separate Cypher step
+     so the parent's existence doesn't gate the file write).
+  4. DELETE all existing `:HAS_KEYWORD / :HAS_CLASS / :HAS_FUNCTION /
 :HAS_IMPORT_INTERNAL / :HAS_IMPORT_EXTERNAL` rels so re-runs produce
      a clean entity attachment.
-  3. UNWIND keywords (lowercased) → MERGE `:Keyword` + MERGE
-     `:HAS_KEYWORD` rel.
-  4. UNWIND classes → MERGE `:Class {signature}` + rel.
-  5. Same for functions; imports split into two passes — `importsInternal`
-     attaches `:HAS_IMPORT_INTERNAL`, `importsExternal` attaches
-     `:HAS_IMPORT_EXTERNAL`. Both target the shared `:Module {name}` node.
+  5. UNWIND keywords (lowercased) → MERGE `:Keyword` + MERGE
+     `:HAS_KEYWORD` rel. Same for classes / functions / imports against
+     `:Class{signature}` / `:Function{signature}` /
+     `:Module{name}` global dedup nodes.
+  6. Call `mirrorFileOrgKeywords` /
+     `buildOrgKeywordMirrorSteps` from
+     [legacyOrgKeywordMirror.ts](legacyOrgKeywordMirror.ts) to clear +
+     remerge `:OrgKeyword -[:APPEARS_IN_FILE {frequency: 1}]->
+:FileNode` edges across all 14 channels exposed by
+     [legacyKeywordChannels.ts](legacyKeywordChannels.ts).
 
   Each entity attachment runs in its own session (one network round-trip
   per group). Skipped entirely if the corresponding analysis array is
@@ -74,6 +98,53 @@ branch / repoName / state / createdAt / updatedAt` (createdAt only on
     between commits; callers that need history must call
     `snapshotFilesToVersion` first (this only touches `:File`, never
     `:FileVersion`).
+
+- **[folder.ts](folder.ts)** — `upsertFolderNode(input)` /
+  `upsertFolderNodesBatch(inputs)` write `:Folder` (camelCase) **and** a
+  legacy `:FolderNode {knowledge_id, relative_path}` mirror in the same
+  transaction. `level` (depth-from-root, 0-based) and `parentPath` are
+  derived in JS by `folderLevel()` / `parentFolderPath()` from
+  [pathUtils.ts](pathUtils.ts). The `:CONTAINS_FOLDER` parent→child
+  edge is set in a separate step after the batched MERGEs so folders
+  can land in any order within a batch.
+
+- **[repo.ts](repo.ts)** — `upsertRepoNode(input)` writes `:Repo`
+  (camelCase summary payload) **and** in the same statement MERGEs
+  `:Knowledge {knowledge_id}` (snake mirror; also carries `knowledgeId`
+  camel so `upsertKnowledgeNode` MERGEs converge on the same node) and
+  `:RepoSummary {knowledge_id, org_id, branch_name}` (snake mirror
+  with `architecture`, `data_flow`, `key_patterns`,
+  `major_subsystems`, `purpose`, `summary`). Reuses
+  `repoNameFromGithubUrl` from [knowledge.ts](knowledge.ts) for
+  `repository_name` / `repo_name` / `display_name`.
+
+- **[pathUtils.ts](pathUtils.ts)** — pure helpers used by the legacy
+  mirror: `folderLevel(path)`, `parentFolderPath(path)`,
+  `basename(path)`. No I/O.
+
+- **[legacyKeywordChannels.ts](legacyKeywordChannels.ts)** — maps a
+  `FileAnalysis` payload into the 14 channels the legacy reader
+  expects materialized as `:OrgKeyword` nodes: `HAS_KEYWORD`,
+  `HAS_CLASS`, `HAS_FUNCTION`, `HAS_IMPORT_INTERNAL`,
+  `HAS_IMPORT_EXTERNAL`, `HAS_ONTOLOGY_CONCEPT`,
+  `HAS_BUSINESS_ENTITY`, `HAS_SYSTEM_CAPABILITY`, `HAS_SIDE_EFFECT`,
+  `HAS_CONFIG_DEPENDENCY`, `HAS_INTEGRATION_SURFACE`,
+  `PROVIDES_CONTRACT`, `CONSUMES_CONTRACT`,
+  `HAS_DATA_FLOW_DIRECTION`. `expandLegacyOrgKeywordEdges(inputs)`
+  flattens per-file inputs into one `:APPEARS_IN_FILE` edge per
+  (keyword, type) pair tagged with `frequency: 1`.
+
+- **[legacyOrgKeywordMirror.ts](legacyOrgKeywordMirror.ts)** — Cypher
+  helpers that consume the channel expansion above:
+  `mirrorFileOrgKeywords(input)` (single-shot: clears existing edges
+  then merges new ones), `buildOrgKeywordMirrorSteps(inputs,
+updatedAt)` (returns Cypher steps for the batched transaction),
+  `recomputeOrgKeywordCountersForKnowledge(orgId, knowledgeId)` and
+  `recomputeOrgKeywordCountersForOrg(orgId)` (recount
+  `total_frequency` + `file_count` aggregates; per-edge writes set
+  `frequency: 1` for the corresponding edge but the counters can drift
+  after a partial delete — call the recompute helper once at the end
+  of an ingestion run for stricter freshness).
 
 - **[concepts.ts](concepts.ts)** — ConceptGraphStrategy enrichment writes
   for the `:Concept` node and its file-attaching edges. `upsertConcept`
@@ -104,20 +175,43 @@ branch / repoName / state / createdAt / updatedAt` (createdAt only on
   the property list written by `upsertFileNode` (the scalar core
   fields plus all extended list properties — `ontologyConcepts`,
   `sideEffects`, `configDependencies`, …, `sectionNames`,
-  `sectionDescriptions`) so the version history is lossless. When
-  adding a new property to `:File`, also add it to the SET clause
-  here, or version snapshots will silently drop it.
+  `sectionDescriptions`, `sectionsJson`) so the version history is
+  lossless. When adding a new property to `:File`, also add it to the
+  SET clause here, or version snapshots will silently drop it.
+
+  The same Cypher additionally sets the legacy snake_case property
+  set on the same `:FileVersion` node (`knowledge_id`,
+  `relative_path`, `commit_hash`, `committed_at`, `change_type`,
+  `org_id`, `section_map`, `business_context`,
+  `data_flow_direction`, the 8 extended array props), MERGEs
+  `:FileNode -[:HAS_VERSION]-> :FileVersion` (snake source for the
+  reader's commit-pinned queries) in addition to the existing
+  `:File -[:HAS_VERSION]-> :FileVersion` (camel source), and copies
+  every `:OrgKeyword -[:APPEARS_IN_FILE]-> :FileNode` edge onto the
+  new `:FileVersion` with `commit_hash` stamped on the edge so
+  commit-pinned `keyword_lookup` queries find versioned hits.
 
 ## Module dependency graph
 
 ```
-client.ts     → neo4j-driver, @bb/config (getConfigValue), @bb/types (Config),
-                @bb/errors (Neo4j* error classes)
-indexes.ts    → client.ts (_runCypher)
-knowledge.ts  → client.ts (_runCypher), @bb/types (KnowledgeDoc, KnowledgeSource, KnowledgeState), node:path
-files.ts     → client.ts (_runCypher), @bb/mongo (FileAnalysis type)
-index.ts      → re-exports the public surface from client.ts + indexes.ts
-                + knowledge.ts + files.ts
+client.ts                  → neo4j-driver, @bb/config (getConfigValue), @bb/types (Config),
+                             @bb/errors (Neo4j* error classes)
+indexes.ts                 → client.ts (_runCypher)
+flatFolderIndexes.ts       → client.ts (_runCypher)
+pathUtils.ts               → (pure functions, no deps)
+knowledge.ts               → client.ts (_runCypher), @bb/types (KnowledgeDoc, KnowledgeSource, KnowledgeState), node:path
+repo.ts                    → client.ts, knowledge.ts (repoNameFromGithubUrl)
+folder.ts                  → client.ts, pathUtils.ts (folderLevel, parentFolderPath), repo.ts (NodeScope type)
+files.ts                   → client.ts, pathUtils.ts (basename, parentFolderPath),
+                             legacyOrgKeywordMirror.ts (mirrorFileOrgKeywords,
+                             buildOrgKeywordMirrorSteps), @bb/mongo (FileAnalysis type)
+fileVersions.ts            → client.ts
+legacyKeywordChannels.ts   → @bb/mongo (FileAnalysis type)
+legacyOrgKeywordMirror.ts  → client.ts, legacyKeywordChannels.ts, @bb/mongo (FileAnalysis type)
+index.ts                   → re-exports the public surface from client.ts + indexes.ts +
+                             flatFolderIndexes.ts + knowledge.ts + files.ts + repo.ts +
+                             folder.ts + fileVersions.ts + concepts.ts + contracts.ts +
+                             guideposts.ts + legacyOrgKeywordMirror.ts (counter helpers only)
 ```
 
 No cycles. `client.ts` is the single root all helpers compose against.

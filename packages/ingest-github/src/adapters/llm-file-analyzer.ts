@@ -140,11 +140,31 @@ function pickSections(value: unknown): FileAnalysisSection[] {
     const rec = item as Record<string, unknown>;
     const name = pickString(rec["name"], "");
     const description = pickString(rec["description"], "");
-    if (name.length > 0 || description.length > 0) {
-      out.push({ name, description });
+    if (name.length === 0 && description.length === 0) {
+      continue;
     }
+    const section: FileAnalysisSection = { name, description };
+    const startLine = pickPositiveInt(rec["start_line"] ?? rec["startLine"]);
+    if (startLine !== undefined) {
+      section.start_line = startLine;
+    }
+    const endLine = pickPositiveInt(rec["end_line"] ?? rec["endLine"]);
+    if (endLine !== undefined) {
+      section.end_line = endLine;
+    }
+    out.push(section);
   }
   return out;
+}
+
+function pickPositiveInt(value: unknown): number | undefined {
+  if (typeof value !== "number") {
+    return undefined;
+  }
+  if (!Number.isInteger(value) || value < 1) {
+    return undefined;
+  }
+  return value;
 }
 
 function attachOptional(analysis: FileAnalysis, key: keyof FileAnalysis, value: string[]): void {

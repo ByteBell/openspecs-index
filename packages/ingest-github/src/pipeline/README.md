@@ -28,7 +28,10 @@ paths` walks old data into the new tree. Also exports
 - `source.ts` — `syncRepository({ repoUrl, branch, destinationDir, gitToken? })`.
   Clone-or-fetch+reset against `origin/<branch>`, `--depth=1`. The pull plan
   may later relax depth; ingestion does not need full history. Wraps git
-  failures in `GitCloneError` (from `@bb/errors`).
+  failures in `GitCloneError` (from `@bb/errors`). Note this is the
+  GitHub-side primitive; GitLab knowledges use `@bytebell/ingest-gitlab`'s
+  `cloneGitlabRepo` (oauth2 URL form, raises `GitlabCloneError`) via its
+  `SourceFactory` and never enter this code path.
 - `filters.ts` — `SKIP_DIRS`, `SKIP_FILES`, `BINARY_EXTENSIONS`, `looksBinary`,
   `passesPathFilters`. Now sourced from `skip-decisions/seed.ts`
   (`SEED_DIRECTORIES`/`SEED_FILENAMES`/`SEED_EXTENSIONS`) plus a small
@@ -81,7 +84,17 @@ deps.skipDecider.decide(input)` per file. Same semantics as before this
   with `{ knowledgeId, payload, branch }` and uses the returned reader +
   commit hash; the local clone is skipped. The factory may also return an
   `archiveSink` which the strategy then threads through to its
-  analyse phase. State transitions (`CREATED → QUEUED → INGESTED → …`) are
+  analyse phase. **The runner calls `ensureCommitDirs(location)` in both
+  branches** (after the factory returns, and before the non-factory
+  `syncRepository`). This is idempotent — factories that pre-create the
+  layout themselves see no effect — but mandatory: without it,
+  `writeScanManifest` would ENOENT on its first write because the
+  `meta-output/` parent dir wouldn't exist. For GitLab knowledges (which
+  reach the runner via `@bytebell/ingest-gitlab`'s injected `SourceFactory`),
+  `parseGithubRepo` accepts gitlab.com URLs so the `location` built from
+  `parsed.owner` / `parsed.repo` resolves cleanly; subgroup gitlab URLs
+  collapse to two segments at this layer and the factory itself uses the
+  full namespace for the path it clones into. State transitions (`CREATED → QUEUED → INGESTED → …`) are
   persisted to Mongo + Neo4j via `transitionState`, and `CancellationError`
   is re-thrown without flipping to FAILED. The optional
   `progressContextFactory` is the runner's own `ProgressContext` source:

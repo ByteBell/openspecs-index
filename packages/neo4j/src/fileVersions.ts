@@ -38,8 +38,43 @@ SET fv.language = f.language,
     fv.contractsConsumed = f.contractsConsumed,
     fv.sectionNames = f.sectionNames,
     fv.sectionDescriptions = f.sectionDescriptions,
-    fv.snapshotAt = $snapshotAt
+    fv.sectionsJson = coalesce(f.sectionsJson, '[]'),
+    fv.snapshotAt = $snapshotAt,
+    // Legacy snake_case mirror props on the same :FileVersion node so the
+    // chat-mcp reader (which filters on snake props) sees the same versions.
+    fv.knowledge_id = $knowledgeId,
+    fv.relative_path = f.relativePath,
+    fv.commit_hash = $commitHash,
+    fv.committed_at = $snapshotAt,
+    fv.change_type = 'snapshot',
+    fv.org_id = f.orgId,
+    fv.section_map = coalesce(f.sectionsJson, '[]'),
+    fv.business_context = f.businessContext,
+    fv.data_flow_direction = f.dataFlowDirection,
+    fv.ontology_concepts = f.ontologyConcepts,
+    fv.business_entities = f.businessEntities,
+    fv.system_capabilities = f.systemCapabilities,
+    fv.side_effects = f.sideEffects,
+    fv.config_dependencies = f.configDependencies,
+    fv.integration_surface = f.integrationSurface,
+    fv.contracts_provided = f.contractsProvided,
+    fv.contracts_consumed = f.contractsConsumed
 MERGE (f)-[:HAS_VERSION]->(fv)
+WITH fv, f
+OPTIONAL MATCH (fn:FileNode {knowledge_id: f.knowledgeId, relative_path: f.relativePath})
+FOREACH (_ IN CASE WHEN fn IS NOT NULL THEN [1] ELSE [] END |
+  MERGE (fn)-[:HAS_VERSION]->(fv)
+)
+WITH fv, f, fn
+WHERE fn IS NOT NULL
+OPTIONAL MATCH (kw:OrgKeyword)-[oe:APPEARS_IN_FILE]->(fn)
+WITH fv, kw, oe
+WHERE kw IS NOT NULL
+MERGE (kw)-[ve:APPEARS_IN_FILE]->(fv)
+SET ve.frequency = coalesce(oe.frequency, 1),
+    ve.commit_hash = fv.commitHash,
+    ve.org_id = oe.org_id,
+    ve.updated_at = fv.snapshotAt
 `;
 
 export interface SnapshotFilesInput {

@@ -101,6 +101,11 @@ async function runGithub(
         repo: parsed.repo,
         commitHash,
       };
+      // The factory has already produced the source tree; meta-output dirs
+      // still need to exist before the strategy writes scan-manifest.json.
+      // Idempotent — factories that pre-create the layout themselves see no
+      // effect.
+      await ensureCommitDirs(location);
       logger.info(`pipeline/run: source factory wired (knowledgeId=${knowledgeId}, commit=${commitHash.slice(0, 12)})`);
     } else {
       // Resolve the HEAD commit SHA before cloning so we can clone *directly*

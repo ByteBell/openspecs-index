@@ -16,4 +16,4 @@ export const FILE_ANALYSIS_FIELDS_BLOCK = `- purpose             : string  — A
 - integrationSurface  : string[] — External systems this file touches (e.g. "OpenRouter API", "Neo4j", "Redis", "filesystem"). Names of systems, not function names.
 - contractsProvided   : string[] — Public exports / endpoints / interfaces this file exposes to other parts of the system (e.g. "registerGithubWorkers", "GET /api/v1/health"). Exact names.
 - contractsConsumed   : string[] — Public exports / endpoints / interfaces this file depends on from elsewhere (e.g. "@bb/llm.askLLM", "fs.opendir"). Exact names.
-- sectionMap          : Array<{name: string, description: string}> — Major sections of the file with one-line descriptions. Empty array for short files. Up to 8 entries.`;
+- sectionMap          : Array<{name: string, description: string, start_line: number, end_line: number}> — Major sections of the file with one-line descriptions and inclusive 1-indexed line ranges (start_line/end_line). Sections must cover non-overlapping line ranges and stay within the file's total line count. Empty array for short files. Up to 8 entries.`;

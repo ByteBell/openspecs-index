@@ -53,6 +53,67 @@ The package owns:
   single file used to cost.
 - Folder-node CRUD (`upsertFolderNode`, `upsertFolderNodesBatch`) —
   same shape as file CRUD; batched variant for bulk indexing.
+- Repo-node CRUD (`upsertRepoNode`) — writes a `:Repo` carrying the
+  per-repo summary payload (purpose, dataFlow, keyPatterns, etc.) and
+  in the same transaction MERGEs a snake_case `:Knowledge` mirror plus
+  the `:HAS_REPO` edge. The mirror carries both `knowledge_id` (snake)
+  and `knowledgeId` (camel) on the same node so the chat-mcp reader
+  (`MATCH (k:Knowledge {org_id})`) and `upsertKnowledgeNode` (MERGE on
+  `knowledgeId`) both converge on a single node.
+- **Legacy snake_case mirror** — every primary writer (`upsertRepoNode`,
+  `upsertFolderNode(sBatch)`, `upsertFileNode(sBatch)`,
+  `snapshotFilesToVersion`) additionally produces the snake_case schema
+  the chat-mcp reader expects. Each upsert is atomic per call:
+  - `:RepoSummary {knowledge_id, org_id, branch_name, architecture,
+data_flow, key_patterns, major_subsystems, purpose, …}` linked from
+    `:Knowledge` via `:HAS_REPO_SUMMARY`.
+  - `:FolderNode {knowledge_id, relative_path, org_id, purpose, summary,
+level, dependency_graph, …}` linked from `:Knowledge` via
+    `:HAS_FOLDER` and from its parent `:FolderNode` via
+    `:CONTAINS_FOLDER` (the parent edge is set in a separate step within
+    the same batched transaction so folder ordering doesn't matter).
+    `level` and parent path are derived in JS by `folderLevel()` /
+    `parentFolderPath()` from [`pathUtils.ts`](./src/pathUtils.ts).
+  - `:FileNode {knowledge_id, relative_path, org_id, node_id (=
+knowledgeId::relativePath), name, language, purpose, summary,
+business_context, section_map (JSON string), data_flow_direction,
+ontology_concepts, business_entities, system_capabilities,
+side_effects, config_dependencies, integration_surface,
+contracts_provided, contracts_consumed, keywords, classes,
+functions, imports_internal, imports_external, …}` linked from
+    `:Knowledge` via `:HAS_FILE` and from its parent `:FolderNode` via
+    `:CONTAINS_FILE`.
+  - `:OrgKeyword {keyword, type, org_id, content_type: 'code',
+total_frequency, file_count}` materialized from
+    [`legacyKeywordChannels`](./src/legacyKeywordChannels.ts) (14
+    channels: classes / functions / keywords / imports / 8 array props /
+    `dataFlowDirection`), with one
+    `:OrgKeyword-[:APPEARS_IN_FILE {frequency: 1, org_id,
+commit_hash}]->(:FileNode | :FileVersion)` edge per (keyword, type)
+    pair. The mirror lives in
+    [`legacyOrgKeywordMirror.ts`](./src/legacyOrgKeywordMirror.ts).
+    Aggregate counters (`total_frequency`, `file_count`) are maintained
+    per-edge during ingestion; call
+    `recomputeOrgKeywordCountersForKnowledge` (exported) at the end of
+    a strategy run if you need stricter freshness after batch deletes.
+  - `:FileVersion` carries both camelCase and snake_case property sets
+    on the same node. `snapshotFilesToVersion` adds `:FileNode
+-[:HAS_VERSION]-> :FileVersion` (snake source) alongside the
+    existing `:File -[:HAS_VERSION]-> :FileVersion` (camel source) and
+    materializes `:OrgKeyword -[:APPEARS_IN_FILE {commit_hash}]->
+:FileVersion` edges from whatever `:OrgKeyword` already points to
+    the corresponding `:FileNode`.
+
+  The legacy reader keys all of these by snake_case `org_id` /
+  `knowledge_id` / `relative_path`; the constraints are registered in
+  [`flatFolderIndexes.ts`](./src/flatFolderIndexes.ts) (uniqueness on
+  `(FileNode.knowledge_id, relative_path)`,
+  `(FolderNode.knowledge_id, relative_path)`,
+  `(RepoSummary.knowledge_id, org_id, branch_name)`,
+  `(OrgKeyword.keyword, type, org_id)`) along with three fulltext
+  indexes (`idx_filenode_ft`, `idx_fileversion_ft`,
+  `idx_orgkeyword_ft`).
+
 - Concept-graph CRUD (ConceptGraphStrategy) — `upsertConcept`,
   `attachFileToConcept` (dispatches HAS_CONCEPT / PLAYS_ROLE /
   BELONGS_TO_DOMAIN), `upsertTestsEdge` (file-to-file `:TESTS`),

@@ -116,7 +116,7 @@ export function parseGithubOwnerRepo(repoUrl: string): { owner: string; repo: st
   }
   try {
     const url = new URL(repoUrl);
-    if (!url.hostname.endsWith("github.com")) {
+    if (!url.hostname.endsWith("github.com") && !url.hostname.endsWith("gitlab.com")) {
       return null;
     }
     const segments = url.pathname.split("/").filter((s) => s.length > 0);

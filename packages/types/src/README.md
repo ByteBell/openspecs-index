@@ -88,10 +88,17 @@ lastAttemptAt }`) plus `EnrichmentFailureReason` (`"cap-exceeded" |
   `metaOutputRootFor`, `orgsRootFor`) that take a `home` string and
   return the kube-style layout
   `<home>/orgs/<orgId>/<provider>/<knowledgeId>/<owner>/<repo>/<commit>/`.
-  Also exports `parseGithubOwnerRepo(repoUrl)` — a pure GitHub URL
-  parser that mirrors the `parseGithubRepo` in
-  `@bb/ingest-github/githubUrl` (duplicated deliberately so kernel-tier
-  code never reaches up into Domain). The `MetaPathsLayout` interface
+  Also exports `parseGithubOwnerRepo(repoUrl)` — a pure URL parser that
+  mirrors the `parseGithubRepo` in `@bb/ingest-github/githubUrl`
+  (duplicated deliberately so kernel-tier code never reaches up into
+  Domain). Both implementations accept `github.com` AND `gitlab.com`
+  hostnames so the path resolver can build a `RepoLocation` for GitLab
+  knowledges routed through the GitHub pipeline via an injected
+  `SourceFactory`; the union still only has a `github` provider variant,
+  so gitlab projects share the github path segment on disk. Subgroup
+  gitlab URLs (`group/sub/project`) collapse to two segments here — the
+  GitLab factory derives the full namespace itself when building its own
+  `RepoLocation`. The `MetaPathsLayout` interface
   documents the leaf-path shape returned by `bytebellPathsFor`. Lives
   here so `@bb/ingest-github` (writer) and `@bb/mcp` (reader) can
   agree on the layout without one importing the other.

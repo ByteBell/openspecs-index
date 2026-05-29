@@ -8,6 +8,10 @@ drift apart.
 
 - `file-analysis-fields.ts` — `FILE_ANALYSIS_FIELDS_BLOCK`. Authoritative list
   of the JSON keys + per-field instructions. Imported by every other prompt.
+  `sectionMap` entries carry four fields: `name`, `description`, `start_line`,
+  `end_line` (inclusive 1-indexed, non-overlapping, within total line count).
+  The chat-mcp `retrieve_file(metadata)` workflow expects the line ranges so
+  callers can pick a targeted `fromLine`/`toLine` without re-reading the file.
 - `file-analysis.ts` — single-call per-file prompt
   (`COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT` + `buildFileAnalysisUserPrompt`).
 - `chunk.ts` — per-chunk prompt for the big-file path. Identical field block,
