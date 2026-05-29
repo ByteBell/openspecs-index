@@ -102,9 +102,10 @@ export function bytebellPathsFor(home: string, loc: RepoLocation): MetaPathsLayo
 }
 
 /**
- * Pure URL parser for GitHub repo URLs. Extracts owner and repo segments,
- * tolerating `.git` suffixes and `tree/branch` paths. Returns `null` on any
- * input that isn't a GitHub-hosted URL.
+ * Pure URL parser for GitHub / GitLab / Bitbucket repo URLs. Extracts owner
+ * and repo segments, tolerating `.git` suffixes and `tree/branch` paths.
+ * Returns `null` on any input that isn't a github.com / gitlab.com /
+ * bitbucket.org URL.
  *
  * Duplicates the public `parseGithubRepo` from `@bb/ingest-github/githubUrl`
  * deliberately — kernel-tier code can't import from Domain. The two
@@ -116,7 +117,11 @@ export function parseGithubOwnerRepo(repoUrl: string): { owner: string; repo: st
   }
   try {
     const url = new URL(repoUrl);
-    if (!url.hostname.endsWith("github.com") && !url.hostname.endsWith("gitlab.com")) {
+    if (
+      !url.hostname.endsWith("github.com") &&
+      !url.hostname.endsWith("gitlab.com") &&
+      !url.hostname.endsWith("bitbucket.org")
+    ) {
       return null;
     }
     const segments = url.pathname.split("/").filter((s) => s.length > 0);
