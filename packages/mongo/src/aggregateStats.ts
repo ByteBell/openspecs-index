@@ -39,7 +39,8 @@ export async function aggregateStats(): Promise<StatsResponse> {
     const commits = pickCommits(doc);
     const fileCount = await db.collection(Collections.Raw).countDocuments({ knowledgeId: doc.knowledgeId });
     const repoName = deriveRepoName(doc);
-    const type = doc.source.kind === "github" ? ("GITHUB" as const) : ("LOCAL" as const);
+    // Added defensive ?. chaining here to prevent crashes on malformed docs
+    const type = doc?.source?.kind === "github" ? ("GITHUB" as const) : ("LOCAL" as const);
 
     let repoIn = 0;
     let repoOut = 0;
@@ -98,7 +99,7 @@ export async function aggregateStats(): Promise<StatsResponse> {
 }
 
 function pickCommits(doc: KnowledgeDoc): CommitHashRecord[] {
-  const source = (doc as unknown as { source?: { commitHashes?: unknown } }).source;
+  const source = (doc as unknown as { source?: { commitHashes?: unknown } })?.source;
   const raw = source?.commitHashes;
   if (!Array.isArray(raw)) {
     return [];
@@ -128,12 +129,15 @@ function parseNumber(value: string): number {
 }
 
 function deriveRepoName(doc: KnowledgeDoc): string {
-  if (doc.source.kind === "local") {
-    const segments = doc.source.sourcePath.split("/").filter((s) => s.length > 0);
-    return segments.at(-1) ?? doc.source.sourcePath;
+  // Added highly defensive ?. optional chaining throughout this function
+  if (doc?.source?.kind === "local") {
+    const pathStr = doc?.source?.sourcePath || "";
+    const segments = pathStr.split("/").filter((s) => s.length > 0);
+    return segments.at(-1) ?? pathStr;
   }
   try {
-    const segments = new URL(doc.info.repoUrl ?? "").pathname
+    const repoUrl = doc?.info?.repoUrl ?? "";
+    const segments = new URL(repoUrl).pathname
       .split("/")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
@@ -145,5 +149,5 @@ function deriveRepoName(doc: KnowledgeDoc): string {
   } catch {
     // fall through
   }
-  return doc.info.repoUrl ?? "";
+  return doc?.info?.repoUrl ?? "Unknown Repository";
 }

@@ -5,6 +5,7 @@ import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { KEY_MAP } from "./keyMap.ts";
 import { Field } from "./Field.tsx";
+import { ensureGlobalLink } from "./globalLink.ts";
 
 interface Row {
   id: string;
@@ -101,6 +102,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
           }
           entry.setter(values[row.id] ?? "");
         }
+        ensureGlobalLink();
         exit();
         onDone({ saved: true });
       } catch (cause: unknown) {

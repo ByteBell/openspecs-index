@@ -25,6 +25,7 @@ __tests__
 .env.*.local
 *.pem
 *.key
+config.json
 
 # Logs
 logs/

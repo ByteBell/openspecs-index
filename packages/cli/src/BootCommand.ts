@@ -25,6 +25,7 @@ import {
 } from "./infraPorts.ts";
 import { diagnosePortConflict, promptPortConflict } from "./portConflictPrompt.ts";
 import { removeContainer } from "./dockerPortDiagnostics.ts";
+import { ensureGlobalLink } from "./globalLink.ts";
 
 const MAX_CONFLICT_ROUNDS = 4;
 
@@ -70,6 +71,8 @@ async function runBoot(): Promise<void> {
   if (!(await startServer())) {
     return;
   }
+
+  ensureGlobalLink();
 
   const port = getConfigValue(Config.ServerPort);
   success(`MCP endpoint: http://127.0.0.1:${port}/mcp`);

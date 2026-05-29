@@ -13,6 +13,7 @@ import { buildStatsCommand } from "./StatsCommand.ts";
 import { buildMcpCommand } from "./McpCommand.ts";
 import { buildMigrateCommand } from "./MigratePathsCommand.ts";
 import { error } from "./output.ts";
+import { buildTinkerCommand } from "./tinkercommand.tsx";
 
 const VERSION = "0.0.0";
 
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
   program.addCommand(buildStatsCommand());
   program.addCommand(buildMcpCommand());
   program.addCommand(buildMigrateCommand());
+  program.addCommand(buildTinkerCommand());
   await program.parseAsync(process.argv);
 }
 
