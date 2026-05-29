@@ -33,6 +33,10 @@ export function getConfigPath(): string {
   return path.join(getBytebellHome(), "config.json");
 }
 
+export function getApiKeyPath(): string {
+  return path.join(getBytebellHome(), "openrouter-api-key.pem");
+}
+
 export function __registerCacheInvalidator(fn: () => void): void {
   cacheInvalidators.push(fn);
 }
