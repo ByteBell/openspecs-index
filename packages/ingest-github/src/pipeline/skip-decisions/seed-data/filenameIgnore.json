@@ -42,6 +42,7 @@
   "Cargo.toml",
   "requirements.txt",
   "Pipfile",
+  "tsconfig.json",
   "tsconfig.base.json",
   "pyproject.toml",
   "Gemfile",

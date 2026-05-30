@@ -14,11 +14,21 @@ export interface DecisionEntry {
   files?: string[];
 }
 
+export type OversizedReason = "size-bytes" | "line-count";
+
+export interface OversizedDecisionEntry {
+  reason: OversizedReason;
+  sizeBytes: number;
+  repository_name?: string;
+  firstSeenAt: string;
+}
+
 export interface DecisionsCache {
   directories: Record<string, DecisionEntry>;
   extensions: Record<string, DecisionEntry>;
   filenames: Record<string, DecisionEntry>;
   filename_globs: Record<string, DecisionEntry>;
+  oversized_files: Record<string, OversizedDecisionEntry>;
 }
 
 export function defaultCachePath(): string {
@@ -30,7 +40,7 @@ export function defaultCachePath(): string {
 }
 
 export function emptyCache(): DecisionsCache {
-  return { directories: {}, extensions: {}, filenames: {}, filename_globs: {} };
+  return { directories: {}, extensions: {}, filenames: {}, filename_globs: {}, oversized_files: {} };
 }
 
 export function loadCache(filePath: string): DecisionsCache {
@@ -80,6 +90,25 @@ export function setExtensionDecision(
   cache.extensions[ext] = entry;
 }
 
+export function setOversizedDecision(
+  cache: DecisionsCache,
+  relativePath: string,
+  sizeBytes: number,
+  reason: OversizedReason,
+  repositoryName: string | undefined,
+): void {
+  const existing = cache.oversized_files[relativePath];
+  const entry: OversizedDecisionEntry = {
+    reason,
+    sizeBytes,
+    firstSeenAt: existing?.firstSeenAt ?? new Date().toISOString(),
+  };
+  if (repositoryName !== undefined) {
+    entry.repository_name = repositoryName;
+  }
+  cache.oversized_files[relativePath] = entry;
+}
+
 export function setFilenameDecision(
   cache: DecisionsCache,
   filename: string,
@@ -113,7 +142,36 @@ function narrow(value: unknown): DecisionsCache {
     extensions: narrowSection(rec["extensions"]),
     filenames: narrowSection(rec["filenames"]),
     filename_globs: narrowSection(rec["filename_globs"]),
+    oversized_files: narrowOversizedSection(rec["oversized_files"]),
   };
+}
+
+function narrowOversizedSection(value: unknown): Record<string, OversizedDecisionEntry> {
+  if (typeof value !== "object" || value === null) {
+    return {};
+  }
+  const out: Record<string, OversizedDecisionEntry> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw !== "object" || raw === null) {
+      continue;
+    }
+    const obj = raw as Record<string, unknown>;
+    const reason = obj["reason"];
+    const sizeBytes = obj["sizeBytes"];
+    const firstSeenAt = obj["firstSeenAt"];
+    if (reason !== "size-bytes" && reason !== "line-count") {
+      continue;
+    }
+    if (typeof sizeBytes !== "number" || typeof firstSeenAt !== "string") {
+      continue;
+    }
+    const entry: OversizedDecisionEntry = { reason, sizeBytes, firstSeenAt };
+    if (typeof obj["repository_name"] === "string") {
+      entry.repository_name = obj["repository_name"];
+    }
+    out[key] = entry;
+  }
+  return out;
 }
 
 function narrowSection(value: unknown): Record<string, DecisionEntry> {
@@ -151,7 +209,8 @@ export function logCacheSummary(cache: DecisionsCache): void {
   const exts = Object.keys(cache.extensions).length;
   const filenames = Object.keys(cache.filenames).length;
   const globs = Object.keys(cache.filename_globs).length;
+  const oversized = Object.keys(cache.oversized_files).length;
   logger.info(
-    `skip-decisions cache loaded: directories=${dirs} extensions=${exts} filenames=${filenames} globs=${globs}`,
+    `skip-decisions cache loaded: directories=${dirs} extensions=${exts} filenames=${filenames} globs=${globs} oversized=${oversized}`,
   );
 }

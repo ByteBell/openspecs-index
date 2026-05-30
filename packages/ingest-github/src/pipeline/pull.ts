@@ -138,6 +138,12 @@ export async function runPull(
       source = createDiskSourceReader({ repoDir, commitHash: targetCommit });
     }
 
+    logger.info(
+      `pull: ${knowledgeId} ${currentCommit.slice(0, 12)} → ${targetCommit.slice(0, 12)} ` +
+        `added=${diff.added.length} modified=${diff.modified.length} ` +
+        `deleted=${diff.deleted.length} renamed=${diff.renamed.length}`,
+    );
+
     throwIfCancelled(knowledgeId);
     await snapshotFilesToVersion({ knowledgeId, commitHash: currentCommit }).catch((cause: unknown) => {
       const msgText = cause instanceof Error ? cause.message : String(cause);

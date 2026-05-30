@@ -1,0 +1,64 @@
+/**
+ * Types owned by the intermediate-representation strategy. These describe the artifacts the
+ * IR path builds for a big file: a thin per-window skim outline, the located declarations used
+ * to cut the analysis chunks, and the per-chunk record that is kept verbatim (never condensed).
+ */
+import type { FileAnalysis } from "@bb/mongo";
+
+/**
+ * One top-level declaration discovered during the skim pass. `signature` is the verbatim first
+ * line of the declaration and is used to locate it in the source deterministically (no AST)
+ * when computing chunk boundaries (see {@link LocatedDeclaration}).
+ */
+export interface OutlineDeclaration {
+  kind: string;
+  name: string;
+  signature: string;
+  role: string;
+}
+
+/**
+ * The thin outline produced for a single skim window. Output is intentionally small so the
+ * outlines of every window concatenated still fit one context window.
+ */
+export interface SkimWindowOutline {
+  startLine: number;
+  endLine: number;
+  language: string;
+  windowSummary: string;
+  importsInternal: string[];
+  importsExternal: string[];
+  declarations: OutlineDeclaration[];
+}
+
+/**
+ * A declaration whose start line has been resolved in the source by matching its verbatim skim
+ * `signature`. The located declarations are the cut points for the analysis chunks — a chunk
+ * boundary only ever falls on a declaration start — and feed the file-map digest.
+ */
+export interface LocatedDeclaration {
+  kind: string;
+  name: string;
+  signature: string;
+  role: string;
+  /** 1-based line in the source where the declaration begins. */
+  startLine: number;
+}
+
+/**
+ * A single kept chunk record. Carries a per-chunk `fileId` (the chunks of one big file share
+ * `relativePath` but each gets a distinct id), its line range, and the chunk's analysis. These
+ * are persisted as-is — the IR strategy never condenses them into one file analysis.
+ */
+export interface IrChunkRecord {
+  /** Per-chunk node id, `${fileNodeId}:L${startLine}-${endLine}`; distinct per chunk, shared `relativePath`. */
+  fileId: string;
+  relativePath: string;
+  chunkIndex: number;
+  totalChunks: number;
+  startLine: number;
+  endLine: number;
+  language: string;
+  analysis: FileAnalysis;
+  tokenUsage?: { inputTokens: number; outputTokens: number; costUsd: number } | undefined;
+}

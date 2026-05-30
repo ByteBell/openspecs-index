@@ -12,11 +12,15 @@ export interface ScannedFile {
   content: string;
 }
 
+export type OversizedReason = "size-bytes" | "line-count";
+
 export interface OversizedFile {
   kind: "oversized";
   relativePath: string;
   absolutePath: string;
   sizeBytes: number;
+  /** Which hard limit tripped — byte cap or line-count cap. Persisted into `llmDecisions.json` so re-runs can audit why a path was skipped. */
+  reason: OversizedReason;
 }
 
 export type ScanEntry = ScannedFile | OversizedFile;
@@ -188,4 +192,11 @@ export interface SkipDecider {
    * I/O errors. Called once at the end of a `decideAndDeferSave` batch.
    */
   persist(): void;
+  /**
+   * Record that a path was rejected by a hard size/line limit (not by an
+   * LLM or static-seed decision). Writes the entry into the `oversized_files`
+   * section of `llmDecisions.json` and persists best-effort. Idempotent —
+   * re-noting an already-recorded path overwrites its size/reason fields.
+   */
+  noteOversized(input: { relativePath: string; sizeBytes: number; reason: OversizedReason }): void;
 }

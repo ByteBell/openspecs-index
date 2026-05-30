@@ -73,8 +73,12 @@ export function registerLocalIngestWorker(): void {
 }
 
 export { createFlatFolderStrategy } from "./strategies/flat-folder/index.ts";
-export { createLlmFileAnalyzer } from "./adapters/llm-file-analyzer.ts";
+export { createLlmFileAnalyzer, languageFromPath } from "./adapters/llm-file-analyzer.ts";
 export { createDiskSourceReader } from "./pipeline/disk-source-reader.ts";
+export { withConcurrency, runInPool } from "./pipeline/concurrency.ts";
+export type { ConcurrencyLimiter } from "./pipeline/concurrency.ts";
+export { makeSkipDecider } from "./pipeline/skip-decisions/index.ts";
+export type { SkipDeciderDeps } from "./pipeline/skip-decisions/index.ts";
 export { createPipelineRunner } from "./pipeline/run.ts";
 export type { CreatePipelineRunnerDeps } from "./pipeline/run.ts";
 export { createGithubIngestHandler, createLocalIngestHandler } from "./handlers/ingest-job.ts";
@@ -109,6 +113,7 @@ export type {
   PullFactoryResult,
 } from "./types/pipeline.ts";
 export type { DiffResult, RenamedFile } from "./pipeline/git-diff.ts";
+export { diffCommits, emptyDiff, checkoutCommit } from "./pipeline/git-diff.ts";
 export type { CondensedFileAnalysis } from "./types/condensed-file-analysis.ts";
 export {
   fetchLatestCommitHash,
@@ -133,3 +138,103 @@ export type {
   ProgressTotalMode,
 } from "./progress/types.ts";
 export { nullProgressContextFactory } from "./progress/NullProgressReporter.ts";
+
+// Reconstruction-grade IR analyzer (intermediate-representation strategy). Exposed so callers
+// outside the package can run the split / unit-IR / verify phases or the whole-file pipeline.
+export {
+  createReconstructionAnalyzer,
+  type ReconstructionAnalyzer,
+  type AnalyseFileInput,
+  type ExtractUnitIrInput,
+  type VerifyUnitInput,
+  type AnalyzeUnitInput,
+  type AnalyzeFileInput,
+  type AnalyseFileResult,
+  type UnitIrResult,
+  type VerifyUnitResult,
+  type UnitReconstruction,
+  type FileReconstructionResult,
+  type CodeUnit,
+  type ModuleIr,
+  type UnitDescriptor,
+  type FileAnalysisResult,
+  type SemanticFields,
+  type EquivalenceReport,
+  type UnitVerification,
+  computeUnitFingerprint,
+  computeModuleFingerprint,
+  buildUnitId,
+  analyzeFileToRecords,
+  codeUnitKey,
+  type AnalyzeFileToRecordsInput,
+  type FileRecords,
+  type FileModuleRecord,
+  type CodeUnitsRecord,
+  type CodeUnitEntry,
+} from "./strategies/intermediate-representation/reconstruction/index.ts";
+
+// IR big-file path (boundary-aware chunking, no condensation). Exposed so callers can chunk a
+// large file, refine cuts onto declaration boundaries, and get one verbatim record per chunk.
+export {
+  createIrBigFileAnalyzer,
+  type IrBigFileAnalyzer,
+  type AnalyzeBigFileInput,
+  type IrBigFileResult,
+  type BigFileChunksResult,
+} from "./strategies/intermediate-representation/big-file/index.ts";
+export type { IrChunkRecord } from "./strategies/intermediate-representation/types.ts";
+
+// IR ingest strategy — composes the scan / analyse-small / compute-boundaries / cut-big-files /
+// analyse-big-chunks phases into one IngestStrategy. Persists per-file and per-chunk
+// FileAnalysisResult records on disk; no folder/repo summary, no Neo4j writes, no reconstruction.
+export { createIrStrategy, type IrStrategyDeps } from "./strategies/intermediate-representation/index.ts";
+export type {
+  IrFileAnalysisRecord,
+  IrBigFileBoundaries,
+  IrBigFileChunkRaw,
+} from "./strategies/intermediate-representation/records.ts";
+
+// IR phases — exposed so a driver can step them one at a time (each persists its output, so
+// running them in order against the same MetaPaths reproduces what `createIrStrategy().execute`
+// does).
+export {
+  scanAndClassify as irScanAndClassify,
+  type ScanAndClassifyInput as IrScanAndClassifyInput,
+  type ScanAndClassifyResult as IrScanAndClassifyResult,
+} from "./strategies/intermediate-representation/phases/scan-and-classify.ts";
+export {
+  analyseSmallFiles as irAnalyseSmallFiles,
+  type AnalyseSmallInput as IrAnalyseSmallInput,
+  type AnalyseSmallResult as IrAnalyseSmallResult,
+} from "./strategies/intermediate-representation/phases/analyse-small.ts";
+export {
+  computeBigFileBoundaries as irComputeBigFileBoundaries,
+  type ComputeBoundariesInput as IrComputeBoundariesInput,
+  type ComputeBoundariesResult as IrComputeBoundariesResult,
+} from "./strategies/intermediate-representation/phases/compute-boundaries.ts";
+export {
+  cutBigFiles as irCutBigFiles,
+  type CutBigFilesInput as IrCutBigFilesInput,
+  type CutBigFilesResult as IrCutBigFilesResult,
+} from "./strategies/intermediate-representation/phases/cut-big-files.ts";
+export {
+  analyseBigChunks as irAnalyseBigChunks,
+  type AnalyseBigChunksInput as IrAnalyseBigChunksInput,
+  type AnalyseBigChunksResult as IrAnalyseBigChunksResult,
+} from "./strategies/intermediate-representation/phases/analyse-big-chunks.ts";
+
+// Cross-run incremental helpers — used by drivers that replay a commit sequence outside the
+// pull pipeline (e.g. benchmark replayers). The flat-folder pull path does the equivalent via
+// Mongo state + `analyseChangedFiles`.
+export {
+  findPriorIndexedCommit,
+  applyDiffInvalidation,
+  logCommitDiff,
+  logNoPriorCommit,
+  type PriorIndexedCommit,
+  type PriorIndexedCommitCandidate,
+  type ApplyDiffInvalidationInput,
+  type ApplyDiffInvalidationResult,
+  type LogCommitDiffInput,
+  type LogNoPriorCommitInput,
+} from "./strategies/intermediate-representation/incremental.ts";

@@ -1,10 +1,45 @@
 import { getConfigValue } from "@bb/config";
 import { Config } from "@bb/types";
 import { LlmConfigError, LlmError } from "@bb/errors";
+import { logger } from "@bb/logger";
 import { tokenLen } from "./tokenizer.ts";
 import type { AskLlmOptions, AskLlmResult } from "./client.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+/**
+ * Per-attempt backoff schedule (ms). Used when a model returns an empty completion or a
+ * transient transport / 5xx error — we wait, then either retry the same model (within
+ * `ATTEMPTS_PER_MODEL`) or shift to the next model in the chain. Exponential so we don't
+ * hammer a struggling provider, capped so a stuck call cannot hold the pool indefinitely.
+ */
+const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
+const ATTEMPTS_PER_MODEL = 2;
+
+function backoffDelay(attemptIdx: number): number {
+  const delay = BACKOFF_MS[Math.min(attemptIdx, BACKOFF_MS.length - 1)];
+  return delay ?? BACKOFF_MS[BACKOFF_MS.length - 1] ?? 16_000;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Errors we treat as worth retrying / shifting model for: empty completions + 5xx + transport. */
+function isRetryable(cause: unknown): boolean {
+  if (cause instanceof LlmConfigError) {
+    return false;
+  }
+  if (cause instanceof LlmError) {
+    const status = cause.status;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      // 4xx (other than 429) means the request itself is bad — retrying won't help.
+      return status === 429;
+    }
+    return true;
+  }
+  return false;
+}
 
 interface OpenRouterMessage {
   role: "system" | "user";
@@ -63,10 +98,18 @@ export function resolveOpenRouterChain(opts: AskLlmOptions): string[] {
   return [...new Set(chain)].slice(0, 3);
 }
 
-export async function callOpenRouter(prompt: string, opts: AskLlmOptions, timeoutMs: number): Promise<AskLlmResult> {
+/**
+ * Single-model OpenRouter call — one fetch, no retry, no fallback. Used as the inner step of
+ * {@link callOpenRouter}, which loops the resolved chain with backoff. Throws on transport
+ * failure, non-OK HTTP, or an empty-completion 200 (the model returned with no content).
+ */
+async function callOpenRouterOnce(
+  prompt: string,
+  opts: AskLlmOptions,
+  timeoutMs: number,
+  model: string,
+): Promise<AskLlmResult> {
   const apiKey = opts.apiKey ?? getConfigValue(Config.OpenrouterApiKey);
-  const cappedChain = resolveOpenRouterChain(opts);
-  const model = cappedChain[0] ?? opts.model ?? getConfigValue(Config.OpenrouterModel);
 
   const messages: OpenRouterMessage[] = [];
   if (opts.systemPrompt !== undefined) {
@@ -76,10 +119,7 @@ export async function callOpenRouter(prompt: string, opts: AskLlmOptions, timeou
 
   const usageAccounting: OpenRouterUsageAccounting = { include: true };
   const providerRouting: OpenRouterProviderRouting = { allow_fallbacks: false };
-  const body: OpenRouterRequest =
-    cappedChain.length > 1
-      ? { model, models: cappedChain, messages, usage: usageAccounting, provider: providerRouting }
-      : { model, messages, usage: usageAccounting, provider: providerRouting };
+  const body: OpenRouterRequest = { model, messages, usage: usageAccounting, provider: providerRouting };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -129,4 +169,55 @@ export async function callOpenRouter(prompt: string, opts: AskLlmOptions, timeou
       costUsd: typeof json.usage?.cost === "number" ? json.usage.cost : 0,
     },
   };
+}
+
+/**
+ * Calls OpenRouter walking the resolved model chain with explicit per-model retry and
+ * exponential backoff. For each model, retry up to `ATTEMPTS_PER_MODEL` times on retryable
+ * failures (empty completion, 5xx, 429, transport); after that, shift to the next model.
+ * Config errors (auth) and non-retryable 4xx bypass the loop. The first successful call wins.
+ */
+export async function callOpenRouter(prompt: string, opts: AskLlmOptions, timeoutMs: number): Promise<AskLlmResult> {
+  const chain = resolveOpenRouterChain(opts);
+  let lastError: unknown = new LlmError("OpenRouter call failed without producing an error");
+  let globalAttemptIdx = 0;
+
+  for (let modelIdx = 0; modelIdx < chain.length; modelIdx += 1) {
+    const model = chain[modelIdx];
+    if (model === undefined) {
+      continue;
+    }
+    for (let attempt = 0; attempt < ATTEMPTS_PER_MODEL; attempt += 1) {
+      try {
+        const result = await callOpenRouterOnce(prompt, opts, timeoutMs, model);
+        if (modelIdx > 0 || attempt > 0) {
+          logger.info(`openrouter: succeeded on ${model} (modelIdx=${modelIdx} attempt=${attempt + 1})`);
+        }
+        return result;
+      } catch (cause: unknown) {
+        lastError = cause;
+        if (!isRetryable(cause)) {
+          throw cause;
+        }
+        const isLastTryForModel = attempt === ATTEMPTS_PER_MODEL - 1;
+        const isLastModel = modelIdx === chain.length - 1;
+        const moreWork = !(isLastTryForModel && isLastModel);
+        const msg = cause instanceof Error ? cause.message : String(cause);
+        if (moreWork) {
+          const delay = backoffDelay(globalAttemptIdx);
+          globalAttemptIdx += 1;
+          const nextLabel = isLastTryForModel
+            ? `shifting to next model ${chain[modelIdx + 1] ?? "(none)"}`
+            : `retrying same model`;
+          logger.warn(
+            `openrouter: ${model} failed (attempt ${attempt + 1}/${ATTEMPTS_PER_MODEL}) — ${msg}; backing off ${delay}ms then ${nextLabel}`,
+          );
+          await sleep(delay);
+        } else {
+          logger.warn(`openrouter: exhausted ${chain.length} model(s) × ${ATTEMPTS_PER_MODEL} attempts — last error: ${msg}`);
+        }
+      }
+    }
+  }
+  throw lastError;
 }

@@ -95,7 +95,7 @@ async function* walk(
     const ext = path.extname(entry.name).toLowerCase();
     if (sizeBytes > limits.absoluteCap) {
       counts.oversized += 1;
-      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes };
+      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes, reason: "size-bytes" };
       continue;
     }
     const buf = await readFile(abs);
@@ -106,7 +106,7 @@ async function* walk(
     const content = buf.toString("utf8");
     if (countLines(content) > limits.bigFileLineThreshold) {
       counts.oversized += 1;
-      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes };
+      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes, reason: "line-count" };
       continue;
     }
     if (deps.skipDecider !== undefined) {
@@ -230,7 +230,7 @@ async function* walkAndCategorize(
     const ext = path.extname(entry.name).toLowerCase();
     if (sizeBytes > limits.absoluteCap) {
       counts.oversized += 1;
-      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes };
+      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes, reason: "size-bytes" };
       continue;
     }
     const buf = await readFile(abs);
@@ -241,7 +241,7 @@ async function* walkAndCategorize(
     const content = buf.toString("utf8");
     if (countLines(content) > limits.bigFileLineThreshold) {
       counts.oversized += 1;
-      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes };
+      yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes, reason: "line-count" };
       continue;
     }
     const deciderInput: SkipDeciderInput = { relativePath, absolutePath: abs, ext };

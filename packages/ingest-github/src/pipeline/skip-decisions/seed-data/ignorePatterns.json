@@ -86,6 +86,7 @@
     { "type": "exact", "pattern": "Cargo.toml" },
     { "type": "exact", "pattern": "requirements.txt" },
     { "type": "exact", "pattern": "Pipfile" },
+    { "type": "exact", "pattern": "tsconfig.json" },
     { "type": "exact", "pattern": "tsconfig.base.json" },
     { "type": "exact", "pattern": "pyproject.toml" },
     { "type": "exact", "pattern": "Gemfile" },
@@ -551,6 +552,15 @@
     { "type": "extension", "pattern": ".rlib" },
     { "type": "extension", "pattern": ".dex" },
     { "type": "extension", "pattern": ".aar" }
+  ],
+  "buildArtifacts": [
+    { "type": "directory", "pattern": "target" },
+    { "type": "directory", "pattern": ".fingerprint" },
+    { "type": "directory", "pattern": "deps" },
+    { "type": "directory", "pattern": "incremental" },
+    { "type": "extension", "pattern": ".rmeta" },
+    { "type": "extension", "pattern": ".timestamp" },
+    { "type": "exact", "pattern": "CACHEDIR.TAG" }
   ],
   "directories": [
     { "type": "directory", "pattern": ".git" },

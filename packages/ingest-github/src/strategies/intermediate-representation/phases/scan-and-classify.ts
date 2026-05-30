@@ -1,16 +1,24 @@
+/**
+ * IR phase 1 — scan + classify. Walks the repo once and classifies every eligible file as
+ * `small` / `big` / `oversized` by token count, writing the result to `scan-manifest.json`. The
+ * downstream IR phases consume the manifest instead of re-walking.
+ *
+ * Mirrors flat-folder's `scanAndClassify` structurally (same `ScanManifest` shape and on-disk
+ * location) so the two strategies share `MetaPaths` without contradiction. IR does not need the
+ * legacy `bigFiles.json`, so it is not written here.
+ */
 import path from "node:path";
 import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { logger } from "@bb/logger";
 import type { AskLlmOptions } from "@bb/llm";
 import type { MetaPaths } from "#src/types/meta-paths.ts";
-import type { BigFileEntry } from "#src/types/big-file.ts";
 import type { SkipDecider, SourceReader } from "#src/types/pipeline.ts";
 import type { ProgressContext } from "#src/progress/types.ts";
 import type { ConcurrencyLimiter } from "#src/pipeline/concurrency.ts";
 import { throwIfCancelled } from "#src/pipeline/cancellation.ts";
 import { makeSkipDecider } from "#src/pipeline/skip-decisions/index.ts";
-import { classifyByTokens, writeBigFiles } from "#src/strategies/flat-folder/big-file/detector.ts";
+import { classifyByTokens } from "#src/strategies/flat-folder/big-file/detector.ts";
 import {
   emptyManifest,
   writeScanManifest,
@@ -25,13 +33,6 @@ export interface ScanAndClassifyInput {
   skipDecider?: SkipDecider;
   llmCallContext?: AskLlmOptions;
   progressContext?: ProgressContext;
-  /**
-   * Shared LLM-concurrency limiter. When supplied the underlying
-   * `scanRepository` runs its two-pass strategy: walk + cache-only decisions
-   * first, then parallel-deduplicated LLM resolution for unknown
-   * extensions/filenames under this limiter. Optional so the function
-   * still works standalone.
-   */
   limiter?: ConcurrencyLimiter;
 }
 
@@ -39,19 +40,10 @@ export interface ScanAndClassifyResult {
   manifest: ScanManifest;
 }
 
-/**
- * Walks the repo once, classifies every eligible file as small / big /
- * oversized by token count, and writes `scan-manifest.json`. The downstream
- * small-file and big-file phases consume the manifest instead of re-walking.
- *
- * Also writes the legacy `bigFiles.json` so the pull-path and backfill phases
- * (which still read it directly) keep working without migration.
- */
 export async function scanAndClassify(input: ScanAndClassifyInput): Promise<ScanAndClassifyResult> {
   const contextWindowLimit = getConfigValue(Config.ContextWindowLimit);
   const maxTokensPerChunk = getConfigValue(Config.MaxTokensPerChunk);
   const manifest = emptyManifest();
-  const bigFileEntries: BigFileEntry[] = [];
 
   const repositoryHint =
     input.source.localRepoDir.length > 0 ? path.basename(input.source.localRepoDir) : input.knowledgeId;
@@ -77,22 +69,16 @@ export async function scanAndClassify(input: ScanAndClassifyInput): Promise<Scan
       reporter?.incrementSeen();
 
       if (entry.kind === "oversized") {
-        const manifestEntry: ScanManifestEntry = {
+        const oversized: ScanManifestEntry = {
           relativePath: entry.relativePath,
           absolutePath: entry.absolutePath,
           sizeBytes: entry.sizeBytes,
           tokenCount: 0,
           kind: "oversized",
         };
-        manifest.entries.push(manifestEntry);
+        manifest.entries.push(oversized);
         manifest.summary.oversizedCount += 1;
         manifest.summary.totalFiles += 1;
-        bigFileEntries.push({
-          relativePath: entry.relativePath,
-          sizeBytes: entry.sizeBytes,
-          tokenCount: 0,
-          reason: "too-large",
-        });
         skipDecider.noteOversized({
           relativePath: entry.relativePath,
           sizeBytes: entry.sizeBytes,
@@ -117,12 +103,6 @@ export async function scanAndClassify(input: ScanAndClassifyInput): Promise<Scan
         });
         manifest.summary.bigCount += 1;
         manifest.summary.estimatedBigChunks += estimatedChunks;
-        bigFileEntries.push({
-          relativePath: entry.relativePath,
-          sizeBytes: entry.sizeBytes,
-          tokenCount,
-          reason: "context-window-exceeded",
-        });
       } else {
         manifest.entries.push({
           relativePath: entry.relativePath,
@@ -140,9 +120,8 @@ export async function scanAndClassify(input: ScanAndClassifyInput): Promise<Scan
   }
 
   await writeScanManifest(input.metaPaths, manifest);
-  await writeBigFiles(input.metaPaths, bigFileEntries);
   logger.info(
-    `scan-and-classify done: total=${manifest.summary.totalFiles} small=${manifest.summary.smallCount} big=${manifest.summary.bigCount} oversized=${manifest.summary.oversizedCount} totalTokens=${manifest.summary.totalTokens} estimatedBigChunks=${manifest.summary.estimatedBigChunks}`,
+    `ir/scan-and-classify done: total=${manifest.summary.totalFiles} small=${manifest.summary.smallCount} big=${manifest.summary.bigCount} oversized=${manifest.summary.oversizedCount} totalTokens=${manifest.summary.totalTokens} estimatedBigChunks=${manifest.summary.estimatedBigChunks}`,
   );
   return { manifest };
 }

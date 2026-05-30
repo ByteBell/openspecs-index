@@ -4,7 +4,7 @@ import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { askYesNoLLM, type AskLlmOptions } from "@bb/llm";
 import { logger } from "@bb/logger";
-import type { SkipDecider, SkipDeciderInput, SkipDecision } from "#src/types/pipeline.ts";
+import type { OversizedReason, SkipDecider, SkipDeciderInput, SkipDecision } from "#src/types/pipeline.ts";
 import {
   defaultCachePath,
   emptyCache,
@@ -13,6 +13,7 @@ import {
   saveCache,
   setExtensionDecision,
   setFilenameDecision,
+  setOversizedDecision,
   type DecisionsCache,
 } from "./cache.ts";
 import {
@@ -105,6 +106,14 @@ export function makeSkipDecider(deps: SkipDeciderDeps = {}): SkipDecider {
     }
   }
 
+  function noteOversized(input: { relativePath: string; sizeBytes: number; reason: OversizedReason }): void {
+    if (!enabled) {
+      return;
+    }
+    setOversizedDecision(cache, input.relativePath, input.sizeBytes, input.reason, deps.repositoryName);
+    persist();
+  }
+
   return {
     async decide(input: SkipDeciderInput): Promise<SkipDecision> {
       const sync = staticDecision(input);
@@ -126,6 +135,7 @@ export function makeSkipDecider(deps: SkipDeciderDeps = {}): SkipDecider {
       return await resolveLlm(input);
     },
     persist,
+    noteOversized,
   };
 }
 
