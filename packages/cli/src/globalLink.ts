@@ -30,7 +30,6 @@ function findBytebellOnPath(): string | null {
   }
   return null;
 }
-
 function isAlreadyLinked(): boolean {
   const existing = findBytebellOnPath();
   if (existing === null) {
@@ -40,23 +39,15 @@ function isAlreadyLinked(): boolean {
     const stat = fs.lstatSync(existing);
     if (stat.isSymbolicLink()) {
       const linkTarget = fs.realpathSync(existing);
-
-      // Get the path to the CLI entry to derive the wrapper path
       const cliEntry = resolveCliEntry();
-
-      // Calculate the wrapper path exactly as it is done in ensureGlobalLink
-      const wrapperDir = path.resolve(path.dirname(cliEntry), "..", "bin");
-      const wrapperPath = path.join(wrapperDir, "bytebell");
-
-      // Check if the symlink points to the wrapper script
-      return linkTarget === wrapperPath;
+      const wrapperPath = path.resolve(path.dirname(cliEntry), "..", "bin", "bytebell");
+      return linkTarget === fs.realpathSync(wrapperPath);
     }
     return false;
   } catch {
     return false;
   }
 }
-
 export function ensureGlobalLink(): LinkResult {
   const cliEntry = resolveCliEntry();
 
