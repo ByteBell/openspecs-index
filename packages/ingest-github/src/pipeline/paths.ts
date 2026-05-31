@@ -29,6 +29,7 @@ export function metaPathsFor(knowledgeId: string): MetaPaths {
     folderSummariesDir: path.join(metaRoot, "folder-summaries"),
     bigFileAnalysisDir: path.join(metaRoot, "big-file-analysis"),
     bigFileChunksDir: path.join(metaRoot, "big-file-analysis", "chunks"),
+    mcpEnrichmentDir: path.join(metaRoot, "mcp-enrichment"),
     bigFilesJson: path.join(metaRoot, "bigFiles.json"),
     scanManifestJson: path.join(metaRoot, "scan-manifest.json"),
     repoSummaryJson: path.join(metaRoot, "repo-summary.json"),
@@ -69,6 +70,7 @@ export async function ensureMetaDirs(paths: MetaPaths): Promise<void> {
   await mkdir(paths.folderSummariesDir, { recursive: true, mode: DIR_MODE });
   await mkdir(paths.bigFileAnalysisDir, { recursive: true, mode: DIR_MODE });
   await mkdir(paths.bigFileChunksDir, { recursive: true, mode: DIR_MODE });
+  await mkdir(paths.mcpEnrichmentDir, { recursive: true, mode: DIR_MODE });
 }
 
 const SLASH_RE = /\//gu;

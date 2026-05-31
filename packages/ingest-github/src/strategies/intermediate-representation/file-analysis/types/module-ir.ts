@@ -5,7 +5,7 @@
  * code, exports, import map, file constants). `UnitDescriptor` is one entry of the unit list
  * Prompt 1 enumerates — a span plus verbatim source, fed individually into Prompt 2.
  */
-import type { UnitConstant } from "./code-unit.ts";
+import type { UnitConstant } from "./named-constant.ts";
 import type { SemanticFields } from "./semantics.ts";
 
 /** One entry of the resolved import symbol map. */

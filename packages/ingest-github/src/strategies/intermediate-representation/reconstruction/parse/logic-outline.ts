@@ -5,7 +5,7 @@
  */
 import { pickString } from "#src/strategies/intermediate-representation/parse.ts";
 import type { LogicStep } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
-import { pickRecordArray } from "./primitives.ts";
+import { pickRecordArray } from "#src/strategies/intermediate-representation/file-analysis/parse/primitives.ts";
 
 const STEP_KINDS = new Set<LogicStep["step"]>(["sequence", "branch", "loop", "return", "raise", "call", "emit"]);
 

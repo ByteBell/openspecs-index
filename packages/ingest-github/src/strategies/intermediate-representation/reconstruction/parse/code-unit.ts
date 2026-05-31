@@ -6,10 +6,10 @@
  */
 import { pickStringArray } from "#src/strategies/intermediate-representation/parse.ts";
 import type { CodeUnit } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
-import type { UnitDescriptor } from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
-import { pickBool } from "./primitives.ts";
+import type { UnitDescriptor } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
+import { pickBool } from "#src/strategies/intermediate-representation/file-analysis/parse/primitives.ts";
 import { parseLogicOutline } from "./logic-outline.ts";
-import { parseNamedConstants } from "./named-constants.ts";
+import { parseNamedConstants } from "#src/strategies/intermediate-representation/file-analysis/parse/named-constants.ts";
 import {
   parseCalls,
   parseErrorPolicy,

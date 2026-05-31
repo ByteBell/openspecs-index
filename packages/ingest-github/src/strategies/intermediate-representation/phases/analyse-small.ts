@@ -17,7 +17,7 @@ import { runInPool } from "#src/pipeline/concurrency.ts";
 import { throwIfCancelled, CancellationError } from "#src/pipeline/cancellation.ts";
 import { languageFromPath } from "#src/adapters/llm-file-analyzer.ts";
 import { readScanManifest } from "#src/strategies/flat-folder/scan-manifest.ts";
-import { analyseFile } from "#src/strategies/intermediate-representation/reconstruction/analyzers/analyse-file.ts";
+import { analyseFile } from "#src/strategies/intermediate-representation/file-analysis/analyse-file.ts";
 import type { IrFileAnalysisRecord } from "#src/strategies/intermediate-representation/records.ts";
 import {
   hasFileAnalysisRecord,
@@ -102,7 +102,7 @@ export async function analyseSmallFiles(input: AnalyseSmallInput): Promise<Analy
         if (input.llmCallContext !== undefined) {
           analyseInput.llmCallContext = input.llmCallContext;
         }
-        const { split: analysis, tokenUsage } = await analyseFile(analyseInput);
+        const { split: analysis, tokenUsage, model } = await analyseFile(analyseInput);
 
         const record: IrFileAnalysisRecord = {
           relativePath: entry.relativePath,
@@ -113,6 +113,7 @@ export async function analyseSmallFiles(input: AnalyseSmallInput): Promise<Analy
           analysedAt: new Date().toISOString(),
           analysis,
           tokenUsage,
+          model,
         };
         await saveFileAnalysisRecord(input.metaPaths, record);
 
@@ -120,7 +121,13 @@ export async function analyseSmallFiles(input: AnalyseSmallInput): Promise<Analy
         totalOutputTokens += tokenUsage.outputTokens;
         totalCostUsd += tokenUsage.costUsd;
         analysed += 1;
-        reporter?.increment(1, { fileName: entry.relativePath });
+        reporter?.increment(1, {
+          fileName: entry.relativePath,
+          inputTokens: tokenUsage.inputTokens,
+          outputTokens: tokenUsage.outputTokens,
+          costUsd: tokenUsage.costUsd,
+          model,
+        });
       } catch (cause: unknown) {
         if (cause instanceof CancellationError) {
           throw cause;

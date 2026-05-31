@@ -11,7 +11,7 @@ import type {
   UnitMember,
   VerbatimBlock,
 } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
-import { asRecord, pickBool, pickInt, pickRecordArray } from "./primitives.ts";
+import { asRecord, pickBool, pickInt, pickRecordArray } from "#src/strategies/intermediate-representation/file-analysis/parse/primitives.ts";
 
 /** Returns the trimmed string at `key`, or null when absent/empty. */
 function optString(rec: Record<string, unknown>, key: string): string | null {

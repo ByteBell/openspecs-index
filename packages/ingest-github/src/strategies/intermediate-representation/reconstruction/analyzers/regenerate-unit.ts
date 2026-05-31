@@ -12,7 +12,7 @@ import {
   REGENERATE_SYSTEM_PROMPT,
   buildRegenerateUserPrompt,
 } from "#src/strategies/intermediate-representation/reconstruction/prompts/verify.ts";
-import { usageOf } from "./usage.ts";
+import { usageOf } from "#src/strategies/intermediate-representation/usage.ts";
 
 /** The regenerated source plus the call's token usage. */
 export interface RegenerateResult {

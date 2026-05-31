@@ -3,7 +3,7 @@
  * and the per-unit `constants` field. Values are preserved verbatim (they are literals).
  */
 import { pickString } from "#src/strategies/intermediate-representation/parse.ts";
-import type { UnitConstant } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
+import type { UnitConstant } from "#src/strategies/intermediate-representation/file-analysis/types/named-constant.ts";
 import { pickRecordArray } from "./primitives.ts";
 
 /**

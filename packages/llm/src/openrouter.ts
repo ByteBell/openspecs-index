@@ -25,7 +25,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Errors we treat as worth retrying / shifting model for: empty completions + 5xx + transport. */
+/**
+ * Errors we treat as worth retrying / shifting model for. Config errors are unrecoverable.
+ * Provider-reported 4xx (other than 429) means the request itself is bad — retrying won't help.
+ * EVERYTHING else (5xx, transport, empty completions, body-read failures, DOMException
+ * `TimeoutError` from Bun's socket idle timer) is treated as transient and retried.
+ */
 function isRetryable(cause: unknown): boolean {
   if (cause instanceof LlmConfigError) {
     return false;
@@ -33,12 +38,15 @@ function isRetryable(cause: unknown): boolean {
   if (cause instanceof LlmError) {
     const status = cause.status;
     if (typeof status === "number" && status >= 400 && status < 500) {
-      // 4xx (other than 429) means the request itself is bad — retrying won't help.
       return status === 429;
     }
     return true;
   }
-  return false;
+  // DOMException (TimeoutError), TypeError ("fetch failed"), and other non-config errors are
+  // treated as transient. The retry loop will re-try the same model up to ATTEMPTS_PER_MODEL,
+  // then shift to the next fallback model. Misclassifying a permanent error as retryable just
+  // means we spend a few extra fallback attempts before giving up — a cheap insurance policy.
+  return true;
 }
 
 interface OpenRouterMessage {
@@ -151,7 +159,15 @@ async function callOpenRouterOnce(
     });
   }
 
-  const json = (await response.json()) as OpenRouterResponse;
+  // Body read is outside the fetch try/catch above — wrap separately so a socket-level read
+  // failure (Bun DOMException `TimeoutError`, parse failure on truncated JSON, etc.) becomes
+  // an LlmError that the retry loop can recognise and shift models on.
+  let json: OpenRouterResponse;
+  try {
+    json = (await response.json()) as OpenRouterResponse;
+  } catch (cause: unknown) {
+    throw new LlmError("OpenRouter response body read failed", cause);
+  }
   const content = json.choices?.[0]?.message?.content;
   if (typeof content !== "string" || content.length === 0) {
     throw new LlmError("OpenRouter returned empty completion");
@@ -191,7 +207,10 @@ export async function callOpenRouter(prompt: string, opts: AskLlmOptions, timeou
       try {
         const result = await callOpenRouterOnce(prompt, opts, timeoutMs, model);
         if (modelIdx > 0 || attempt > 0) {
-          logger.info(`openrouter: succeeded on ${model} (modelIdx=${modelIdx} attempt=${attempt + 1})`);
+          const priorAttempts = modelIdx * ATTEMPTS_PER_MODEL + attempt;
+          logger.info(
+            `openrouter: RECOVERED FAILURE — succeeded on ${model} after ${priorAttempts} failed attempt(s) (modelIdx=${modelIdx} attempt=${attempt + 1})`,
+          );
         }
         return result;
       } catch (cause: unknown) {

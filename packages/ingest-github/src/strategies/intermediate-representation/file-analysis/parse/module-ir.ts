@@ -7,8 +7,8 @@ import { FALLBACK_LANGUAGE } from "#src/types/file-analysis.ts";
 import type {
   ImportSymbol,
   ModuleIr,
-} from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
-import type { SemanticFields } from "#src/strategies/intermediate-representation/reconstruction/types/semantics.ts";
+} from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
+import type { SemanticFields } from "#src/strategies/intermediate-representation/file-analysis/types/semantics.ts";
 import { asRecord, pickRecordArray } from "./primitives.ts";
 import { parseNamedConstants } from "./named-constants.ts";
 

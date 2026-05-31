@@ -9,7 +9,7 @@
  * the IR strategy does NOT roll chunks up into a per-file manifest.
  */
 import type { TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
-import type { FileAnalysisResult } from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
+import type { FileAnalysisResult } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 import type {
   LocatedDeclaration,
   SkimWindowOutline,
@@ -29,6 +29,8 @@ export interface IrFileAnalysisRecord {
   analysedAt: string;
   analysis: FileAnalysisResult;
   tokenUsage: TokenUsage;
+  /** Model id the LLM client actually answered with for THIS file/chunk (the surviving fallback, if any). Empty when no call succeeded (failure-fallback record). */
+  model: string;
 }
 
 /**

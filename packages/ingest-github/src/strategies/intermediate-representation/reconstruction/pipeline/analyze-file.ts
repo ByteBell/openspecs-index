@@ -8,15 +8,17 @@ import { type AskLlmOptions } from "@bb/llm";
 import { addUsage, ZERO_USAGE, type TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
 import { languageFromPath } from "#src/adapters/llm-file-analyzer.ts";
 import type { CodeUnit } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
-import type { ModuleIr } from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
+import type { ModuleIr } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 import type {
   FileReconstructionResult,
   UnitReconstruction,
 } from "#src/strategies/intermediate-representation/reconstruction/types/results.ts";
-import { computeModuleFingerprint } from "#src/strategies/intermediate-representation/reconstruction/fingerprint.ts";
-import { analyseFile as runFileAnalysis } from "#src/strategies/intermediate-representation/reconstruction/analyzers/analyse-file.ts";
+import { computeModuleFingerprint } from "#src/strategies/intermediate-representation/file-analysis/fingerprint.ts";
+import { analyseFile as runFileAnalysis } from "#src/strategies/intermediate-representation/file-analysis/analyse-file.ts";
 import { analyzeUnit } from "./analyze-unit.ts";
 import { buildResolutionContext } from "./resolution-context.ts";
+import { assembleFileFromUnits } from "./reconstruct-file.ts";
+import { verifyWholeFile } from "../analyzers/verify-whole-file.ts";
 
 /** Input to the whole-file pipeline. */
 export interface AnalyzeFileInput {
@@ -29,6 +31,12 @@ export interface AnalyzeFileInput {
   knowledgeId?: string;
   orgId?: string;
   llmCallContext?: AskLlmOptions;
+  /**
+   * Optional override for the equivalence (judge) call only. Forwarded unchanged to every
+   * per-unit verify call. Lets callers pin a single strong judge while sweeping the model under
+   * test across `llmCallContext`. When omitted, the judge uses `llmCallContext`.
+   */
+  judgeLlmCallContext?: AskLlmOptions;
 }
 
 /** Returns a copy of `unit` with scope keys stamped when supplied. */
@@ -75,6 +83,7 @@ export async function analyzeFile(input: AnalyzeFileInput): Promise<FileReconstr
       relativePath: input.relativePath,
       context: buildResolutionContext(split.split.module, split.split.units),
       ...(input.llmCallContext !== undefined ? { llmCallContext: input.llmCallContext } : {}),
+      ...(input.judgeLlmCallContext !== undefined ? { judgeLlmCallContext: input.judgeLlmCallContext } : {}),
     });
     usage = addUsage(usage, reconstruction.tokenUsage);
     units.push({ ...reconstruction, codeUnit: withScope(reconstruction.codeUnit, input.knowledgeId, input.orgId) });
@@ -84,6 +93,25 @@ export async function analyzeFile(input: AnalyzeFileInput): Promise<FileReconstr
     ...split.split.module,
     semanticFingerprint: computeModuleFingerprint(split.split.module, input.relativePath),
   };
+
+  // Whole-file verification: stitch unit skeletons + module-level header, ask the judge.
+  const assembledSource = assembleFileFromUnits({
+    module,
+    descriptors: split.split.units,
+    units,
+  });
+  const wholeFile = await verifyWholeFile({
+    relativePath: input.relativePath,
+    originalSource: input.source,
+    assembledSource,
+    ...(input.judgeLlmCallContext !== undefined
+      ? { llmCallContext: input.judgeLlmCallContext }
+      : input.llmCallContext !== undefined
+        ? { llmCallContext: input.llmCallContext }
+        : {}),
+  });
+  usage = addUsage(usage, wholeFile.tokenUsage);
+
   return {
     fileId: input.fileNodeId,
     relativePath: input.relativePath,
@@ -91,6 +119,9 @@ export async function analyzeFile(input: AnalyzeFileInput): Promise<FileReconstr
     module,
     units,
     reconstructionCompleteness: meanCompleteness(units),
+    assembledSource,
+    wholeFileReport: wholeFile.report,
+    wholeFileCompleteness: wholeFile.report.reconstructionCompleteness,
     tokenUsage: usage,
   };
 }

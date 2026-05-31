@@ -67,14 +67,30 @@ encoded with `encodeMetaPath` so slashes survive a flat layout. The chunk number
 filename only — the IR strategy does **not** roll chunks up into a per-file manifest, and each
 chunk record carries the parent file's `relativePath`.
 
+## Folder layout
+
+```text
+intermediate-representation/
+  file-analysis/      The SPLIT call: prompt, types, parsers, helpers. Owns the LLM call that
+                      turns a file (or chunk) into a FileAnalysisResult. See file-analysis/context.md.
+  reconstruction/     The recreate-and-diff loop: extract unit IR → regenerate source → judge
+                      equivalence. Consumes file-analysis output; never owns it. See reconstruction/CLAUDE.md.
+  big-file/           Boundary-aware skim + chunk cutting (used by phases 3+4).
+  phases/             The five IR phases (scan / analyse-small / boundaries / cut / analyse-big-chunks).
+```
+
+The split is enforced: nothing under `reconstruction/` carries file-analysis types, prompts, or
+parsers — they live under `file-analysis/`. The `phase2-mcp` strategy (sibling folder) reads
+file-analysis records as its pass-2 input.
+
 ## Naming
 
-- The file-analysis function is `analyseFile` (from `reconstruction/analyzers/analyse-file.ts`).
-  The reconstruction layer's whole-file pipeline (`pipeline/analyze-file.ts`) keeps the American
+- The file-analysis function is `analyseFile` (from `file-analysis/analyse-file.ts`).
+  The reconstruction layer's whole-file pipeline (`reconstruction/pipeline/analyze-file.ts`) keeps the American
   spelling `analyzeFile`; the two are distinguished by spelling — `analyseFile` is the single LLM
-  call, `analyzeFile` is the whole-file orchestrator.
+  call, `analyzeFile` is the whole-file orchestrator that consumes its output.
 - The result shape is `FileAnalysisResult` (renamed from `FileSplit` in
-  `reconstruction/types/module-ir.ts`); it is what gets persisted as `analysis` on every record.
+  `file-analysis/types/module-ir.ts`); it is what gets persisted as `analysis` on every record.
 
 ## Invariants
 

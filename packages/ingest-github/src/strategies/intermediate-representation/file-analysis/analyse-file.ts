@@ -9,13 +9,13 @@ import { askJsonLLM, type AskLlmOptions } from "@bb/llm";
 import { LlmConfigError, LlmError } from "@bb/errors";
 import { logger } from "@bb/logger";
 import { ZERO_USAGE } from "#src/strategies/intermediate-representation/parse.ts";
-import { parseFileAnalysisResult } from "#src/strategies/intermediate-representation/reconstruction/parse/file-split.ts";
-import type { AnalyseFileResult } from "#src/strategies/intermediate-representation/reconstruction/types/results.ts";
+import { parseFileAnalysisResult } from "#src/strategies/intermediate-representation/file-analysis/parse/file-analysis.ts";
+import type { AnalyseFileResult } from "#src/strategies/intermediate-representation/file-analysis/types/results.ts";
 import {
-  SPLIT_SYSTEM_PROMPT,
-  buildSplitUserPrompt,
-} from "#src/strategies/intermediate-representation/reconstruction/prompts/split.ts";
-import { usageOf } from "./usage.ts";
+  FILE_ANALYSIS_SYSTEM_PROMPT,
+  buildFileAnalysisUserPrompt,
+} from "#src/strategies/intermediate-representation/file-analysis/prompts/file-analysis.ts";
+import { usageOf } from "#src/strategies/intermediate-representation/usage.ts";
 
 /** Input to the file-analysis phase. */
 export interface AnalyseFileInput {
@@ -33,7 +33,7 @@ export interface AnalyseFileInput {
  * @returns The shaped {@link FileAnalysisResult} plus the call's token usage.
  */
 export async function analyseFile(input: AnalyseFileInput): Promise<AnalyseFileResult> {
-  const userPrompt = buildSplitUserPrompt({
+  const userPrompt = buildFileAnalysisUserPrompt({
     language: input.language,
     relativePath: input.relativePath,
     fileNodeId: input.fileNodeId,
@@ -41,21 +41,33 @@ export async function analyseFile(input: AnalyseFileInput): Promise<AnalyseFileR
   });
   try {
     const response = await askJsonLLM<Record<string, unknown>>(
-      SPLIT_SYSTEM_PROMPT,
+      FILE_ANALYSIS_SYSTEM_PROMPT,
       userPrompt,
       input.llmCallContext ?? {},
     );
     if (response.result === null) {
       logger.warn(`analyseFile: ${input.relativePath} returned unparseable JSON`);
-      return { split: parseFileAnalysisResult({}, input.fileNodeId), tokenUsage: usageOf(response.usage) };
+      return {
+        split: parseFileAnalysisResult({}, input.fileNodeId, input.source),
+        tokenUsage: usageOf(response.usage),
+        model: response.usage.model,
+      };
     }
-    return { split: parseFileAnalysisResult(response.result, input.fileNodeId), tokenUsage: usageOf(response.usage) };
+    return {
+      split: parseFileAnalysisResult(response.result, input.fileNodeId, input.source),
+      tokenUsage: usageOf(response.usage),
+      model: response.usage.model,
+    };
   } catch (cause: unknown) {
     if (cause instanceof LlmConfigError || cause instanceof LlmError) {
       throw cause;
     }
     const msg = cause instanceof Error ? cause.message : String(cause);
     logger.warn(`analyseFile: ${input.relativePath} askJsonLLM failed: ${msg}`);
-    return { split: parseFileAnalysisResult({}, input.fileNodeId), tokenUsage: ZERO_USAGE };
+    return {
+      split: parseFileAnalysisResult({}, input.fileNodeId, input.source),
+      tokenUsage: ZERO_USAGE,
+      model: "",
+    };
   }
 }

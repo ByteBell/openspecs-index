@@ -1,26 +1,28 @@
 /**
- * Public barrel for the reconstruction-grade IR path. Importers should depend ONLY on this
- * file (the package's `index.ts` re-exports it), never on internal modules.
+ * Public barrel for the reconstruction (recreate-and-diff) loop. Importers should depend ONLY
+ * on this file, never on internal modules.
+ *
+ * The file-analysis (SPLIT) call and its types live in `../file-analysis/` and are NOT
+ * re-exported here — they are not part of reconstruction's surface. Callers that need them
+ * import from `#src/strategies/intermediate-representation/file-analysis/...` directly.
  */
 export { createReconstructionAnalyzer, type ReconstructionAnalyzer } from "./analyzer.ts";
 
 // Phase inputs (for callers stepping a single phase).
-export type { AnalyseFileInput } from "./analyzers/analyse-file.ts";
 export type { ExtractUnitIrInput } from "./analyzers/extract-unit-ir.ts";
 export type { VerifyUnitInput } from "./analyzers/verify-unit.ts";
 export type { AnalyzeUnitInput } from "./pipeline/analyze-unit.ts";
 export type { AnalyzeFileInput } from "./pipeline/analyze-file.ts";
 
-// Result envelopes.
+// Result envelopes for the reconstruction phases (file-analysis's envelope lives in file-analysis/).
 export type {
-  AnalyseFileResult,
   UnitIrResult,
   VerifyUnitResult,
   UnitReconstruction,
   FileReconstructionResult,
 } from "./types/results.ts";
 
-// IR shapes (for consumers persisting / querying the records).
+// Per-unit IR shapes (for consumers persisting / querying the records).
 export type {
   CodeUnit,
   CodeUnitParameter,
@@ -32,13 +34,14 @@ export type {
   VerbatimBlock,
   ExampleIoPair,
 } from "./types/code-unit.ts";
-export type { ModuleIr, ImportSymbol, UnitDescriptor, FileAnalysisResult } from "./types/module-ir.ts";
-export type { SemanticFields } from "./types/semantics.ts";
 export type { EquivalenceReport, UnitVerification } from "./types/verification.ts";
+export type { WholeFileEquivalenceReport } from "./analyzers/verify-whole-file.ts";
+export { verifyWholeFile } from "./analyzers/verify-whole-file.ts";
+export { assembleFileFromUnits } from "./pipeline/reconstruct-file.ts";
 
-// Computed-in-code helpers (fingerprint + unit id) exposed for callers that persist records.
-export { computeUnitFingerprint, computeModuleFingerprint } from "./fingerprint.ts";
-export { buildUnitId } from "./unit-id.ts";
+// Unit fingerprint — computed in code, never by the LLM. The module fingerprint lives in
+// file-analysis/.
+export { computeUnitFingerprint } from "./fingerprint.ts";
 
 // File → records: module-level record + keyed code-units map. Shared by the normal-file path and
 // the big-file per-chunk reconstruction; used by callers that persist file-analysis + code-units.

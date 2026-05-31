@@ -19,7 +19,7 @@ import { runInPool } from "#src/pipeline/concurrency.ts";
 import { throwIfCancelled, CancellationError } from "#src/pipeline/cancellation.ts";
 import { languageFromPath } from "#src/adapters/llm-file-analyzer.ts";
 import { readScanManifest } from "#src/strategies/flat-folder/scan-manifest.ts";
-import { analyseFile } from "#src/strategies/intermediate-representation/reconstruction/analyzers/analyse-file.ts";
+import { analyseFile } from "#src/strategies/intermediate-representation/file-analysis/analyse-file.ts";
 import { addUsage, ZERO_USAGE, type TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
 import type {
   IrBigFileChunkRaw,
@@ -114,7 +114,7 @@ export async function analyseBigChunks(input: AnalyseBigChunksInput): Promise<An
         if (input.llmCallContext !== undefined) {
           analyseInput.llmCallContext = input.llmCallContext;
         }
-        const { split: analysis, tokenUsage } = await analyseFile(analyseInput);
+        const { split: analysis, tokenUsage, model } = await analyseFile(analyseInput);
         const record: IrFileAnalysisRecord = {
           relativePath,
           language: analysis.module.language.length > 0 ? analysis.module.language : language,
@@ -124,11 +124,18 @@ export async function analyseBigChunks(input: AnalyseBigChunksInput): Promise<An
           analysedAt: new Date().toISOString(),
           analysis,
           tokenUsage,
+          model,
         };
         await saveAnalysedChunk(input.metaPaths, relativePath, chunkNumber, record);
         analysed += 1;
         totalUsage = addUsage(totalUsage, tokenUsage);
-        reporter?.increment(1, { fileName: tag });
+        reporter?.increment(1, {
+          fileName: tag,
+          inputTokens: tokenUsage.inputTokens,
+          outputTokens: tokenUsage.outputTokens,
+          costUsd: tokenUsage.costUsd,
+          model,
+        });
       } catch (cause: unknown) {
         if (cause instanceof CancellationError) {
           throw cause;

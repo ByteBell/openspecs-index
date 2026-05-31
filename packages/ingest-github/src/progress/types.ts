@@ -19,13 +19,27 @@ export interface ProgressReporterInput {
 }
 
 /**
+ * Optional per-increment annotations. `fileName` labels the in-flight task. The four LLM
+ * fields — `inputTokens`, `outputTokens`, `costUsd`, `model` — let phases that just finished an
+ * LLM call stream usage into the reporter so cli renderers can show running totals next to the
+ * bar. Phases without LLM work (scan, cut-big-files) omit them.
+ */
+export interface ProgressIncrementMeta {
+  fileName?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+  model?: string;
+}
+
+/**
  * Per-phase progress sink. One instance per phase or sub-phase of a job.
  * The host implementation decides whether emissions are timer-sampled,
  * push-per-call, persisted, or discarded.
  */
 export interface ProgressReporter {
   start(): Promise<void>;
-  increment(delta?: number, meta?: { fileName?: string }): void;
+  increment(delta?: number, meta?: ProgressIncrementMeta): void;
   /** Grow the denominator when the work set is a streaming iterator. */
   incrementSeen(delta?: number): void;
   setTotal(total: number): void;

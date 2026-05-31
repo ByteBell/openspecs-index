@@ -16,6 +16,13 @@ export interface VerifyUnitInput {
   /** The unit's original verbatim source (the oracle). */
   originalSource: string;
   llmCallContext?: AskLlmOptions;
+  /**
+   * Optional override for the equivalence (judge) call only. When supplied, regeneration still
+   * uses {@link VerifyUnitInput.llmCallContext} (the model under test) but the equivalence
+   * judgement runs against this distinct model — letting callers pin a single strong judge while
+   * benchmarking other models. When omitted, the judge falls back to `llmCallContext`.
+   */
+  judgeLlmCallContext?: AskLlmOptions;
 }
 
 /**
@@ -26,11 +33,12 @@ export interface VerifyUnitInput {
  */
 export async function verifyUnit(input: VerifyUnitInput): Promise<VerifyUnitResult> {
   const regen = await regenerateUnit(input.unit, input.llmCallContext);
+  const judgeContext = input.judgeLlmCallContext ?? input.llmCallContext;
   const equiv = await verifyEquivalence({
     qualifiedName: input.unit.qualifiedName,
     originalSource: input.originalSource,
     regeneratedSource: regen.regeneratedSource,
-    ...(input.llmCallContext !== undefined ? { llmCallContext: input.llmCallContext } : {}),
+    ...(judgeContext !== undefined ? { llmCallContext: judgeContext } : {}),
   });
   const tokenUsage: TokenUsage = addUsage(regen.tokenUsage, equiv.tokenUsage);
   return {

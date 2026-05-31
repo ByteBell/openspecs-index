@@ -35,4 +35,6 @@ export enum Config {
   SkipDecisionEnabled = "skip.decision.enabled",
   SkipDecisionMaxCharsForLlm = "skip.decision.max.chars.for.llm",
   SkipDecisionCachePath = "skip.decision.cache.path",
+  McpEnrichmentUrl = "mcp_enrichment.url",
+  McpEnrichmentAuthHeader = "mcp_enrichment.auth_header",
 }

@@ -6,7 +6,7 @@
 import type {
   ModuleIr,
   UnitDescriptor,
-} from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
+} from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 
 /**
  * Renders the resolution context for one file.

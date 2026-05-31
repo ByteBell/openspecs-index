@@ -7,7 +7,7 @@
 import { type AskLlmOptions } from "@bb/llm";
 import { addUsage, type TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
 import type { CodeUnit } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
-import type { UnitDescriptor } from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
+import type { UnitDescriptor } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 import type { UnitReconstruction } from "#src/strategies/intermediate-representation/reconstruction/types/results.ts";
 import type { UnitVerification } from "#src/strategies/intermediate-representation/reconstruction/types/verification.ts";
 import { computeUnitFingerprint } from "#src/strategies/intermediate-representation/reconstruction/fingerprint.ts";
@@ -23,6 +23,8 @@ export interface AnalyzeUnitInput {
   /** Imports + sibling signatures for resolution only. */
   context: string;
   llmCallContext?: AskLlmOptions;
+  /** Optional judge override forwarded to {@link verifyUnit}. See its docstring. */
+  judgeLlmCallContext?: AskLlmOptions;
 }
 
 /** Builds the unit-IR extraction input, threading the optional LLM context only when present. */
@@ -44,6 +46,7 @@ function verifyInput(input: AnalyzeUnitInput, unit: CodeUnit): Parameters<typeof
     unit,
     originalSource: input.descriptor.source,
     ...(input.llmCallContext !== undefined ? { llmCallContext: input.llmCallContext } : {}),
+    ...(input.judgeLlmCallContext !== undefined ? { judgeLlmCallContext: input.judgeLlmCallContext } : {}),
   };
 }
 

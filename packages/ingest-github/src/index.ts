@@ -132,6 +132,7 @@ export {
 export type {
   ProgressContext,
   ProgressContextFactory,
+  ProgressIncrementMeta,
   ProgressPhase,
   ProgressReporter,
   ProgressReporterInput,
@@ -139,31 +140,42 @@ export type {
 } from "./progress/types.ts";
 export { nullProgressContextFactory } from "./progress/NullProgressReporter.ts";
 
-// Reconstruction-grade IR analyzer (intermediate-representation strategy). Exposed so callers
-// outside the package can run the split / unit-IR / verify phases or the whole-file pipeline.
+// File-analysis (SPLIT call) surface — owns the prompt that produces a file-level analysis +
+// module IR + unit list, plus the shapes those records share. The reconstruction loop consumes
+// these records; pass-2 (phase2-mcp) enriches them; flat-folder is untouched.
+export { analyseFile, type AnalyseFileInput } from "./strategies/intermediate-representation/file-analysis/analyse-file.ts";
+export type { AnalyseFileResult } from "./strategies/intermediate-representation/file-analysis/types/results.ts";
+export type {
+  ModuleIr,
+  ImportSymbol,
+  UnitDescriptor,
+  FileAnalysisResult,
+} from "./strategies/intermediate-representation/file-analysis/types/module-ir.ts";
+export type { SemanticFields } from "./strategies/intermediate-representation/file-analysis/types/semantics.ts";
+export type { UnitConstant } from "./strategies/intermediate-representation/file-analysis/types/named-constant.ts";
+export { computeModuleFingerprint } from "./strategies/intermediate-representation/file-analysis/fingerprint.ts";
+export { buildUnitId } from "./strategies/intermediate-representation/file-analysis/unit-id.ts";
+
+// Reconstruction (recreate-and-diff) analyzer. Exposed so callers can run the unit-IR / verify
+// phases or the whole-file pipeline against an already-produced file-analysis split.
 export {
   createReconstructionAnalyzer,
   type ReconstructionAnalyzer,
-  type AnalyseFileInput,
   type ExtractUnitIrInput,
   type VerifyUnitInput,
   type AnalyzeUnitInput,
   type AnalyzeFileInput,
-  type AnalyseFileResult,
   type UnitIrResult,
   type VerifyUnitResult,
   type UnitReconstruction,
   type FileReconstructionResult,
   type CodeUnit,
-  type ModuleIr,
-  type UnitDescriptor,
-  type FileAnalysisResult,
-  type SemanticFields,
   type EquivalenceReport,
   type UnitVerification,
+  type WholeFileEquivalenceReport,
+  verifyWholeFile,
+  assembleFileFromUnits,
   computeUnitFingerprint,
-  computeModuleFingerprint,
-  buildUnitId,
   analyzeFileToRecords,
   codeUnitKey,
   type AnalyzeFileToRecordsInput,
@@ -238,3 +250,18 @@ export {
   type LogCommitDiffInput,
   type LogNoPriorCommitInput,
 } from "./strategies/intermediate-representation/incremental.ts";
+
+// mcp-enrichment strategy — pass-2 cross-file enrichment over file-analysis records, written
+// to `mcpEnrichmentDir/<encoded>.json` (and per chunk for big files). Reads `Config.McpEnrichmentUrl`
+// at startup; never mutates the file-analysis records on disk.
+export {
+  createMcpEnrichmentStrategy,
+  type McpEnrichmentStrategyDeps,
+} from "./strategies/mcp-enrichment/index.ts";
+export type {
+  McpEnrichmentRecord,
+  EnrichmentProvenance,
+  FieldProvenance,
+  McpToolCallLog,
+  McpToolName,
+} from "./strategies/mcp-enrichment/records.ts";

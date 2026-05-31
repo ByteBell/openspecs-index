@@ -57,12 +57,8 @@ export interface UnitMember {
   static: boolean;
 }
 
-/** A literal preserved verbatim (magic number, address, enum value, ...). */
-export interface UnitConstant {
-  name: string | null;
-  value: string;
-  kind: string;
-}
+import type { UnitConstant } from "#src/strategies/intermediate-representation/file-analysis/types/named-constant.ts";
+export type { UnitConstant };
 
 /** A verbatim block kept exactly (regex, format string, template, inline assembly). */
 export interface VerbatimBlock {

@@ -1,6 +1,7 @@
 import type {
   ProgressContext,
   ProgressContextFactory,
+  ProgressIncrementMeta,
   ProgressPhase,
   ProgressReporter,
   ProgressReporterInput,
@@ -10,7 +11,7 @@ class NullProgressReporter implements ProgressReporter {
   async start(): Promise<void> {
     /* no-op */
   }
-  increment(_delta?: number, _meta?: { fileName?: string }): void {
+  increment(_delta?: number, _meta?: ProgressIncrementMeta): void {
     /* no-op */
   }
   incrementSeen(_delta?: number): void {

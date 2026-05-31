@@ -13,7 +13,7 @@ import {
   EQUIVALENCE_SYSTEM_PROMPT,
   buildEquivalenceUserPrompt,
 } from "#src/strategies/intermediate-representation/reconstruction/prompts/verify.ts";
-import { usageOf } from "./usage.ts";
+import { usageOf } from "#src/strategies/intermediate-representation/usage.ts";
 
 /** The equivalence report plus the call's token usage. */
 export interface VerifyEquivalenceResult {

@@ -1,17 +1,13 @@
 /**
- * The result envelopes returned by the exposed analyzer phases. Each carries its own
- * `TokenUsage` so callers can meter cost per phase and sum across a file.
+ * Per-phase result envelopes for the reconstruction (recreate-and-diff) loop. Each carries its
+ * own `TokenUsage` so callers can meter cost per phase. The file-analysis call's envelope
+ * (`AnalyseFileResult`) lives in `file-analysis/types/results.ts`, not here.
  */
 import type { TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
+import type { ModuleIr } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 import type { CodeUnit } from "./code-unit.ts";
-import type { FileAnalysisResult, ModuleIr } from "./module-ir.ts";
 import type { UnitVerification } from "./verification.ts";
-
-/** Result of the file-analysis call: the file split plus the call's token usage. */
-export interface AnalyseFileResult {
-  split: FileAnalysisResult;
-  tokenUsage: TokenUsage;
-}
+import type { WholeFileEquivalenceReport } from "#src/strategies/intermediate-representation/reconstruction/analyzers/verify-whole-file.ts";
 
 /**
  * Result of Prompt 2 (unit IR). The `codeUnit` here has an empty `semanticFingerprint` —
@@ -42,8 +38,10 @@ export interface UnitReconstruction {
 
 /**
  * The whole-file reconstruction result: the fingerprinted module IR, every finalised unit,
- * and the summed token usage. `reconstructionCompleteness` is the mean of the per-unit
- * completeness scores (1 when there are no behavioral units to verify).
+ * the deterministically assembled file source, the whole-file judge verdict, and the summed
+ * token usage. `reconstructionCompleteness` is the mean of the per-unit structural scores
+ * (1 when there are no behavioral units to verify). `wholeFileCompleteness` is the whole-file
+ * judge's `[0, 1]` score comparing the ASSEMBLED file to the ORIGINAL.
  */
 export interface FileReconstructionResult {
   fileId: string;
@@ -52,5 +50,8 @@ export interface FileReconstructionResult {
   module: ModuleIr;
   units: UnitReconstruction[];
   reconstructionCompleteness: number;
+  assembledSource: string;
+  wholeFileReport: WholeFileEquivalenceReport;
+  wholeFileCompleteness: number;
   tokenUsage: TokenUsage;
 }

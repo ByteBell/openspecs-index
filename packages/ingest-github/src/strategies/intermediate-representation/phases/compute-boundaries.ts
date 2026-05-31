@@ -110,7 +110,12 @@ export async function computeBigFileBoundaries(input: ComputeBoundariesInput): P
         await saveBoundaries(input.metaPaths, boundaries);
         totalUsage = addUsage(totalUsage, usage);
         processed += 1;
-        reporter?.increment(1, { fileName: entry.relativePath });
+        reporter?.increment(1, {
+          fileName: entry.relativePath,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          costUsd: usage.costUsd,
+        });
       } catch (cause: unknown) {
         if (cause instanceof CancellationError) {
           throw cause;

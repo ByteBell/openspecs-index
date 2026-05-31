@@ -53,6 +53,8 @@ export const configSchema = z
     "skip.decision.enabled": z.boolean().default(true),
     "skip.decision.max.chars.for.llm": z.number().int().positive().default(4000),
     "skip.decision.cache.path": z.string().default(""),
+    "mcp_enrichment.url": z.string().default(""),
+    "mcp_enrichment.auth_header": z.string().default(""),
   })
   .strict();
 
@@ -97,6 +99,8 @@ export type ConfigValueMap = {
   [Config.SkipDecisionEnabled]: boolean;
   [Config.SkipDecisionMaxCharsForLlm]: number;
   [Config.SkipDecisionCachePath]: string;
+  [Config.McpEnrichmentUrl]: string;
+  [Config.McpEnrichmentAuthHeader]: string;
 };
 
 export type ConfigValue<K extends Config> = ConfigValueMap[K];
@@ -155,6 +159,8 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.SkipDecisionEnabled]: "bytebell set skip.decision.enabled <true|false>",
   [Config.SkipDecisionMaxCharsForLlm]: "bytebell set skip.decision.max.chars.for.llm <n>",
   [Config.SkipDecisionCachePath]: "bytebell set skip.decision.cache.path <path>",
+  [Config.McpEnrichmentUrl]: "bytebell set mcp_enrichment.url <url>",
+  [Config.McpEnrichmentAuthHeader]: "bytebell set mcp_enrichment.auth_header <header>",
 };
 
 export function readField<K extends Config>(cfg: BytebellConfig, key: K): ConfigValue<K> {
@@ -231,6 +237,10 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg["skip.decision.max.chars.for.llm"] as ConfigValue<K>;
     case Config.SkipDecisionCachePath:
       return cfg["skip.decision.cache.path"] as ConfigValue<K>;
+    case Config.McpEnrichmentUrl:
+      return cfg["mcp_enrichment.url"] as ConfigValue<K>;
+    case Config.McpEnrichmentAuthHeader:
+      return cfg["mcp_enrichment.auth_header"] as ConfigValue<K>;
   }
 }
 
@@ -308,5 +318,9 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, "skip.decision.max.chars.for.llm": value as number };
     case Config.SkipDecisionCachePath:
       return { ...cfg, "skip.decision.cache.path": value as string };
+    case Config.McpEnrichmentUrl:
+      return { ...cfg, "mcp_enrichment.url": value as string };
+    case Config.McpEnrichmentAuthHeader:
+      return { ...cfg, "mcp_enrichment.auth_header": value as string };
   }
 }

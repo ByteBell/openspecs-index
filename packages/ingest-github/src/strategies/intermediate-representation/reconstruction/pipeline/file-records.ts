@@ -11,9 +11,9 @@ import { logger } from "@bb/logger";
 import { addUsage, ZERO_USAGE, type TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
 import { languageFromPath } from "#src/adapters/llm-file-analyzer.ts";
 import type { CodeUnit } from "#src/strategies/intermediate-representation/reconstruction/types/code-unit.ts";
-import type { ModuleIr, UnitDescriptor } from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
-import { computeModuleFingerprint } from "#src/strategies/intermediate-representation/reconstruction/fingerprint.ts";
-import { analyseFile as runFileAnalysis } from "#src/strategies/intermediate-representation/reconstruction/analyzers/analyse-file.ts";
+import type { ModuleIr, UnitDescriptor } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
+import { computeModuleFingerprint } from "#src/strategies/intermediate-representation/file-analysis/fingerprint.ts";
+import { analyseFile as runFileAnalysis } from "#src/strategies/intermediate-representation/file-analysis/analyse-file.ts";
 import { analyzeUnit } from "./analyze-unit.ts";
 import { buildResolutionContext } from "./resolution-context.ts";
 

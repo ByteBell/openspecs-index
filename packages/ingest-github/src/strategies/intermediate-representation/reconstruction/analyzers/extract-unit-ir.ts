@@ -9,13 +9,13 @@ import { LlmConfigError, LlmError } from "@bb/errors";
 import { logger } from "@bb/logger";
 import { ZERO_USAGE } from "#src/strategies/intermediate-representation/parse.ts";
 import { parseCodeUnit } from "#src/strategies/intermediate-representation/reconstruction/parse/code-unit.ts";
-import type { UnitDescriptor } from "#src/strategies/intermediate-representation/reconstruction/types/module-ir.ts";
+import type { UnitDescriptor } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 import type { UnitIrResult } from "#src/strategies/intermediate-representation/reconstruction/types/results.ts";
 import {
   UNIT_IR_SYSTEM_PROMPT,
   buildUnitIrUserPrompt,
 } from "#src/strategies/intermediate-representation/reconstruction/prompts/unit-ir.ts";
-import { usageOf } from "./usage.ts";
+import { usageOf } from "#src/strategies/intermediate-representation/usage.ts";
 
 /** Input to the unit-IR phase. */
 export interface ExtractUnitIrInput {
