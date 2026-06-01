@@ -13,9 +13,15 @@
  *   5) analyse-big-chunks — for every raw chunk, run the SAME file-analysis call used for small
  *                            files; persist the result as `chunk-N.json`. Each chunk record
  *                            carries the parent file's `relativePath`; chunks are NOT rolled up.
+ *   6) extract-unit-sources — PURE. For every file-analysis record on disk (small + chunk),
+ *                            re-project each UnitDescriptor onto its own `<safeUnit>.source.json`
+ *                            under `unitAnalysisDir/<encoded>/(chunk-N/)?`. No LLM call.
+ *   7) analyse-units       — one LLM call per unit source record. Persists
+ *                            `<safeUnit>.analysis.json` (fingerprinted CodeUnit + accounting)
+ *                            beside the source record.
  *
- * The IR strategy stops after the analyses are on disk: no folder / repo summary, no Neo4j
- * writes, no reconstruction. Those land downstream.
+ * The IR strategy stops once the per-unit analysis records are on disk: no folder / repo
+ * summary, no Neo4j writes, no reconstruction. Those land downstream.
  */
 import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
@@ -32,6 +38,8 @@ import { analyseSmallFiles } from "./phases/analyse-small.ts";
 import { computeBigFileBoundaries } from "./phases/compute-boundaries.ts";
 import { cutBigFiles } from "./phases/cut-big-files.ts";
 import { analyseBigChunks } from "./phases/analyse-big-chunks.ts";
+import { extractUnitSources } from "./phases/extract-unit-sources.ts";
+import { analyseUnits } from "./phases/analyse-units.ts";
 
 export interface IrStrategyDeps {
   progressContextFactory?: ProgressContextFactory;
@@ -126,12 +134,39 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
         const chunkResult = await analyseBigChunks(chunkInput);
         usage = addUsage(usage, chunkResult.tokenUsage);
 
+        // 6) extract-unit-sources — PURE. Re-project every UnitDescriptor onto its own
+        // <safeUnit>.source.json under unitAnalysisDir/<encoded>/(chunk-N/)?.
+        throwIfCancelled(knowledgeId);
+        const sourcesResult = await extractUnitSources({
+          knowledgeId,
+          metaPaths,
+          concurrency: llmConcurrency,
+          progressContext,
+        });
+
+        // 7) analyse-units — one LLM call per unit; writes <safeUnit>.analysis.json beside
+        // each source record. Honors LlmConcurrency + the active llmCallContext.
+        throwIfCancelled(knowledgeId);
+        const unitsInput: Parameters<typeof analyseUnits>[0] = {
+          knowledgeId,
+          metaPaths,
+          concurrency: llmConcurrency,
+          progressContext,
+        };
+        if (llmCallContext !== undefined) {
+          unitsInput.llmCallContext = llmCallContext;
+        }
+        const unitsResult = await analyseUnits(unitsInput);
+        usage = addUsage(usage, unitsResult.tokenUsage);
+
         progressContext.completed();
 
         logger.info(
           `ir: done — small=${smallResult.analysed}+${smallResult.cached} ` +
             `boundaries=${boundariesResult.processed}+${boundariesResult.cached} ` +
             `cut=${cutResult.cut}+${cutResult.cached} chunks=${chunkResult.analysed}+${chunkResult.cached} ` +
+            `unit-sources=${sourcesResult.extracted}+${sourcesResult.cached} ` +
+            `units=${unitsResult.analysed}+${unitsResult.cached} ` +
             `tokens(in/out)=${usage.inputTokens}/${usage.outputTokens} cost=$${usage.costUsd.toFixed(4)}`,
         );
 

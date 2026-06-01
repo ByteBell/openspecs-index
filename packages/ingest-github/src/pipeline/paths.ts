@@ -30,6 +30,7 @@ export function metaPathsFor(knowledgeId: string): MetaPaths {
     bigFileAnalysisDir: path.join(metaRoot, "big-file-analysis"),
     bigFileChunksDir: path.join(metaRoot, "big-file-analysis", "chunks"),
     mcpEnrichmentDir: path.join(metaRoot, "mcp-enrichment"),
+    unitAnalysisDir: path.join(metaRoot, "unit-analysis"),
     bigFilesJson: path.join(metaRoot, "bigFiles.json"),
     scanManifestJson: path.join(metaRoot, "scan-manifest.json"),
     repoSummaryJson: path.join(metaRoot, "repo-summary.json"),
@@ -71,6 +72,74 @@ export async function ensureMetaDirs(paths: MetaPaths): Promise<void> {
   await mkdir(paths.bigFileAnalysisDir, { recursive: true, mode: DIR_MODE });
   await mkdir(paths.bigFileChunksDir, { recursive: true, mode: DIR_MODE });
   await mkdir(paths.mcpEnrichmentDir, { recursive: true, mode: DIR_MODE });
+  await mkdir(paths.unitAnalysisDir, { recursive: true, mode: DIR_MODE });
+}
+
+/**
+ * Filesystem-safe encoding of a code unit's qualified name. Strips characters that are
+ * problematic on case-insensitive or path-restricted filesystems and caps length at 80.
+ */
+export function safeUnitName(qualifiedName: string): string {
+  return qualifiedName.replace(/[^A-Za-z0-9._-]+/gu, "_").slice(0, 80);
+}
+
+/** Absolute path of the per-file file-analysis record for a small file. */
+export function fileAnalysisRecordPath(metaPaths: MetaPaths, relativePath: string): string {
+  return path.join(metaPaths.fileAnalysisDir, `${encodeMetaPath(relativePath)}.json`);
+}
+
+/** Absolute path of the boundaries record for one big file. */
+export function bigFileBoundariesPath(metaPaths: MetaPaths, relativePath: string): string {
+  return path.join(metaPaths.bigFileAnalysisDir, `${encodeMetaPath(relativePath)}.boundaries.json`);
+}
+
+/** Per-file chunk directory holding every `chunk-N.*.json` for one big file. */
+export function bigFileChunkDir(metaPaths: MetaPaths, relativePath: string): string {
+  return path.join(metaPaths.bigFileChunksDir, encodeMetaPath(relativePath));
+}
+
+/** Absolute path of one big-file raw chunk record (`chunk-N.raw.json`, 1-based). */
+export function bigFileRawChunkPath(metaPaths: MetaPaths, relativePath: string, chunkNumber: number): string {
+  return path.join(bigFileChunkDir(metaPaths, relativePath), `chunk-${String(chunkNumber)}.raw.json`);
+}
+
+/** Absolute path of one big-file analysed chunk record (`chunk-N.json`, 1-based). */
+export function bigFileAnalysedChunkPath(
+  metaPaths: MetaPaths,
+  relativePath: string,
+  chunkNumber: number,
+): string {
+  return path.join(bigFileChunkDir(metaPaths, relativePath), `chunk-${String(chunkNumber)}.json`);
+}
+
+/**
+ * Per-file/per-chunk unit directory holding `<safeUnit>.source.json` /
+ * `<safeUnit>.analysis.json`. `chunkNumber === null` for small files;
+ * `chunkNumber >= 1` for big-file chunks (matches the chunk-N file-analysis record).
+ */
+export function unitDirFor(metaPaths: MetaPaths, relativePath: string, chunkNumber: number | null): string {
+  const base = path.join(metaPaths.unitAnalysisDir, encodeMetaPath(relativePath));
+  return chunkNumber === null ? base : path.join(base, `chunk-${String(chunkNumber)}`);
+}
+
+/** Absolute path of one unit's `<name>.source.json` record. */
+export function unitSourceRecordPath(
+  metaPaths: MetaPaths,
+  relativePath: string,
+  chunkNumber: number | null,
+  qualifiedName: string,
+): string {
+  return path.join(unitDirFor(metaPaths, relativePath, chunkNumber), `${safeUnitName(qualifiedName)}.source.json`);
+}
+
+/** Absolute path of one unit's `<name>.analysis.json` record. */
+export function unitAnalysisRecordPath(
+  metaPaths: MetaPaths,
+  relativePath: string,
+  chunkNumber: number | null,
+  qualifiedName: string,
+): string {
+  return path.join(unitDirFor(metaPaths, relativePath, chunkNumber), `${safeUnitName(qualifiedName)}.analysis.json`);
 }
 
 const SLASH_RE = /\//gu;

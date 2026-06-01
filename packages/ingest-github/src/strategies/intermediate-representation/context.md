@@ -45,10 +45,25 @@ disk).
                            Writes:  metaPaths.bigFileChunksDir/<encoded>/chunk-1.json
                                     chunk-2.json, …  (1-indexed)
                                     relativePath in the record = the parent file's path
+
+6. extract-unit-sources    pure / no LLM. For every file-analysis record on disk (small file +
+                           big-file chunk), re-project each UnitDescriptor onto its own
+                           `<safeUnit>.source.json` file. The descriptor's `source` slice was
+                           populated at file-analysis time, so this phase only re-emits it as
+                           its own record with sha256/sizeBytes/tokenCount.
+                           Writes:  metaPaths.unitAnalysisDir/<encoded>/<safeUnit>.source.json
+                                    metaPaths.unitAnalysisDir/<encoded>/chunk-<N>/<safeUnit>.source.json
+
+7. analyse-units           one LLM call per unit source record (the unit-IR analysis call).
+                           Reads the source record + the parent's ModuleIr + sibling
+                           descriptors to build the resolution context, then runs
+                           `extractUnit` (analyse-unit-ir + fingerprint).
+                           Writes:  metaPaths.unitAnalysisDir/<encoded>/<safeUnit>.analysis.json
+                                    metaPaths.unitAnalysisDir/<encoded>/chunk-<N>/<safeUnit>.analysis.json
+                                    one IrUnitAnalysisRecord per unit
 ```
 
-Nothing else runs from here. No folder summary, no repo summary, no Neo4j writes, no
-reconstruction.
+Nothing else runs from here. No folder summary, no repo summary, no Neo4j writes.
 
 ## Inputs / outputs
 
@@ -59,6 +74,8 @@ reconstruction.
 | compute-boundaries   | `scan-manifest.json`, source `readFile`                | per-file `<x>.boundaries.json`                |
 | cut-big-files        | `scan-manifest.json`, `<x>.boundaries.json`, source    | per-chunk `chunk-N.raw.json`                  |
 | analyse-big-chunks   | `scan-manifest.json`, `chunk-N.raw.json`               | per-chunk `chunk-N.json`                      |
+| extract-unit-sources | `scan-manifest.json`, per-file/per-chunk file-analysis records | per-unit `<safeUnit>.source.json`     |
+| analyse-units        | per-unit source records + parent file-analysis records | per-unit `<safeUnit>.analysis.json`           |
 
 ## Storage
 
@@ -73,22 +90,21 @@ chunk record carries the parent file's `relativePath`.
 intermediate-representation/
   file-analysis/      The SPLIT call: prompt, types, parsers, helpers. Owns the LLM call that
                       turns a file (or chunk) into a FileAnalysisResult. See file-analysis/context.md.
-  reconstruction/     The recreate-and-diff loop: extract unit IR → regenerate source → judge
-                      equivalence. Consumes file-analysis output; never owns it. See reconstruction/CLAUDE.md.
+  unit-analysis/      The per-unit IR-extraction surface (phase 7's workhorse): unit-IR LLM
+                      call, fingerprint, file→records helper.
   big-file/           Boundary-aware skim + chunk cutting (used by phases 3+4).
-  phases/             The five IR phases (scan / analyse-small / boundaries / cut / analyse-big-chunks).
+  phases/             The seven IR phases (scan / analyse-small / boundaries / cut /
+                      analyse-big-chunks / extract-unit-sources / analyse-units).
 ```
 
-The split is enforced: nothing under `reconstruction/` carries file-analysis types, prompts, or
-parsers — they live under `file-analysis/`. The `phase2-mcp` strategy (sibling folder) reads
-file-analysis records as its pass-2 input.
+The `phase2-mcp` strategy (sibling folder) reads file-analysis records as its pass-2 input.
 
 ## Naming
 
 - The file-analysis function is `analyseFile` (from `file-analysis/analyse-file.ts`).
-  The reconstruction layer's whole-file pipeline (`reconstruction/pipeline/analyze-file.ts`) keeps the American
-  spelling `analyzeFile`; the two are distinguished by spelling — `analyseFile` is the single LLM
-  call, `analyzeFile` is the whole-file orchestrator that consumes its output.
+- The unit-IR analysis function is `analyzeUnitIr` (from `unit-analysis/analyze-unit-ir.ts`);
+  the per-unit extract+fingerprint orchestrator is `extractUnit`
+  (from `unit-analysis/extract-unit.ts`).
 - The result shape is `FileAnalysisResult` (renamed from `FileSplit` in
   `file-analysis/types/module-ir.ts`); it is what gets persisted as `analysis` on every record.
 
@@ -105,12 +121,15 @@ file-analysis records as its pass-2 input.
 | File                                    | Responsibility                                          |
 | --------------------------------------- | ------------------------------------------------------- |
 | `index.ts`                              | Strategy facade. `createIrStrategy()` returns an `IngestStrategy`. |
-| `records.ts`                            | Persisted record types (`IrFileAnalysisRecord`, `IrBigFileBoundaries`, `IrBigFileChunkRaw`). |
-| `storage.ts`                            | Disk I/O — save / read / list helpers for every record. |
+| `records.ts`                            | Persisted file-level record types (`IrFileAnalysisRecord`, `IrBigFileBoundaries`, `IrBigFileChunkRaw`). |
+| `types.ts`                              | Per-unit record types (`IrUnitSourceRecord`, `IrUnitAnalysisRecord`) + big-file skim/outline types. |
+| `storage.ts`                            | Disk I/O — save / read / list helpers for every record. ALL paths come from `#src/pipeline/paths.ts`. |
 | `phases/scan-and-classify.ts`           | Phase 1.                                                |
 | `phases/analyse-small.ts`               | Phase 2.                                                |
 | `phases/compute-boundaries.ts`          | Phase 3.                                                |
 | `phases/cut-big-files.ts`               | Phase 4 (pure).                                         |
 | `phases/analyse-big-chunks.ts`          | Phase 5.                                                |
+| `phases/extract-unit-sources.ts`        | Phase 6 (pure).                                         |
+| `phases/analyse-units.ts`               | Phase 7.                                                |
+| `unit-analysis/`                        | Per-unit IR extraction surface — analyze-unit-ir, extract-unit, fingerprint, file→records. |
 | `big-file/skim.ts`, `big-file/declarations.ts`, `chunking.ts` | Reused by phases 3 + 4.        |
-| `reconstruction/`                       | Untouched. Not orchestrated by this strategy.           |

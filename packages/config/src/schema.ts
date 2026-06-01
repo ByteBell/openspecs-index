@@ -37,7 +37,7 @@ export const configSchema = z
     ollama_url: z.string().default("http://localhost:11434"),
     ollama_model: z.string().default(""),
     "context.window.limit": z.number().int().positive().default(15000),
-    "max.tokens.per.chunk": z.number().int().positive().default(6000),
+    "max.tokens.per.chunk": z.number().int().positive().default(10000),
     "big.file.concurrency": z.number().int().positive().default(25),
     "absolute.file.size.cap": z.number().int().positive().default(52428800),
     "concurrent.workers": z.number().int().positive().default(4),

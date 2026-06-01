@@ -4,6 +4,8 @@
  * to cut the analysis chunks, and the per-chunk record that is kept verbatim (never condensed).
  */
 import type { FileAnalysis } from "@bb/mongo";
+import type { TokenUsage } from "#src/strategies/intermediate-representation/parse.ts";
+import type { CodeUnit } from "#src/strategies/intermediate-representation/unit-analysis/types/code-unit.ts";
 
 /**
  * One top-level declaration discovered during the skim pass. `signature` is the verbatim first
@@ -61,4 +63,52 @@ export interface IrChunkRecord {
   language: string;
   analysis: FileAnalysis;
   tokenUsage?: { inputTokens: number; outputTokens: number; costUsd: number } | undefined;
+}
+
+/**
+ * Per-unit SOURCE record written by Phase 6 (`extract-unit-sources`, pure). One file per
+ * discovered unit descriptor, stored under
+ * `unitAnalysisDir/<encoded>/(chunk-N/)?<safeUnit>.source.json`. The `source` slice is taken
+ * verbatim from the parent file-analysis record's descriptor — Phase 6 does not re-read the
+ * original file, it just re-projects the descriptor onto its own file. `chunkNumber` is
+ * non-null when the unit came from a big-file chunk (1-based, matching the `chunk-N` filename
+ * of the chunk's file-analysis record).
+ */
+export interface IrUnitSourceRecord {
+  relativePath: string;
+  chunkNumber: number | null;
+  fileId: string;
+  language: string;
+  unitId: string;
+  unitKind: string;
+  name: string;
+  qualifiedName: string;
+  parentUnitId: string | null;
+  startLine: number;
+  endLine: number;
+  isBehavioral: boolean;
+  source: string;
+  sha256: string;
+  sizeBytes: number;
+  tokenCount: number;
+  extractedAt: string;
+}
+
+/**
+ * Per-unit ANALYSIS record written by Phase 7 (`analyse-units`, one LLM call per unit). Holds
+ * the fully-fingerprinted {@link CodeUnit} produced from the matching {@link IrUnitSourceRecord}
+ * by `extractUnit`, plus per-call accounting. Stored beside the source record under
+ * `unitAnalysisDir/<encoded>/(chunk-N/)?<safeUnit>.analysis.json`.
+ */
+export interface IrUnitAnalysisRecord {
+  relativePath: string;
+  chunkNumber: number | null;
+  fileId: string;
+  unitId: string;
+  qualifiedName: string;
+  codeUnit: CodeUnit;
+  attempts: number;
+  tokenUsage: TokenUsage;
+  model: string;
+  analysedAt: string;
 }

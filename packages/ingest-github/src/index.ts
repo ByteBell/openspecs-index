@@ -156,26 +156,17 @@ export type { UnitConstant } from "./strategies/intermediate-representation/file
 export { computeModuleFingerprint } from "./strategies/intermediate-representation/file-analysis/fingerprint.ts";
 export { buildUnitId } from "./strategies/intermediate-representation/file-analysis/unit-id.ts";
 
-// Reconstruction (recreate-and-diff) analyzer. Exposed so callers can run the unit-IR / verify
-// phases or the whole-file pipeline against an already-produced file-analysis split.
+// Unit-analysis surface — extract per-unit IR + fingerprint, and the file→records helper. The
+// reconstruction (regenerate-from-spec) surface is no longer exported from this package.
 export {
-  createReconstructionAnalyzer,
-  type ReconstructionAnalyzer,
-  type ExtractUnitIrInput,
-  type VerifyUnitInput,
-  type AnalyzeUnitInput,
-  type AnalyzeFileInput,
-  type UnitIrResult,
-  type VerifyUnitResult,
-  type UnitReconstruction,
-  type FileReconstructionResult,
-  type CodeUnit,
-  type EquivalenceReport,
-  type UnitVerification,
-  type WholeFileEquivalenceReport,
-  verifyWholeFile,
-  assembleFileFromUnits,
+  analyzeUnitIr,
+  type AnalyzeUnitIrInput,
+  type AnalyzeUnitIrResult,
+  extractUnit,
+  type ExtractUnitInput,
+  type ExtractUnitResult,
   computeUnitFingerprint,
+  buildResolutionContext,
   analyzeFileToRecords,
   codeUnitKey,
   type AnalyzeFileToRecordsInput,
@@ -183,7 +174,15 @@ export {
   type FileModuleRecord,
   type CodeUnitsRecord,
   type CodeUnitEntry,
-} from "./strategies/intermediate-representation/reconstruction/index.ts";
+  type CodeUnit,
+  type CodeUnitParameter,
+  type LogicStep,
+  type ErrorPolicy,
+  type UnitCall,
+  type UnitMember,
+  type VerbatimBlock,
+  type ExampleIoPair,
+} from "./strategies/intermediate-representation/unit-analysis/index.ts";
 
 // IR big-file path (boundary-aware chunking, no condensation). Exposed so callers can chunk a
 // large file, refine cuts onto declaration boundaries, and get one verbatim record per chunk.
@@ -205,6 +204,10 @@ export type {
   IrBigFileBoundaries,
   IrBigFileChunkRaw,
 } from "./strategies/intermediate-representation/records.ts";
+export type {
+  IrUnitSourceRecord,
+  IrUnitAnalysisRecord,
+} from "./strategies/intermediate-representation/types.ts";
 
 // IR phases — exposed so a driver can step them one at a time (each persists its output, so
 // running them in order against the same MetaPaths reproduces what `createIrStrategy().execute`
@@ -234,6 +237,16 @@ export {
   type AnalyseBigChunksInput as IrAnalyseBigChunksInput,
   type AnalyseBigChunksResult as IrAnalyseBigChunksResult,
 } from "./strategies/intermediate-representation/phases/analyse-big-chunks.ts";
+export {
+  extractUnitSources as irExtractUnitSources,
+  type ExtractUnitSourcesInput as IrExtractUnitSourcesInput,
+  type ExtractUnitSourcesResult as IrExtractUnitSourcesResult,
+} from "./strategies/intermediate-representation/phases/extract-unit-sources.ts";
+export {
+  analyseUnits as irAnalyseUnits,
+  type AnalyseUnitsInput as IrAnalyseUnitsInput,
+  type AnalyseUnitsResult as IrAnalyseUnitsResult,
+} from "./strategies/intermediate-representation/phases/analyse-units.ts";
 
 // Cross-run incremental helpers — used by drivers that replay a commit sequence outside the
 // pull pipeline (e.g. benchmark replayers). The flat-folder pull path does the equivalent via
@@ -265,3 +278,13 @@ export type {
   McpToolCallLog,
   McpToolName,
 } from "./strategies/mcp-enrichment/records.ts";
+
+// Unit-record path helpers — used by benchmark runners and any driver that needs to address
+// `<name>.source.json` / `<name>.analysis.json` beside each analysed code unit. All path
+// composition lives in `pipeline/paths.ts` so the IR strategy never builds paths inline.
+export {
+  safeUnitName,
+  unitDirFor,
+  unitSourceRecordPath,
+  unitAnalysisRecordPath,
+} from "./pipeline/paths.ts";

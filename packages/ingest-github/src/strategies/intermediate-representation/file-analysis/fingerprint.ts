@@ -2,7 +2,7 @@
  * Deterministic module-level `semanticFingerprint`. Done IN CODE, never by the LLM. The file
  * path is folded in so two files with identical module-level shapes still get distinct
  * fingerprints. A non-empty fingerprint is the marker that the module has been computed
- * (`""` = not yet). Unit fingerprints live next door in `reconstruction/fingerprint.ts`.
+ * (`""` = not yet). Unit fingerprints live next door in `unit-analysis/fingerprint.ts`.
  */
 import { createHash } from "node:crypto";
 import type { ModuleIr } from "./types/module-ir.ts";
