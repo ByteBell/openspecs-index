@@ -2,7 +2,7 @@
 
 ## Quickstart
 
-> Looking for the full CLI reference? Every `bytebell` subcommand, flag, and option lives in **[commands.md](commands.md)**. The Quickstart below is the minimum sequence from zero to a queryable graph.
+> Looking for the full CLI reference? Every `bytebell` subcommand, flag, and option lives in **[docs/commands.md](docs/commands.md)**. The Quickstart below is the minimum sequence from zero to a queryable graph.
 
 ### Prerequisites
 
@@ -18,7 +18,7 @@ One command — checks prerequisites, clones the repo, installs dependencies, an
 curl -fsSL https://raw.githubusercontent.com/ByteBell/open-ir/main/install.sh | bash
 ```
 
-Verify with `bytebell --help`. (Manual install steps are in [commands.md](commands.md).)
+Verify with `bytebell --help`. (Manual install steps are in [docs/getting-started.md](docs/getting-started.md).)
 
 ### Fastest path: `bytebell setup`
 
@@ -26,7 +26,7 @@ Verify with `bytebell --help`. (Manual install steps are in [commands.md](comman
 bytebell setup
 ```
 
-One interactive command does everything the manual steps below automate: picks your LLM provider, auto-fills and boots the local stack, optionally indexes a repo (handling private-repo tokens and branch selection), and **auto-wires the MCP endpoint into your editor**. See [SETUP.md](SETUP.md) for the full walkthrough.
+One interactive command does everything the manual steps below automate: picks your LLM provider, auto-fills and boots the local stack, optionally indexes a repo (handling private-repo tokens and branch selection), and **auto-wires the MCP endpoint into your editor**. See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
 
 The sections below are the manual, step-by-step equivalent — useful if you want to configure each piece yourself or bring your own infrastructure.
 
@@ -92,7 +92,7 @@ Or add this under the `mcpServers` key of Claude Desktop's config (or Cursor's `
 }
 ```
 
-The server registers `smart_search`, `keyword_lookup`, and `retrieve_file`, plus a bundled skill at `bytebell://skills/index` that the client can fetch and install once per session for the recommended workflow.
+The server registers `list_knowledge`, `smart_search`, `keyword_lookup`, and `retrieve_file`, plus a bundled skill at `bytebell://skills/index` that the client can fetch and install once per session for the recommended workflow.
 
 ## What Bytebell does
 
@@ -103,7 +103,7 @@ Those outputs are persisted into two stores:
 - **Neo4j** receives a `:File` node enriched with `purpose`, `summary`, `businessContext`, `language`, `sha`, and `sizeBytes`, linked via `:HAS_CLASS`, `:HAS_FUNCTION`, `:HAS_KEYWORD`, `:HAS_IMPORT_INTERNAL`, and `:HAS_IMPORT_EXTERNAL` to deduplicated child nodes shared across the whole graph. Fulltext indexes cover purpose+summary, business context, keyword names, and class/function signatures.
 - **MongoDB** receives the raw file content, language, SHA256, and the full `FileAnalysis` JSON for cite-back and exact retrieval.
 
-LLM clients then query that graph through three MCP tools — `smart_search`, `keyword_lookup`, `retrieve_file` — which together cover fused semantic + structural search, reverse entity-to-file lookup, and targeted content reads. They let an agent answer questions like _"Which files implement our retry/backoff policy and where is it configured?"_ without reading the entire repo into context.
+LLM clients then query that graph through four MCP tools — `list_knowledge`, `smart_search`, `keyword_lookup`, `retrieve_file` — which together cover repo enumeration, fused semantic + structural search, reverse entity-to-file lookup, and targeted content reads. They let an agent answer questions like _"Which files implement our retry/backoff policy and where is it configured?"_ without reading the entire repo into context.
 
 ```mermaid
 flowchart LR
@@ -173,9 +173,10 @@ There are no cross-file call edges in the current schema — that's a deliberate
 
 ### Retrieval
 
-Three MCP tools, registered at `http://127.0.0.1:8080/mcp`:
+Four MCP tools, registered at `http://127.0.0.1:8080/mcp`:
 
-- **`smart_search(query, k=20)`** — fused six-channel search across File `purpose`/`summary`, `businessContext`, paths, keyword names, class/function signatures, and module imports. Returns deduplicated, ranked top-K files with folder clustering. Use first.
+- **`list_knowledge`** — enumerate the indexed repos and their `knowledgeId`s. Call first.
+- **`smart_search(query, page, pageSize=30)`** — fused eight-channel search across File `purpose`, `businessContext`, paths, `keywords`, `classes`, `functions`, and internal/external module imports. Returns deduplicated, ranked, paginated files with folder clustering. Use first for content questions.
 - **`keyword_lookup(term)`** — reverse lookup. A search term resolves to all matching named entities (keywords, classes, functions, module names) and the files linked to each.
 - **`retrieve_file`** — three operations: `metadata` (purpose, summary, businessContext, classes/functions with line ranges, imports), `content` (read specific line ranges or search within one file with surrounding context), `bulk_search` (parallel scan of up to 50 files for a string).
 
@@ -206,18 +207,18 @@ Most well-formed code questions resolve in 2–4 tool calls. No re-clone, no ful
 | `bytebell boot`                                               | Warm restart.                                                                      |
 | `docker compose -f infra/docker/docker-compose.yml down [-v]` | Stop containers (and optionally drop volumes — destroys all indexed data).         |
 
-Full reference, including every flag and option: [commands.md](commands.md).
+Full reference, including every flag and option: [docs/commands.md](docs/commands.md).
 
 ## Bring your own infrastructure
 
 By default, `bytebell boot` provisions a local Docker stack (`bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis`) with auto-generated credentials. If you already run Mongo, Neo4j, and Redis (or want to use a managed service), set the connection details before booting and the Docker step is skipped:
 
 ```bash
-bytebell set mongo-uri      mongodb://user:pass@host:27017/bytebell
-bytebell set neo4j-uri      bolt://host:7687
+bytebell set mongo          mongodb://user:pass@host:27017/bytebell
+bytebell set neo4j          bolt://host:7687
 bytebell set neo4j-user     neo4j
 bytebell set neo4j-password <your-password>
-bytebell set redis-url      redis://host:6379
+bytebell set redis          redis://host:6379
 ```
 
 Docker is not required on the host in this mode. See the [Configuration reference](#configuration-reference) for the full key list.
@@ -230,21 +231,14 @@ For the full PRD — package tiers, state machine, HTTP route catalogue, verific
 
 ## Configuration reference
 
-Settings live in `~/.bytebell/config.json` and are written exclusively by `bytebell set <key> <value>` (or by first-run auto-fill on `bytebell boot`). Keys:
+Settings live in `~/.bytebell/config.json` and are written exclusively by `bytebell set <key> <value>` (or by first-run auto-fill on `bytebell boot`). The two you must set to ingest are:
 
-| Key                  | Purpose                                  | Default                              |
-| -------------------- | ---------------------------------------- | ------------------------------------ |
-| `openrouter-api-key` | API key for per-file LLM analysis        | _(required, blank by default)_       |
-| `openrouter-model`   | OpenRouter model slug used for analysis  | _(required)_                         |
-| `mongo-uri`          | MongoDB connection string                | `mongodb://localhost:27017/bytebell` |
-| `neo4j-uri`          | Neo4j Bolt URI                           | `bolt://localhost:7687`              |
-| `neo4j-user`         | Neo4j auth user                          | `neo4j`                              |
-| `neo4j-password`     | Neo4j auth password                      | _(generated on first boot)_          |
-| `redis-url`          | Redis URL for BullMQ                     | `redis://localhost:6379`             |
-| `server-port`        | Local HTTP/MCP port                      | `8080`                               |
-| `concurrency-github` | Concurrent files analysed per GitHub job | tuned per box                        |
-| `log-level`          | Winston log level                        | `info`                               |
-| `log-retention-days` | Daily log retention                      | `14`                                 |
+| Key                  | Purpose                                 | Default                        |
+| -------------------- | --------------------------------------- | ------------------------------ |
+| `openrouter-api-key` | API key for per-file LLM analysis       | _(required, blank by default)_ |
+| `openrouter-model`   | OpenRouter model slug used for analysis | `deepseek/deepseek-v4-flash`   |
+
+The **full list of keys** — infrastructure, LLM provider (OpenRouter / Ollama), logging, and storage backends, with validation and defaults — lives in **[docs/configuration.md](docs/configuration.md)**.
 
 If a required setting is missing, Bytebell either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
 
@@ -279,7 +273,7 @@ Bytebell's shape — _build a code graph at ingest time, enrich every node with 
 
 - Codebase-Memory ([2603.27277](https://arxiv.org/abs/2603.27277)) — MCP-served knowledge graph with LLM-derived metadata; reports 10× token reduction.
 
-The design choices follow directly: each `:File` node carries LLM-generated semantics alongside `:HAS_CLASS` / `:HAS_FUNCTION` / `:HAS_KEYWORD` / `:HAS_IMPORT_*` edges (structure), and the three MCP tools fuse both surfaces at query time.
+The design choices follow directly: each `:File` node carries LLM-generated semantics alongside `:HAS_CLASS` / `:HAS_FUNCTION` / `:HAS_KEYWORD` / `:HAS_IMPORT_*` edges (structure), and the MCP retrieval tools fuse both surfaces at query time.
 
 ## Enterprise
 
@@ -295,7 +289,7 @@ To discuss Enterprise licensing, evaluation, or services, contact `team@bytebell
 
 ## Contributing
 
-Hooks, commit conventions, and pre-push gates are documented in [contributing.md](contributing.md). Architectural rules — file-size limits, tier boundaries, the `README.md` requirement, the Bun-only and OpenRouter-only constraints — live in [CLAUDE.md](CLAUDE.md) and apply to every PR.
+Hooks, commit conventions, and pre-push gates are documented in [CONTRIBUTING.md](CONTRIBUTING.md). Architectural rules — file-size limits, tier boundaries, the `README.md` requirement, the Bun-only and OpenRouter-only constraints — live in [CLAUDE.md](CLAUDE.md) and apply to every PR.
 
 ## License
 

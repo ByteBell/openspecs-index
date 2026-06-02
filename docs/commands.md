@@ -23,6 +23,7 @@ Options:
 
 Commands:
   set [key] [value]          Write a value to ~/.bytebell/config.json. With no args, opens the interactive setup form.
+  setup                      Interactive first-run wizard: configure LLM provider, then boot.
   boot                       Bring up Docker infra (mongo + neo4j + redis) and start the bytebell-server.
   shutdown                   Stop the bytebell-server (docker infra is left running).
   server                     Manage the bytebell-server daemon.
@@ -34,6 +35,7 @@ Commands:
   delete                     Pick an indexed knowledge entry and delete it from Mongo + Neo4j.
   stats                      Show ingestion totals, per-repo breakdown, and per-commit token usage.
   mcp                        Manage and view MCP usage.
+  migrate                    One-off migrations between on-disk layouts.
   help [command]             display help for command
 ```
 
@@ -78,24 +80,46 @@ Usage: bytebell mcp [options] [command]
 Manage and view MCP usage.
 
 Commands:
+  install          Detect installed coding tools and register the bytebell MCP endpoint in their config.
   stats            Show input/output token stats for MCP
   help [command]   display help for command
 ```
 
-| Command     | Purpose                                                                  |
-| ----------- | ------------------------------------------------------------------------ |
-| `set`       | Write a value to `~/.bytebell/config.json` (interactive form if no args) |
-| `boot`      | Start Docker infra (mongo + neo4j + redis) and the bytebell-server       |
-| `shutdown`  | Stop the bytebell-server (Docker infra is left running)                  |
-| `server`    | Manage the bytebell-server daemon                                        |
-| `index`     | Index a remote git repository                                            |
-| `pull`      | Re-index a previously added GitHub repo at branch HEAD (or a given SHA)  |
-| `ingest`    | Ingest a local directory                                                 |
-| `ls`        | List indexed knowledge entries                                           |
-| `delete`    | Pick an entry and delete it from Mongo + Neo4j                           |
-| `stats`     | Show ingestion totals, per-repo breakdown, per-commit token usage        |
-| `mcp`       | Parent command for MCP usage subcommands                                 |
-| `mcp stats` | Show input/output token stats for MCP (global + monthly breakdown)       |
+| Command         | Purpose                                                                  |
+| --------------- | ------------------------------------------------------------------------ |
+| `set`           | Write a value to `~/.bytebell/config.json` (interactive form if no args) |
+| `setup`         | Interactive first-run wizard: configure LLM provider, boot, optional index, MCP install |
+| `boot`          | Start Docker infra (mongo + neo4j + redis) and the bytebell-server       |
+| `shutdown`      | Stop the bytebell-server (Docker infra is left running)                  |
+| `server`        | Manage the bytebell-server daemon                                        |
+| `index`         | Index a remote git repository                                            |
+| `pull`          | Re-index a previously added GitHub repo at branch HEAD (or a given SHA)  |
+| `ingest`        | Ingest a local directory                                                 |
+| `ls`            | List indexed knowledge entries                                           |
+| `delete`        | Pick an entry and delete it from Mongo + Neo4j                           |
+| `stats`         | Show ingestion totals, per-repo breakdown, per-commit token usage        |
+| `mcp`           | Parent command for MCP usage subcommands                                 |
+| `mcp install`   | Detect installed editors and register the MCP endpoint in their config   |
+| `mcp stats`     | Show input/output token stats for MCP (global + monthly breakdown)       |
+| `migrate paths` | Reconcile the legacy on-disk repo layout with the commit-scoped layout   |
+
+---
+
+## `bytebell setup`
+
+Interactive first-run wizard ([SetupCommand.ts](../packages/cli/src/SetupCommand.ts)). Requires an interactive terminal — it refuses to run when stdin is piped. Walks through, in order:
+
+1. **Provider** — pick OpenRouter (enter API key + model) or Ollama (URL + model) in the Ink wizard.
+2. **Apply config** — writes the chosen provider keys to `~/.bytebell/config.json`.
+3. **Boot** — stops any running server, then runs the full boot sequence (Docker infra + `bytebell-server`).
+4. **Optional index** — if you supplied a repo URL in the wizard, indexes it and streams progress.
+5. **MCP install** — runs `mcp install` to register the endpoint in detected editors; prints the manual `claude mcp add …` line if none were auto-configured.
+
+```
+bytebell setup
+```
+
+The recommended path for a first run: one command takes you from nothing to a queryable, editor-wired graph. Every step it automates is also available standalone (`set`, `boot`, `index`, `mcp install`).
 
 ---
 
@@ -109,25 +133,7 @@ bytebell set openrouter-api-key sk-or-v1-...
 bytebell set                 # opens the interactive form
 ```
 
-Valid keys (see [keyMap.ts](../packages/cli/src/keyMap.ts)):
-
-| Key                           | Validation          | Redacted in output |
-| ----------------------------- | ------------------- | ------------------ |
-| `mongo`                       | string (URI)        | no                 |
-| `neo4j`                       | string (URI)        | no                 |
-| `neo4j-user`                  | string              | no                 |
-| `neo4j-password`              | string              | yes                |
-| `redis`                       | string (URI)        | no                 |
-| `port`                        | integer 1–65535     | no                 |
-| `log-level`                   | one of `LOG_LEVELS` | no                 |
-| `log-retention-days`          | positive integer    | no                 |
-| `concurrency.github`          | positive integer    | no                 |
-| `openrouter-api-key`          | string              | yes                |
-| `openrouter-model`            | string              | no                 |
-| `openrouter-fallback-model-1` | string              | no                 |
-| `openrouter-fallback-model-2` | string              | no                 |
-| `openrouter-fallback-model-3` | string              | no                 |
-| `openrouter-fallback-model-4` | string              | no                 |
+For the full list of valid keys — every key with its validation, default, and whether it is redacted in output — see **[configuration.md](configuration.md)** (the canonical reference, generated from [keyMap.ts](../packages/cli/src/keyMap.ts)).
 
 This is the only sanctioned write path to `config.json` (manual edits work but are not advertised). There is no `.env` file — see [CLAUDE.md](../CLAUDE.md) "Rule of Env Vars".
 
@@ -287,6 +293,18 @@ bytebell stats
 
 Parent command for MCP-related views ([McpCommand.ts](../packages/cli/src/McpCommand.ts)).
 
+### `bytebell mcp install`
+
+Detects installed coding tools — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and writes the bytebell MCP endpoint (`http://127.0.0.1:<port>/mcp`) into each one's config, backing up the file first ([mcpInstall.ts](../packages/cli/src/mcpInstall.ts)). The JSON shape differs per tool; the command handles each. `bytebell setup` runs this automatically on first boot.
+
+```
+bytebell mcp install
+```
+
+If no editors are detected, prints the manual `claude mcp add --transport http bytebell http://127.0.0.1:<port>/mcp` command.
+
+---
+
 ### `bytebell mcp stats`
 
 Hits `GET /api/v1/mcp/stats` and renders:
@@ -299,6 +317,23 @@ bytebell mcp stats
 ```
 
 When no monthly rows exist, prints `No monthly usage records found.`
+
+---
+
+## `bytebell migrate paths`
+
+One-off on-disk layout reconciliation ([MigratePathsCommand.ts](../packages/cli/src/MigratePathsCommand.ts)). Migrates the legacy `~/.bytebell/repos/.meta/<knowledgeId>/` tree to the commit-scoped `~/.bytebell/orgs/<orgId>/<provider>/<knowledgeId>/<owner>/<repo>/<commit>/...` layout. Knowledge with a database record is migrated; legacy directories with no record are abandoned (deleted).
+
+```
+bytebell migrate paths            # run the migration
+bytebell migrate paths --dry-run  # print what would change without touching disk
+```
+
+| Option      | Description                                    |
+| ----------- | ---------------------------------------------- |
+| `--dry-run` | Print what would change without touching disk. |
+
+The same reconciliation runs automatically at server boot — this command is for running it ahead of time or inspecting it with `--dry-run`.
 
 ---
 

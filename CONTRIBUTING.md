@@ -2,7 +2,7 @@
 
 Thanks for contributing. This document describes the automated checks that run on every commit and push, what each check enforces, and how to recover when one fails.
 
-The toolchain is **Bun-only**. Husky wires three Git hooks: `pre-commit`, `commit-msg`, and `pre-push`. All checks are deterministic and run locally — there is no CI fallback for these gates.
+The toolchain is **Bun-only**. Husky wires three Git hooks: `pre-commit`, `commit-msg`, and `pre-push`. All checks are deterministic and run locally. GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) additionally re-runs two of the pre-push gates — `format:check` and `typecheck` — on every pull request and push to `main`; lint and tests are not yet wired into CI.
 
 ---
 

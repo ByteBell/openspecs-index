@@ -54,8 +54,5 @@ coverage/
 .turbo/
 .eslintcache
 
-# Docs
-docs/
-
 # claude personal settings
 .claude/

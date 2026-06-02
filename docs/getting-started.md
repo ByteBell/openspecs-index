@@ -129,7 +129,7 @@ pulls images and can take a couple of minutes; later boots are quick.
 
 Already running Mongo / Neo4j / Redis and don't want the Docker stack? Point Bytebell
 at your own instances instead — see **Bring your own infrastructure** in
-[README.md](README.md). (`bytebell boot` skips any service whose config you've already set.)
+[README.md](../README.md). (`bytebell boot` skips any service whose config you've already set.)
 
 ### Indexing lifecycle
 
@@ -141,7 +141,7 @@ cost.
 ### Full reference
 
 Every command, flag, and option: [commands.md](commands.md). Architecture and design:
-[docs/arch.md](docs/arch.md).
+[arch.md](arch.md).
 
 </details>
 
