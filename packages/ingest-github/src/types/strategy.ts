@@ -14,6 +14,14 @@ export interface StrategyContext {
    * runs, where calls fall back to `Config.OpenrouterApiKey`.
    */
   llmCallContext?: AskLlmOptions;
+  /**
+   * Optional override for the per-unit IR analysis call (phase 7 of the IR strategy). When
+   * present, `analyseUnits` uses this instead of {@link llmCallContext}. Lets a driver route
+   * file-analysis (phase 2/5) through one model and per-unit reconstruction through another —
+   * e.g. claude for file-level + minimax for unit-level. Absent → unit calls fall back to
+   * {@link llmCallContext}.
+   */
+  unitsLlmCallContext?: AskLlmOptions;
 }
 
 export interface StrategyInput {

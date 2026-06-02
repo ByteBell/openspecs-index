@@ -165,6 +165,9 @@ export {
   extractUnit,
   type ExtractUnitInput,
   type ExtractUnitResult,
+  extractUnitCached,
+  type ExtractUnitCachedInput,
+  type ExtractUnitCachedResult,
   computeUnitFingerprint,
   buildResolutionContext,
   analyzeFileToRecords,
@@ -288,3 +291,10 @@ export {
   unitSourceRecordPath,
   unitAnalysisRecordPath,
 } from "./pipeline/paths.ts";
+
+// On-disk cleanup helper — external drivers (re-ingest commands, test harnesses, benchmark
+// "start fresh" flows) call this to wipe every IR artefact for one file in one call.
+export {
+  deleteAllForFile,
+  type DeleteAllForFileReport,
+} from "./strategies/intermediate-representation/storage.ts";

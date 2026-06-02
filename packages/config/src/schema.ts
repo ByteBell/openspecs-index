@@ -49,6 +49,7 @@ export const configSchema = z
     "condense.prompt.overhead": z.number().int().nonnegative().default(1500),
     "small.file.dedup.threshold": z.number().int().positive().default(3),
     "big.file.line.threshold": z.number().int().positive().default(2000),
+    "max.tokens.file": z.number().int().positive().default(120000),
     org_id: z.string().default("local"),
     "skip.decision.enabled": z.boolean().default(true),
     "skip.decision.max.chars.for.llm": z.number().int().positive().default(4000),
@@ -95,6 +96,7 @@ export type ConfigValueMap = {
   [Config.CondensePromptOverhead]: number;
   [Config.SmallFileDedupThreshold]: number;
   [Config.BigFileLineThreshold]: number;
+  [Config.MaxTokensFile]: number;
   [Config.OrgId]: string;
   [Config.SkipDecisionEnabled]: boolean;
   [Config.SkipDecisionMaxCharsForLlm]: number;
@@ -155,6 +157,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.CondensePromptOverhead]: "bytebell set condense.prompt.overhead <n>",
   [Config.SmallFileDedupThreshold]: "bytebell set small.file.dedup.threshold <n>",
   [Config.BigFileLineThreshold]: "bytebell set big.file.line.threshold <n>",
+  [Config.MaxTokensFile]: "bytebell set max.tokens.file <n>",
   [Config.OrgId]: "bytebell set org_id <value>",
   [Config.SkipDecisionEnabled]: "bytebell set skip.decision.enabled <true|false>",
   [Config.SkipDecisionMaxCharsForLlm]: "bytebell set skip.decision.max.chars.for.llm <n>",
@@ -229,6 +232,8 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg["small.file.dedup.threshold"] as ConfigValue<K>;
     case Config.BigFileLineThreshold:
       return cfg["big.file.line.threshold"] as ConfigValue<K>;
+    case Config.MaxTokensFile:
+      return cfg["max.tokens.file"] as ConfigValue<K>;
     case Config.OrgId:
       return cfg.org_id as ConfigValue<K>;
     case Config.SkipDecisionEnabled:
@@ -310,6 +315,8 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, "small.file.dedup.threshold": value as number };
     case Config.BigFileLineThreshold:
       return { ...cfg, "big.file.line.threshold": value as number };
+    case Config.MaxTokensFile:
+      return { ...cfg, "max.tokens.file": value as number };
     case Config.OrgId:
       throw new Error("org_id is fixed to 'local' in OSS builds and cannot be set");
     case Config.SkipDecisionEnabled:

@@ -83,46 +83,65 @@ export function safeUnitName(qualifiedName: string): string {
   return qualifiedName.replace(/[^A-Za-z0-9._-]+/gu, "_").slice(0, 80);
 }
 
-/** Absolute path of the per-file file-analysis record for a small file. */
+/** Per-file directory under `fileAnalysisDir` owning everything about one small file. */
+export function fileDirFor(metaPaths: MetaPaths, relativePath: string): string {
+  return path.join(metaPaths.fileAnalysisDir, encodeMetaPath(relativePath));
+}
+
+/** Per-file directory under `bigFileAnalysisDir` owning everything about one big file. */
+export function bigFileDirFor(metaPaths: MetaPaths, relativePath: string): string {
+  return path.join(metaPaths.bigFileAnalysisDir, encodeMetaPath(relativePath));
+}
+
+/** Absolute path of the per-file file-analysis record for a small file (`<fileDir>/analysis.json`). */
 export function fileAnalysisRecordPath(metaPaths: MetaPaths, relativePath: string): string {
-  return path.join(metaPaths.fileAnalysisDir, `${encodeMetaPath(relativePath)}.json`);
+  return path.join(fileDirFor(metaPaths, relativePath), "analysis.json");
 }
 
-/** Absolute path of the boundaries record for one big file. */
+/** Absolute path of the boundaries record for one big file (`<bigFileDir>/boundaries.json`). */
 export function bigFileBoundariesPath(metaPaths: MetaPaths, relativePath: string): string {
-  return path.join(metaPaths.bigFileAnalysisDir, `${encodeMetaPath(relativePath)}.boundaries.json`);
+  return path.join(bigFileDirFor(metaPaths, relativePath), "boundaries.json");
 }
 
-/** Per-file chunk directory holding every `chunk-N.*.json` for one big file. */
+/** Per-file chunks directory holding every `chunk-N/` for one big file. */
 export function bigFileChunkDir(metaPaths: MetaPaths, relativePath: string): string {
-  return path.join(metaPaths.bigFileChunksDir, encodeMetaPath(relativePath));
+  return path.join(bigFileDirFor(metaPaths, relativePath), "chunks");
 }
 
-/** Absolute path of one big-file raw chunk record (`chunk-N.raw.json`, 1-based). */
+/** Per-chunk directory `<bigFileDir>/chunks/chunk-N/`. */
+export function chunkDirFor(metaPaths: MetaPaths, relativePath: string, chunkNumber: number): string {
+  return path.join(bigFileChunkDir(metaPaths, relativePath), `chunk-${String(chunkNumber)}`);
+}
+
+/** Absolute path of one big-file raw chunk record (`<chunkDir>/raw.json`, 1-based N). */
 export function bigFileRawChunkPath(metaPaths: MetaPaths, relativePath: string, chunkNumber: number): string {
-  return path.join(bigFileChunkDir(metaPaths, relativePath), `chunk-${String(chunkNumber)}.raw.json`);
+  return path.join(chunkDirFor(metaPaths, relativePath, chunkNumber), "raw.json");
 }
 
-/** Absolute path of one big-file analysed chunk record (`chunk-N.json`, 1-based). */
+/** Absolute path of one big-file analysed chunk record (`<chunkDir>/analysis.json`, 1-based N). */
 export function bigFileAnalysedChunkPath(
   metaPaths: MetaPaths,
   relativePath: string,
   chunkNumber: number,
 ): string {
-  return path.join(bigFileChunkDir(metaPaths, relativePath), `chunk-${String(chunkNumber)}.json`);
+  return path.join(chunkDirFor(metaPaths, relativePath, chunkNumber), "analysis.json");
 }
 
 /**
- * Per-file/per-chunk unit directory holding `<safeUnit>.source.json` /
- * `<safeUnit>.analysis.json`. `chunkNumber === null` for small files;
- * `chunkNumber >= 1` for big-file chunks (matches the chunk-N file-analysis record).
+ * Per-file/per-chunk codeUnits directory holding `<safeUnit>.source.json` /
+ * `<safeUnit>.analysis.json`.
+ *
+ * - Small file (`chunkNumber === null`): `<fileAnalysisDir>/<encoded>/codeUnits/`
+ * - Big-file chunk (`chunkNumber >= 1`): `<bigFileAnalysisDir>/<encoded>/chunks/chunk-<N>/codeUnits/`
  */
 export function unitDirFor(metaPaths: MetaPaths, relativePath: string, chunkNumber: number | null): string {
-  const base = path.join(metaPaths.unitAnalysisDir, encodeMetaPath(relativePath));
-  return chunkNumber === null ? base : path.join(base, `chunk-${String(chunkNumber)}`);
+  if (chunkNumber === null) {
+    return path.join(fileDirFor(metaPaths, relativePath), "codeUnits");
+  }
+  return path.join(chunkDirFor(metaPaths, relativePath, chunkNumber), "codeUnits");
 }
 
-/** Absolute path of one unit's `<name>.source.json` record. */
+/** Absolute path of one unit's `<name>.source.json` record (phase 6). */
 export function unitSourceRecordPath(
   metaPaths: MetaPaths,
   relativePath: string,
@@ -132,7 +151,7 @@ export function unitSourceRecordPath(
   return path.join(unitDirFor(metaPaths, relativePath, chunkNumber), `${safeUnitName(qualifiedName)}.source.json`);
 }
 
-/** Absolute path of one unit's `<name>.analysis.json` record. */
+/** Absolute path of one unit's `<name>.analysis.json` record (phase 7). */
 export function unitAnalysisRecordPath(
   metaPaths: MetaPaths,
   relativePath: string,

@@ -37,6 +37,19 @@ async function readRecord(file: string): Promise<IrFileAnalysisRecord | null> {
   }
 }
 
+async function isDir(p: string): Promise<boolean> {
+  try {
+    return (await stat(p)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Enumerates small-file IR records under the per-file layout:
+ *   `<fileAnalysisDir>/<encoded>/analysis.json`
+ * (`<encoded>` may itself contain a `codeUnits/` subdir — only `analysis.json` is loaded.)
+ */
 async function listSmallTargets(metaPaths: MetaPaths): Promise<EnrichmentTarget[]> {
   let entries: string[];
   try {
@@ -45,73 +58,61 @@ async function listSmallTargets(metaPaths: MetaPaths): Promise<EnrichmentTarget[
     return [];
   }
   const targets: EnrichmentTarget[] = [];
-  for (const name of entries) {
-    if (!name.endsWith(".json")) {
+  for (const encodedName of entries) {
+    const fileDir = path.join(metaPaths.fileAnalysisDir, encodedName);
+    if (!(await isDir(fileDir))) {
       continue;
     }
-    const file = path.join(metaPaths.fileAnalysisDir, name);
-    const record = await readRecord(file);
+    const analysisFile = path.join(fileDir, "analysis.json");
+    const record = await readRecord(analysisFile);
     if (record === null) {
       continue;
     }
-    targets.push({ relativePath: record.relativePath, recordFile: file });
+    targets.push({ relativePath: record.relativePath, recordFile: analysisFile });
   }
   return targets;
 }
 
-async function listChunkTargetsForFile(
-  parentDir: string,
-  encodedName: string,
-): Promise<EnrichmentTarget[]> {
-  const fileChunkDir = path.join(parentDir, encodedName);
-  let chunkEntries: string[];
-  try {
-    chunkEntries = await readdir(fileChunkDir);
-  } catch {
-    return [];
-  }
-  const targets: EnrichmentTarget[] = [];
-  for (const chunkName of chunkEntries) {
-    const match = /^chunk-(\d+)\.json$/u.exec(chunkName);
-    if (match === null) {
-      continue;
-    }
-    const numStr = match[1];
-    if (numStr === undefined) {
-      continue;
-    }
-    const chunkNumber = Number.parseInt(numStr, 10);
-    const file = path.join(fileChunkDir, chunkName);
-    const record = await readRecord(file);
-    if (record === null) {
-      continue;
-    }
-    targets.push({ relativePath: record.relativePath, chunkNumber, recordFile: file });
-  }
-  return targets;
-}
-
+/**
+ * Enumerates big-file chunk IR records under the per-file layout:
+ *   `<bigFileAnalysisDir>/<encoded>/chunks/chunk-N/analysis.json`
+ */
 async function listChunkTargets(metaPaths: MetaPaths): Promise<EnrichmentTarget[]> {
   let entries: string[];
   try {
-    entries = await readdir(metaPaths.bigFileChunksDir);
+    entries = await readdir(metaPaths.bigFileAnalysisDir);
   } catch {
     return [];
   }
   const targets: EnrichmentTarget[] = [];
-  for (const name of entries) {
-    const fileChunkDir = path.join(metaPaths.bigFileChunksDir, name);
-    let info;
+  for (const encodedName of entries) {
+    const chunksDir = path.join(metaPaths.bigFileAnalysisDir, encodedName, "chunks");
+    if (!(await isDir(chunksDir))) {
+      continue;
+    }
+    let chunkEntries: string[];
     try {
-      info = await stat(fileChunkDir);
+      chunkEntries = await readdir(chunksDir);
     } catch {
       continue;
     }
-    if (!info.isDirectory()) {
-      continue;
+    for (const chunkName of chunkEntries) {
+      const match = /^chunk-(\d+)$/u.exec(chunkName);
+      if (match === null) {
+        continue;
+      }
+      const numStr = match[1];
+      if (numStr === undefined) {
+        continue;
+      }
+      const chunkNumber = Number.parseInt(numStr, 10);
+      const analysisFile = path.join(chunksDir, chunkName, "analysis.json");
+      const record = await readRecord(analysisFile);
+      if (record === null) {
+        continue;
+      }
+      targets.push({ relativePath: record.relativePath, chunkNumber, recordFile: analysisFile });
     }
-    const fileTargets = await listChunkTargetsForFile(metaPaths.bigFileChunksDir, name);
-    targets.push(...fileTargets);
   }
   return targets;
 }

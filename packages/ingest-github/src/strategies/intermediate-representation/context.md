@@ -51,16 +51,20 @@ disk).
                            `<safeUnit>.source.json` file. The descriptor's `source` slice was
                            populated at file-analysis time, so this phase only re-emits it as
                            its own record with sha256/sizeBytes/tokenCount.
-                           Writes:  metaPaths.unitAnalysisDir/<encoded>/<safeUnit>.source.json
-                                    metaPaths.unitAnalysisDir/<encoded>/chunk-<N>/<safeUnit>.source.json
+                           Writes (small file):
+                             metaPaths.unitAnalysisDir/<encoded>/<safeUnit>.source.json
+                           Writes (big-file chunk N — nested under the chunk subtree):
+                             metaPaths.bigFileChunksDir/<encoded>/chunk-<N>/unit-analysis/<safeUnit>.source.json
 
 7. analyse-units           one LLM call per unit source record (the unit-IR analysis call).
                            Reads the source record + the parent's ModuleIr + sibling
                            descriptors to build the resolution context, then runs
                            `extractUnit` (analyse-unit-ir + fingerprint).
-                           Writes:  metaPaths.unitAnalysisDir/<encoded>/<safeUnit>.analysis.json
-                                    metaPaths.unitAnalysisDir/<encoded>/chunk-<N>/<safeUnit>.analysis.json
-                                    one IrUnitAnalysisRecord per unit
+                           Writes (small file):
+                             metaPaths.unitAnalysisDir/<encoded>/<safeUnit>.analysis.json
+                           Writes (big-file chunk N):
+                             metaPaths.bigFileChunksDir/<encoded>/chunk-<N>/unit-analysis/<safeUnit>.analysis.json
+                           One IrUnitAnalysisRecord per unit.
 ```
 
 Nothing else runs from here. No folder summary, no repo summary, no Neo4j writes.

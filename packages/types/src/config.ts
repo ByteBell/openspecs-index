@@ -31,6 +31,12 @@ export enum Config {
   CondensePromptOverhead = "condense.prompt.overhead",
   SmallFileDedupThreshold = "small.file.dedup.threshold",
   BigFileLineThreshold = "big.file.line.threshold",
+  /**
+   * Single token-based "oversized" threshold for the scan classifier. A file is marked
+   * `oversized` and skipped from analysis when `tokenLen(content) > MaxTokensFile`. Default
+   * 120_000 — fits any reasonable LLM context window with room for prompt + completion.
+   */
+  MaxTokensFile = "max.tokens.file",
   OrgId = "org_id",
   SkipDecisionEnabled = "skip.decision.enabled",
   SkipDecisionMaxCharsForLlm = "skip.decision.max.chars.for.llm",

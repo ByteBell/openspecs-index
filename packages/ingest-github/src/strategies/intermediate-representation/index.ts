@@ -51,7 +51,9 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
     name: "intermediate-representation",
     async execute(input: StrategyInput): Promise<StrategyResult> {
       const { context, source, metaPaths } = input;
-      const { knowledgeId, llmCallContext } = context;
+      const { knowledgeId, llmCallContext, unitsLlmCallContext } = context;
+      // Phase 7 model override: falls back to the main llmCallContext when unset.
+      const unitsCallContext = unitsLlmCallContext ?? llmCallContext;
       const progressContext: ProgressContext = progressContextFactory(knowledgeId);
       const llmConcurrency = getConfigValue(Config.LlmConcurrency);
 
@@ -153,8 +155,8 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
           concurrency: llmConcurrency,
           progressContext,
         };
-        if (llmCallContext !== undefined) {
-          unitsInput.llmCallContext = llmCallContext;
+        if (unitsCallContext !== undefined) {
+          unitsInput.llmCallContext = unitsCallContext;
         }
         const unitsResult = await analyseUnits(unitsInput);
         usage = addUsage(usage, unitsResult.tokenUsage);

@@ -10,6 +10,12 @@ export {
 
 export { extractUnit, type ExtractUnitInput, type ExtractUnitResult } from "./extract-unit.ts";
 
+export {
+  extractUnitCached,
+  type ExtractUnitCachedInput,
+  type ExtractUnitCachedResult,
+} from "./extract-unit-cached.ts";
+
 export { computeUnitFingerprint } from "./fingerprint.ts";
 
 export { buildResolutionContext } from "./resolution-context.ts";

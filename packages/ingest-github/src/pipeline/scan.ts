@@ -2,15 +2,20 @@ import { opendir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
-import type { AskLlmOptions } from "@bb/llm";
+import { tokenLen, type AskLlmOptions } from "@bb/llm";
 import { logger } from "@bb/logger";
 import { SKIP_DIRS, looksBinary, passesPathFilters } from "./filters.ts";
 import type { ConcurrencyLimiter } from "./concurrency.ts";
 import type { ScanEntry, SkipDecider, SkipDeciderInput } from "#src/types/pipeline.ts";
 
+/**
+ * The scan classifier's only "oversized" test. A file is marked oversized iff its tokenised
+ * content exceeds `maxTokensFile`. `absoluteCap` survives as a hard memory guard so we never
+ * read a multi-gigabyte file into memory just to tokenise it.
+ */
 interface ScanLimits {
   absoluteCap: number;
-  bigFileLineThreshold: number;
+  maxTokensFile: number;
 }
 
 export interface ScanRepositoryDeps {
@@ -50,7 +55,7 @@ function logCounts(counts: ScanCounts): void {
 export async function* scanRepository(rootDir: string, deps: ScanRepositoryDeps = {}): AsyncGenerator<ScanEntry> {
   const limits: ScanLimits = {
     absoluteCap: getConfigValue(Config.AbsoluteFileSizeCap),
-    bigFileLineThreshold: getConfigValue(Config.BigFileLineThreshold),
+    maxTokensFile: getConfigValue(Config.MaxTokensFile),
   };
 
   // Two-pass parallel mode requires both a skip-decider AND a limiter so that
@@ -104,7 +109,7 @@ async function* walk(
       continue;
     }
     const content = buf.toString("utf8");
-    if (countLines(content) > limits.bigFileLineThreshold) {
+    if (tokenLen(content) > limits.maxTokensFile) {
       counts.oversized += 1;
       yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes, reason: "line-count" };
       continue;
@@ -239,7 +244,7 @@ async function* walkAndCategorize(
       continue;
     }
     const content = buf.toString("utf8");
-    if (countLines(content) > limits.bigFileLineThreshold) {
+    if (tokenLen(content) > limits.maxTokensFile) {
       counts.oversized += 1;
       yield { kind: "oversized", relativePath, absolutePath: abs, sizeBytes, reason: "line-count" };
       continue;
@@ -280,18 +285,6 @@ function decisionKey(p: PendingFile): string {
   return `filename:${segments[segments.length - 1] ?? p.relativePath}`;
 }
 
-function countLines(content: string): number {
-  if (content.length === 0) {
-    return 0;
-  }
-  let lines = 1;
-  for (let i = 0; i < content.length; i += 1) {
-    if (content.charCodeAt(i) === 10) {
-      lines += 1;
-    }
-  }
-  return lines;
-}
 
 export async function readScannedFile(absolutePath: string): Promise<string> {
   return await readFile(absolutePath, "utf8");
