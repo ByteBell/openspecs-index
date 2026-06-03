@@ -68,7 +68,8 @@ export interface IrChunkRecord {
 /**
  * Per-unit SOURCE record written by Phase 6 (`extract-unit-sources`, pure). One file per
  * discovered unit descriptor, stored under
- * `unitAnalysisDir/<encoded>/(chunk-N/)?<safeUnit>.source.json`. The `source` slice is taken
+ * `<fileDir>/codeUnits/<safeUnit>.source.json` (small) or
+ * `<bigFileDir>/chunks/chunk-N/codeUnits/<safeUnit>.source.json` (chunk). The `source` slice is taken
  * verbatim from the parent file-analysis record's descriptor — Phase 6 does not re-read the
  * original file, it just re-projects the descriptor onto its own file. `chunkNumber` is
  * non-null when the unit came from a big-file chunk (1-based, matching the `chunk-N` filename
@@ -98,7 +99,8 @@ export interface IrUnitSourceRecord {
  * Per-unit ANALYSIS record written by Phase 7 (`analyse-units`, one LLM call per unit). Holds
  * the fully-fingerprinted {@link CodeUnit} produced from the matching {@link IrUnitSourceRecord}
  * by `extractUnit`, plus per-call accounting. Stored beside the source record under
- * `unitAnalysisDir/<encoded>/(chunk-N/)?<safeUnit>.analysis.json`.
+ * `<fileDir>/codeUnits/<safeUnit>.analysis.json` (small) or
+ * `<bigFileDir>/chunks/chunk-N/codeUnits/<safeUnit>.analysis.json` (chunk).
  */
 export interface IrUnitAnalysisRecord {
   relativePath: string;

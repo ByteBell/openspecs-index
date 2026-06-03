@@ -27,6 +27,16 @@ function sliceLines(sourceLines: readonly string[], startLine: number, endLine: 
  * @param sourceLines - The source string the LLM was given, pre-split by "\n", for the slice.
  * @returns The descriptor, or `null` to drop it.
  */
+/** Extracts the qualified-name segment from an LLM-emitted id like `<prefix>#<kind>:<qn>`. */
+export function qnFromLlmId(id: string): string | null {
+  const hash = id.indexOf("#");
+  if (hash < 0) {
+    return null;
+  }
+  const colon = id.indexOf(":", hash + 1);
+  return colon < 0 ? null : id.slice(colon + 1);
+}
+
 function parseOne(
   rec: Record<string, unknown>,
   fileNodeId: string,
@@ -41,11 +51,16 @@ function parseOne(
   const unitKind = pickString(rec["unit_kind"], "unknown");
   const name = pickString(rec["name"], "");
   const qualifiedName = pickString(rec["qualified_name"], name);
+  // We never trust the LLM's emitted unit_id — it is rebuilt canonically so every per-unit
+  // record carries the same `<fileNodeId>__<qn>#<kind>:<qn>` shape, regardless of which
+  // prefix the model echoed back.
+  const unitId = buildUnitId(fileNodeId, unitKind, qualifiedName);
+  // parentUnitId is kept in the LLM-emitted form here; `remapParentUnitIds` rewrites it once
+  // every descriptor's canonical id is known.
   const parentUnitId =
     typeof rec["parent_unit_id"] === "string" && (rec["parent_unit_id"] as string).length > 0
       ? (rec["parent_unit_id"] as string)
       : null;
-  const unitId = pickString(rec["unit_id"], "") || buildUnitId(fileNodeId, unitKind, qualifiedName);
   return {
     unitId,
     unitKind,
@@ -57,6 +72,24 @@ function parseOne(
     isBehavioral: pickBool(rec["is_behavioral"]),
     source,
   };
+}
+
+/**
+ * Rewrites each descriptor's `parentUnitId` from the LLM-emitted form to the canonical
+ * `<fileNodeId>__<qn>#<kind>:<qn>` form, by looking up the parent's qualified-name.
+ */
+export function remapParentUnitIds(descriptors: UnitDescriptor[]): void {
+  const byQn = new Map<string, string>();
+  for (const d of descriptors) {
+    byQn.set(d.qualifiedName, d.unitId);
+  }
+  for (const d of descriptors) {
+    if (d.parentUnitId === null) {
+      continue;
+    }
+    const parentQn = qnFromLlmId(d.parentUnitId);
+    d.parentUnitId = parentQn !== null ? (byQn.get(parentQn) ?? null) : null;
+  }
 }
 
 /**
@@ -76,5 +109,6 @@ export function parseUnitDescriptors(value: unknown, fileNodeId: string, source:
       out.push(descriptor);
     }
   }
+  remapParentUnitIds(out);
   return out;
 }

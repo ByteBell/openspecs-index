@@ -104,7 +104,7 @@ export async function analyseBigChunks(input: AnalyseBigChunksInput): Promise<An
           return;
         }
         const language = languageFromPath(relativePath);
-        const fileNodeId = `${input.knowledgeId}:${relativePath}:chunk-${String(chunkNumber)}`;
+        const fileNodeId = `${relativePath}:chunk-${String(chunkNumber)}`;
         const analyseInput: Parameters<typeof analyseFile>[0] = {
           language,
           relativePath,

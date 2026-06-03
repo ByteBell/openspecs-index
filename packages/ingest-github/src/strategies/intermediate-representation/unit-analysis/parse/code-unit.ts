@@ -18,6 +18,8 @@ import {
   parseParameters,
   parseVerbatimBlocks,
 } from "./unit-fields.ts";
+import { parseSpecLiterals, parseSpecTests } from "./oracle.ts";
+import { pickString } from "#src/strategies/intermediate-representation/parse.ts";
 
 /** Returns the trimmed string at `key`, or null when absent/empty. */
 function optString(raw: Record<string, unknown>, key: string): string | null {
@@ -75,6 +77,10 @@ export function parseCodeUnit(raw: Record<string, unknown>, descriptor: UnitDesc
     verbatimBlocks: parseVerbatimBlocks(raw["verbatim_blocks"]),
     exampleIoPairs: parseExampleIoPairs(raw["example_io_pairs"]),
     testReferences: pickStringArray(raw["test_references"]),
+    behaviorSummary: pickString(raw["behavior_summary"], ""),
+    specLiterals: parseSpecLiterals(raw["spec_literals"]),
+    declaredConstants: parseNamedConstants(raw["declared_constants"]),
+    specTests: parseSpecTests(raw["spec_tests"]),
     semanticFingerprint: "",
   };
 }

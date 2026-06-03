@@ -15,7 +15,7 @@ import type { FileAnalysisResult } from "#src/strategies/intermediate-representa
 import { asRecord } from "./primitives.ts";
 import { normalizeAnalysisFields } from "./analysis-fields.ts";
 import { parseModuleIr } from "./module-ir.ts";
-import { parseUnitDescriptors } from "./unit-descriptor.ts";
+import { parseUnitDescriptors, qnFromLlmId } from "./unit-descriptor.ts";
 
 /**
  * Narrows the untrusted file-analysis response into a {@link FileAnalysisResult}.
@@ -36,5 +36,35 @@ export function parseFileAnalysisResult(
   const semantic = normalizeAnalysisFields(top);
   const module = parseModuleIr(top["module"], language, semantic);
   const units = parseUnitDescriptors(top["units"], fileNodeId, source);
+  remapModuleContractTestTargets(module, units);
   return { module, units };
+}
+
+/**
+ * Rewrites each `moduleContractTests[*].targets[]` from the LLM-emitted unit-id form to the
+ * canonical `<fileNodeId>__<qn>#<kind>:<qn>` form used by the parsed descriptors. Targets the
+ * LLM emitted for a qualified name that has no matching descriptor are dropped.
+ */
+function remapModuleContractTestTargets(
+  module: FileAnalysisResult["module"],
+  units: readonly FileAnalysisResult["units"][number][],
+): void {
+  if (module.moduleContractTests.length === 0) {
+    return;
+  }
+  const byQn = new Map<string, string>();
+  for (const u of units) {
+    byQn.set(u.qualifiedName, u.unitId);
+  }
+  for (const test of module.moduleContractTests) {
+    const remapped: string[] = [];
+    for (const target of test.targets) {
+      const qn = qnFromLlmId(target);
+      const next = qn !== null ? byQn.get(qn) : undefined;
+      if (next !== undefined) {
+        remapped.push(next);
+      }
+    }
+    test.targets = remapped;
+  }
 }

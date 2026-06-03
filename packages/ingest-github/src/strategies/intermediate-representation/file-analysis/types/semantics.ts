@@ -52,6 +52,7 @@ import type {
   SectionMapEntry,
   SideEffects,
 } from "./v2/shape.ts";
+import type { ModuleContractTest } from "./v2/oracle.ts";
 
 export interface SemanticFields {
   // ---- v1 carryovers --------------------------------------------------------
@@ -110,4 +111,8 @@ export interface SemanticFields {
   // ---- shape + compression (new) -------------------------------------------
   fileFingerprint: FileFingerprint;
   reconstructionHints: ReconstructionHints;
+
+  // ---- module-level verification oracle -----------------------------------
+  /** Scenario tests pinning the file's boundary contract; checkable against any implementation. */
+  moduleContractTests: ModuleContractTest[];
 }

@@ -163,7 +163,7 @@ export async function analyseUnits(input: AnalyseUnitsInput): Promise<AnalyseUni
         }
         const result = await extractUnit(callInput);
         const analysisRecord: IrUnitAnalysisRecord = {
-          relativePath,
+          relativePath: source.fileId,
           chunkNumber,
           fileId: source.fileId,
           unitId: source.unitId,

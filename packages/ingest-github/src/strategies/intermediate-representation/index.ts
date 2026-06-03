@@ -15,10 +15,16 @@
  *                            carries the parent file's `relativePath`; chunks are NOT rolled up.
  *   6) extract-unit-sources — PURE. For every file-analysis record on disk (small + chunk),
  *                            re-project each UnitDescriptor onto its own `<safeUnit>.source.json`
- *                            under `unitAnalysisDir/<encoded>/(chunk-N/)?`. No LLM call.
+ *                            under `<fileDir>/codeUnits/` (small) or
+ *                            `<bigFileDir>/chunks/chunk-N/codeUnits/` (chunk). No LLM call.
  *   7) analyse-units       — one LLM call per unit source record. Persists
  *                            `<safeUnit>.analysis.json` (fingerprinted CodeUnit + accounting)
  *                            beside the source record.
+ *   8) derive-folder-specs — PURE. Aggregates the small-file IRs in each folder into a
+ *                            `FolderSpec` capturing the folder's shared identity
+ *                            (representation family / type, concurrency, hints, language).
+ *                            Per-file records are never mutated; the FolderSpec is a
+ *                            parallel artifact at `<metaRoot>/folder-specs/<encoded>/spec.json`.
  *
  * The IR strategy stops once the per-unit analysis records are on disk: no folder / repo
  * summary, no Neo4j writes, no reconstruction. Those land downstream.
@@ -40,6 +46,7 @@ import { cutBigFiles } from "./phases/cut-big-files.ts";
 import { analyseBigChunks } from "./phases/analyse-big-chunks.ts";
 import { extractUnitSources } from "./phases/extract-unit-sources.ts";
 import { analyseUnits } from "./phases/analyse-units.ts";
+import { deriveFolderSpecs } from "./phases/derive-folder-specs.ts";
 
 export interface IrStrategyDeps {
   progressContextFactory?: ProgressContextFactory;
@@ -137,7 +144,8 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
         usage = addUsage(usage, chunkResult.tokenUsage);
 
         // 6) extract-unit-sources — PURE. Re-project every UnitDescriptor onto its own
-        // <safeUnit>.source.json under unitAnalysisDir/<encoded>/(chunk-N/)?.
+        // <safeUnit>.source.json under <fileDir>/codeUnits/ (small) or
+        // <bigFileDir>/chunks/chunk-N/codeUnits/ (chunk).
         throwIfCancelled(knowledgeId);
         const sourcesResult = await extractUnitSources({
           knowledgeId,
@@ -161,6 +169,12 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
         const unitsResult = await analyseUnits(unitsInput);
         usage = addUsage(usage, unitsResult.tokenUsage);
 
+        // 8) derive-folder-specs — PURE. Aggregate every small file's file-level IR into a
+        // per-folder FolderSpec capturing shared representation family / type, concurrency
+        // model, reconstruction hints, language. No mutation of file-analysis records.
+        throwIfCancelled(knowledgeId);
+        const folderSpecsResult = await deriveFolderSpecs({ knowledgeId, metaPaths });
+
         progressContext.completed();
 
         logger.info(
@@ -169,6 +183,7 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
             `cut=${cutResult.cut}+${cutResult.cached} chunks=${chunkResult.analysed}+${chunkResult.cached} ` +
             `unit-sources=${sourcesResult.extracted}+${sourcesResult.cached} ` +
             `units=${unitsResult.analysed}+${unitsResult.cached} ` +
+            `folder-specs=${folderSpecsResult.foldersDerived} ` +
             `tokens(in/out)=${usage.inputTokens}/${usage.outputTokens} cost=$${usage.costUsd.toFixed(4)}`,
         );
 

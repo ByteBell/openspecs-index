@@ -20,6 +20,7 @@ import type {
 } from "#src/strategies/intermediate-representation/file-analysis/types/module-ir.ts";
 import { computeModuleFingerprint } from "#src/strategies/intermediate-representation/file-analysis/fingerprint.ts";
 import { analyseFile as runFileAnalysis } from "#src/strategies/intermediate-representation/file-analysis/analyse-file.ts";
+import { unitFileIdOf } from "#src/strategies/intermediate-representation/file-analysis/unit-id.ts";
 import { extractUnit } from "./extract-unit.ts";
 import { buildResolutionContext } from "./resolution-context.ts";
 
@@ -95,9 +96,9 @@ export async function analyzeFileToRecords(input: AnalyzeFileToRecordsInput): Pr
   for (const descriptor of descriptors) {
     const result = await extractUnit({
       descriptor,
-      fileId: input.fileNodeId,
+      fileId: unitFileIdOf(descriptor.unitId),
       language: module.language,
-      relativePath: input.relativePath,
+      relativePath: unitFileIdOf(descriptor.unitId),
       context,
       ...(input.llmCallContext !== undefined ? { llmCallContext: input.llmCallContext } : {}),
     });

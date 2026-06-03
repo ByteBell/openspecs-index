@@ -1,21 +1,30 @@
 /**
- * The IR strategy's file-analysis call (one call per file or chunk). Asks the model to produce
- * a file-level analysis + module-level structure + verbatim list of every top-level and nested
- * code unit with its span.
+ * The IR strategy's file-analysis call (one call per file or chunk).
  *
- * The file-level field definitions are the v2 IR field block (`FILE_ANALYSIS_FIELDS_BLOCK_V2`),
- * forked from flat-folder's block and extended with the reconstruction substrate, error-aware,
- * orchestration, shape, and reshape fields. Flat-folder's block is unchanged.
+ * Produces a VERIFIABLE SPEC for the file: a JSON record a checker can hold any implementation
+ * against — current source, a hand-edit, or a regeneration in a different language. The spec
+ * is the union of (a) every field flat-folder's prompt emits — the semantic layer humans rely
+ * on — and (b) the structured surface + behaviour + orchestration + oracle fields defined in
+ * `FILE_ANALYSIS_FIELDS_BLOCK`. See `businessLogic.md` for the theory.
  */
-import { FILE_ANALYSIS_FIELDS_BLOCK_V2 } from "./file-analysis-fields-v2.ts";
-import { FILE_ANALYSIS_JSON_SHAPE } from "./file-analysis-fields.ts";
+import { FILE_ANALYSIS_FIELDS_BLOCK, FILE_ANALYSIS_JSON_SHAPE } from "./file-analysis-fields.ts";
 
 export const FILE_ANALYSIS_SYSTEM_PROMPT = `You are a precise code analyst. You produce JSON describing a single source file for a code knowledge graph.
 
-You will do three things for ONE source file:
-(1) FILE-LEVEL semantic analysis of the whole file (carryover, reshaped, and v2 substrate fields).
-(2) Extract module-level structure (layout, exports, imports, file constants).
-(3) Enumerate every top-level and nested CODE UNIT with its source span.
+The JSON you produce IS the file's verifiable spec — a record a checker can hold any
+implementation (current, hand-edited, or regenerated) against. Three layers, per
+businessLogic.md:
+  - IDENTITY  — what the file/units are and where they live.
+  - SURFACE   — the contract callers bind against (imports, signatures, types, exports).
+  - BEHAVIOUR — the contract a re-implementer must preserve (effects, invariants, edges,
+                errors, concurrency, state, plus \`module_contract_tests\` that *check* the
+                spec).
+
+You will do, for ONE source file:
+(1) FILE-LEVEL semantic carryovers + surface + behaviour + orchestration gaps.
+(2) MODULE_CONTRACT_TESTS — scenario tests that exercise the file's exports and pin invariants.
+(3) Module-level structure (layout, exports, imports, file constants).
+(4) Every top-level and nested CODE UNIT with its source span.
 
 Rules:
 - Return ONLY a JSON object. No prose, no markdown fences, no commentary.
@@ -23,8 +32,8 @@ Rules:
 - Do not invent line ranges — derive them from the actual content.
 - Do not duplicate class/function names verbatim across fields.
 - Names are case-sensitive; preserve source casing exactly.
-- VERBATIM fields (verbatim_literals.value, public_signatures.signature, type_shapes.shape, boundary_conditions.left/right, predicate, bounds, termination_condition) MUST be copied byte-for-byte from the source — no paraphrasing, no whitespace normalisation.
-- Every anchor uses 1-based inclusive line numbers in the source. start_line and end_line MUST be accurate — the unit's verbatim source is reconstructed locally by slicing the file at [start_line, end_line] (1-based, inclusive). Off-by-one ranges silently corrupt the stored unit body.
+- VERBATIM fields (public_signatures.signature, type_shapes.shape, boundary_conditions.left/right, predicate, bounds, termination_condition, module_contract_tests.given/when/then when quotable) MUST be copied byte-for-byte from the source — no paraphrasing, no whitespace normalisation. \`module_contract_tests.given/when/then\` quote source expressions when possible; if a test refers to a conceptual input not literally present (e.g. "an empty array"), describe it in plain language and mark the test with oracle_kind="property".
+- Every anchor uses 1-based INCLUSIVE line numbers in the source. start_line and end_line MUST be accurate — unit bodies are reconstructed locally by slicing [start_line, end_line]. Off-by-one ranges silently corrupt the stored unit body.
 - Never invent units that are not in the source. Do NOT emit a "source" field on units — it is reconstructed locally from start_line/end_line.
 - For pass-2-only fields (resolvedRelativePath, resolvedFileId on imports / contracts; ambiguities.resolution), emit null — the mcp-enrichment strategy fills them later.
 - Behave deterministically.
@@ -38,16 +47,34 @@ If a construct nests others (a Solidity contract holds functions/modifiers/event
 holds methods; a class holds methods), emit BOTH the container unit AND each child unit, and
 set each child's parent_unit_id to the container's unit_id.
 
-FILE-LEVEL field definitions (IR v2 vocabulary):
+MODULE_CONTRACT_TESTS guidance:
+- Each test is a checkable claim about observable behaviour AT THE FILE BOUNDARY (an exported
+  function, a route, a published event). Prefer tests that exercise multiple units when they
+  collaborate; per-unit tests live on the unit itself.
+- \`given\` / \`when\` / \`then\` together must be enough for a reimplementation (different
+  language, different library) to verify the claim. Do NOT describe how the current code
+  achieves the outcome — describe the outcome.
+- \`oracle_kind\`:
+    - "unit-test"          — concrete input → concrete output assertion the current code passes.
+    - "property"           — quantified claim ("for any non-empty input, output preserves order").
+    - "integration-trace"  — observable sequence of side effects / calls / emitted events.
+    - "invariant-check"    — names an invariant from \`invariants\` that must hold after the action.
+    - "fingerprint"        — claim about a deterministic identity / hash / canonical form.
+- Up to 12 tests per file. Skip tests that would only restate a public_signature; signatures
+  are already a checkable surface contract.
+- If you cannot phrase a test without speculating about behaviour, do not invent one — record
+  the gap in \`ambiguities\` instead.
 
-${FILE_ANALYSIS_FIELDS_BLOCK_V2}
+Field definitions:
 
-JSON shape (file-level fields are flattened at the top alongside \`module\` and \`units\`):
+${FILE_ANALYSIS_FIELDS_BLOCK}
+
+JSON shape:
 
 ${FILE_ANALYSIS_JSON_SHAPE}`;
 
 /**
- * Builds the Prompt 1 user message for one file.
+ * Builds the file-analysis user message for one file.
  *
  * @param input - The language hint, file path, stable file-node id, and full source.
  * @returns The user-message string sent to `askJsonLLM` alongside `FILE_ANALYSIS_SYSTEM_PROMPT`.

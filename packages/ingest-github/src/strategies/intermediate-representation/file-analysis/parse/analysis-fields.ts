@@ -36,6 +36,7 @@ import {
   parseStateModel,
 } from "./v2/orchestration.ts";
 import { parseFileFingerprint, parseReconstructionHints } from "./v2/shape.ts";
+import { parseModuleContractTests } from "./v2/oracle.ts";
 
 /**
  * Narrows the file-level fields of a file-analysis response into a total {@link SemanticFields}.
@@ -93,5 +94,8 @@ export function normalizeAnalysisFields(raw: Record<string, unknown>): SemanticF
     // ---- shape + compression --------------------------------------------
     fileFingerprint: parseFileFingerprint(raw["file_fingerprint"]),
     reconstructionHints: parseReconstructionHints(raw["reconstruction_hints"]),
+
+    // ---- module-level verification oracle ------------------------------
+    moduleContractTests: parseModuleContractTests(raw["module_contract_tests"]),
   };
 }

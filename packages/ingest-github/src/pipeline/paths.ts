@@ -30,7 +30,6 @@ export function metaPathsFor(knowledgeId: string): MetaPaths {
     bigFileAnalysisDir: path.join(metaRoot, "big-file-analysis"),
     bigFileChunksDir: path.join(metaRoot, "big-file-analysis", "chunks"),
     mcpEnrichmentDir: path.join(metaRoot, "mcp-enrichment"),
-    unitAnalysisDir: path.join(metaRoot, "unit-analysis"),
     bigFilesJson: path.join(metaRoot, "bigFiles.json"),
     scanManifestJson: path.join(metaRoot, "scan-manifest.json"),
     repoSummaryJson: path.join(metaRoot, "repo-summary.json"),
@@ -72,7 +71,6 @@ export async function ensureMetaDirs(paths: MetaPaths): Promise<void> {
   await mkdir(paths.bigFileAnalysisDir, { recursive: true, mode: DIR_MODE });
   await mkdir(paths.bigFileChunksDir, { recursive: true, mode: DIR_MODE });
   await mkdir(paths.mcpEnrichmentDir, { recursive: true, mode: DIR_MODE });
-  await mkdir(paths.unitAnalysisDir, { recursive: true, mode: DIR_MODE });
 }
 
 /**
@@ -159,6 +157,17 @@ export function unitAnalysisRecordPath(
   qualifiedName: string,
 ): string {
   return path.join(unitDirFor(metaPaths, relativePath, chunkNumber), `${safeUnitName(qualifiedName)}.analysis.json`);
+}
+
+/** Per-folder directory under `metaRoot/folder-specs/` keyed by the encoded folder path. */
+export function folderSpecDir(metaPaths: MetaPaths, folderPath: string): string {
+  const encoded = folderPath.length === 0 ? "__ROOT__" : encodeMetaPath(folderPath);
+  return path.join(metaPaths.metaRoot, "folder-specs", encoded);
+}
+
+/** Absolute path of the FolderSpec record for one folder (`<folderSpecDir>/spec.json`). */
+export function folderSpecRecordPath(metaPaths: MetaPaths, folderPath: string): string {
+  return path.join(folderSpecDir(metaPaths, folderPath), "spec.json");
 }
 
 const SLASH_RE = /\//gu;

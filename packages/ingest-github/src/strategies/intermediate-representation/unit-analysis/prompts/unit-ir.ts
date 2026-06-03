@@ -1,33 +1,68 @@
 /**
- * Prompt 2 — Unit IR Extractor (one call per unit). Produces the reconstruction-grade IR for
- * ONE code unit so another model can regenerate its exact source.
+ * The IR strategy's per-unit (codeUnit) analysis call.
+ *
+ * Produces a VERIFIABLE SPEC for ONE code unit: surface contract, behaviour contract, spec
+ * literals, declared constants, and a small per-unit oracle (`spec_tests`) that a checker can
+ * run against any implementation (current, hand-edited, or regenerated in a different
+ * language). See `businessLogic.md` for the theory.
  */
-import { UNIT_IR_JSON_SHAPE } from "./unit-ir-fields.ts";
+import { UNIT_IR_FIELDS_BLOCK, UNIT_IR_JSON_SHAPE } from "./unit-ir-fields.ts";
 
-export const UNIT_IR_SYSTEM_PROMPT = `You produce a RECONSTRUCTION-GRADE IR for ONE code unit of a given unit_kind, in any
-language. The IR must let another model regenerate the unit's exact source. Fields are
-ADAPTIVE: fill what applies to this unit_kind, set the rest to null/[]/{}. Do NOT invent.
-Preserve specific inline literals EXACTLY (regex patterns, format strings, magic numbers, enum
-values, addresses, inline assembly, ABI schemas) in constants / verbatim_blocks.
-verbatim_blocks is for isolated literals only — NEVER emit the full unit source or large code
-blocks there; the source is already known and echoing it wastes tokens.
+export const UNIT_IR_SYSTEM_PROMPT = `You produce a VERIFIABLE SPEC for ONE code unit of a given unit_kind, in any language.
 
-For BEHAVIORAL units (function/method/modifier/macro/constructor):
-- logic_outline must use ONLY step types "sequence","branch","loop","return","raise","call",
-  "emit"; nest children under branch/loop. Capture EVERY conditional and loop bound — a missed
-  outer condition is the top cause of reconstruction failure.
-- example_io_pairs must be TRUE of the code as written (trace it), not aspirational.
+The spec is NOT a reconstruction of the source. It is the CONTRACT a checker (types, tests,
+properties) will hold any implementation against — the current source, a hand-edit, or a
+regeneration in a different language. Per businessLogic.md:
 
-For CONTAINER/TYPE units (class/struct/contract/impl/trait/interface/enum):
-- fill base_types, implements, members, member_unit_ids; logic fields stay empty.
+  - SURFACE   = the contract callers bind against (signature, types, modifiers, generics).
+  - BEHAVIOUR = the contract a re-implementer MUST preserve (effects, invariants, edges,
+                errors, dependencies, state, events).
+  - ORACLE    = a small set of \`spec_tests\` that pin the contract so any implementation can
+                be checked against the SAME tests.
+
+Fields are ADAPTIVE: fill what applies to this unit_kind, set the rest to null/[]/{}. Do NOT
+invent. Preserve contract-relevant inline literals EXACTLY (regex patterns, error codes,
+format strings, ABI fragments, enum values) in \`spec_literals\`. Do NOT emit the full unit
+source or large code blocks — the source is already known.
+
+For BEHAVIOURAL units (function / method / modifier / macro / constructor):
+- Fill preconditions, postconditions, invariants, edge_cases, error_policy, state_mutations,
+  events_emitted, calls, symbol_references, io_format_spec when applicable.
+- Fill spec_tests with up to 8 checkable scenarios. Each test must be TRUE of the code as
+  written (trace it), not aspirational. If you would have to speculate, omit the test.
+
+For CONTAINER / TYPE units (class / struct / contract / impl / trait / interface / enum):
+- Fill base_types, implements, members, member_unit_ids.
+- spec_tests may stay empty unless the container itself has observable behaviour (a
+  module-level invariant, a constructor side effect).
 
 Output a single JSON object, no prose, no markdown fences. Behave deterministically.
+
+SPEC_TESTS guidance:
+- Each test is a checkable claim about observable behaviour AT THE UNIT BOUNDARY.
+- \`given\` / \`when\` / \`then\` together must be enough for a reimplementation in a different
+  language to verify the claim. Do NOT describe how the current code achieves the outcome.
+- \`oracle_kind\`:
+    - "unit-test"        : concrete input → concrete output.
+    - "property"         : quantified claim (for any input matching X, output satisfies Y).
+    - "invariant-check"  : names an invariant from \`invariants\` and asserts it post-call.
+    - "error-path"       : invalid input triggers a specific error_policy outcome.
+    - "state-transition" : asserts a specific state_mutations / events_emitted effect.
+    - "fingerprint"      : claim about a deterministic identity / hash / canonical form.
+- Phrase tests so they restate the contract, not the implementation. Skip tests that would
+  only restate the signature.
+
+Field definitions:
+
+${UNIT_IR_FIELDS_BLOCK}
+
+JSON shape:
 
 ${UNIT_IR_JSON_SHAPE}`;
 
 /**
- * Builds the Prompt 2 user message for one unit. `mustCapture` carries `missing_from_ir` hints
- * from a failed verification, appended on the single retry; empty on the first attempt.
+ * Builds the per-unit user message. `mustCapture` carries `missing_from_ir` hints from a
+ * failed verification, appended on the single retry; empty on the first attempt.
  *
  * @param input - The unit's kind/name, language, file path, resolution context, source, and
  *                any must-capture retry hints.

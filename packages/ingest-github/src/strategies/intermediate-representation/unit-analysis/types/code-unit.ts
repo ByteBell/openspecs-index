@@ -73,6 +73,33 @@ export interface ExampleIoPair {
   note: string | null;
 }
 
+/** A literal that is PART OF the unit's contract (not a reconstruction echo). */
+export interface SpecLiteral {
+  kind: string;
+  value: string;
+  role: string;
+}
+
+/** What kind of oracle a per-unit spec test is. */
+export type UnitOracleKind =
+  | "unit-test"
+  | "property"
+  | "invariant-check"
+  | "error-path"
+  | "state-transition"
+  | "fingerprint";
+
+/** One per-unit verification oracle entry. */
+export interface SpecTest {
+  testId: string;
+  scenario: string;
+  given: string[];
+  when: string;
+  then: string;
+  oracleKind: UnitOracleKind;
+  rationale: string;
+}
+
 /**
  * The full reconstruction IR for one code unit. `semanticFingerprint` is computed in code
  * (never by the LLM). Scope keys (`knowledgeId`/`orgId`) are stamped by the caller when the
@@ -122,5 +149,13 @@ export interface CodeUnit {
   verbatimBlocks: VerbatimBlock[];
   exampleIoPairs: ExampleIoPair[];
   testReferences: string[];
+  /** 1-2 sentence statement of intent — what the unit guarantees, not how. */
+  behaviorSummary: string;
+  /** Literals that are part of the unit's contract (regex, error codes, format strings, ABI fragments). */
+  specLiterals: SpecLiteral[];
+  /** Constants the unit declares as part of its public contract. */
+  declaredConstants: UnitConstant[];
+  /** Per-unit verification oracle — checkable claims any implementation must satisfy. */
+  specTests: SpecTest[];
   semanticFingerprint: string;
 }

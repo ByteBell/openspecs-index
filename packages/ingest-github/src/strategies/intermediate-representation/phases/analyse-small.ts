@@ -92,7 +92,7 @@ export async function analyseSmallFiles(input: AnalyseSmallInput): Promise<Analy
         logger.debug(`ir/analyse-small: ANALYSING ${entry.relativePath}`);
         const content = await input.source.readFile(entry.relativePath);
         const language = languageFromPath(entry.relativePath);
-        const fileNodeId = `${input.knowledgeId}:${entry.relativePath}`;
+        const fileNodeId = entry.relativePath;
         const analyseInput: Parameters<typeof analyseFile>[0] = {
           language,
           relativePath: entry.relativePath,

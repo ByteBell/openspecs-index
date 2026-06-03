@@ -1,7 +1,8 @@
 /**
  * IR phase 6 — extract-unit-sources (PURE, no LLM). For every {@link IrFileAnalysisRecord} on
  * disk (small files AND big-file chunks), re-project each {@link UnitDescriptor} onto its own
- * `<safeUnit>.source.json` file under `unitAnalysisDir/<encoded>/(chunk-N/)?`. Phase 6 does NOT
+ * `<safeUnit>.source.json` file under `<fileDir>/codeUnits/` (small file) or
+ * `<bigFileDir>/chunks/chunk-N/codeUnits/` (big-file chunk). Phase 6 does NOT
  * re-read the original file — the descriptor's `source` slice was populated at file-analysis
  * time, so this phase only computes sha256/sizeBytes/tokenCount and persists.
  *
@@ -27,6 +28,7 @@ import {
   readFileAnalysisRecordIfPresent,
   saveUnitSourceRecord,
 } from "#src/strategies/intermediate-representation/storage.ts";
+import { unitFileIdOf } from "#src/strategies/intermediate-representation/file-analysis/unit-id.ts";
 
 export interface ExtractUnitSourcesInput {
   knowledgeId: string;
@@ -103,10 +105,11 @@ export async function extractUnitSources(input: ExtractUnitSourcesInput): Promis
             continue;
           }
           const source = descriptor.source;
+          const unitFileId = unitFileIdOf(descriptor.unitId);
           const unitRecord: IrUnitSourceRecord = {
-            relativePath,
+            relativePath: unitFileId,
             chunkNumber,
-            fileId: `${input.knowledgeId}:${relativePath}${chunkNumber === null ? "" : `:chunk-${String(chunkNumber)}`}`,
+            fileId: unitFileId,
             language: record.language,
             unitId: descriptor.unitId,
             unitKind: descriptor.unitKind,
