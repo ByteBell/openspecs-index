@@ -14,6 +14,14 @@ import type {
 
 export type { FileAnalysisSection, FileAnalysis, RawFileDoc, KnowledgeListEntry, DeleteKnowledgeResult, DbPingResult };
 
+/** Optional phase metadata persisted alongside file counts by `updateKnowledgeProgress`. */
+export interface KnowledgeProgressExtra {
+  /** Phase-weighted overall progress (0–100). */
+  progressPercent?: number;
+  /** Name of the phase currently executing. */
+  currentPhase?: string;
+}
+
 export interface IKnowledgeRepository {
   setKnowledgeState(knowledgeId: string, state: KnowledgeState): Promise<void>;
   /**
@@ -33,7 +41,12 @@ export interface IKnowledgeRepository {
     costUsd?: string,
   ): Promise<void>;
   setKnowledgeBranch(knowledgeId: string, branch: string): Promise<void>;
-  updateKnowledgeProgress(knowledgeId: string, processedFiles: number, totalFiles?: number): Promise<void>;
+  updateKnowledgeProgress(
+    knowledgeId: string,
+    processedFiles: number,
+    totalFiles?: number,
+    extra?: KnowledgeProgressExtra,
+  ): Promise<void>;
   upsertKnowledge(doc: Omit<KnowledgeDoc, "updatedAt"> & { updatedAt?: Date }): Promise<void>;
   deleteKnowledge(knowledgeId: string): Promise<DeleteKnowledgeResult>;
   listKnowledge(opts?: { limit?: number }): Promise<KnowledgeListEntry[]>;

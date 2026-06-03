@@ -5,6 +5,7 @@ import { ensureServerRunning } from "./serverSpawn.ts";
 import { ServerStartTimeoutError } from "@bb/errors";
 import { getJson, HttpClientError, postJson } from "./httpClient.ts";
 import { createProgressBar, createSpinner, error, info, type ProgressBar } from "./output.ts";
+import { hasIngestProgress, updateIngestBar, type IngestProgressFields } from "./progressLabel.ts";
 import { startLogTailer, type LogTailer } from "./logTailer.ts";
 import { promptRepoSelector } from "./repoSelectorPrompt.ts";
 import { promptPullMode, resolveCommit } from "./pullPrompts.ts";
@@ -16,12 +17,10 @@ interface PullResponse {
   commitHash?: string;
 }
 
-interface RepoStatus {
+interface RepoStatus extends IngestProgressFields {
   knowledgeId: string;
   state: string;
   fileCount: number;
-  totalFiles?: number;
-  processedFiles?: number;
 }
 
 export function buildPullCommand(): Command {
@@ -164,12 +163,12 @@ async function pollJobStatus(knowledgeId: string, jobId: string): Promise<void> 
     try {
       const status = await getJson<RepoStatus>(`/api/v1/repos/${knowledgeId}`);
 
-      if (status.totalFiles !== undefined && status.totalFiles > 0) {
+      if (hasIngestProgress(status)) {
         if (bar === null) {
           spinner.stop(true, `Re-ingesting ${knowledgeId}`);
           bar = createProgressBar(`Re-ingesting ${knowledgeId}`);
         }
-        bar.update(status.processedFiles ?? 0, status.totalFiles, `Re-ingesting ${knowledgeId}`);
+        updateIngestBar(bar, status, `Re-ingesting ${knowledgeId}`);
       } else {
         spinner.update(`Pulling: ${status.state}${status.fileCount > 0 ? ` (${status.fileCount} files)` : ""}`);
       }

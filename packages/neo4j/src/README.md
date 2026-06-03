@@ -110,8 +110,9 @@ branch / repoName / state / createdAt / updatedAt` (createdAt only on
 
 - **[repo.ts](repo.ts)** — `upsertRepoNode(input)` writes `:Repo`
   (camelCase summary payload) **and** in the same statement MERGEs
-  `:Knowledge {knowledge_id}` (snake mirror; also carries `knowledgeId`
-  camel so `upsertKnowledgeNode` MERGEs converge on the same node) and
+  `:Knowledge {knowledgeId}` (the constrained canonical key, so this
+  upsert and `upsertKnowledgeNode` converge on one node; also carries
+  the `knowledge_id` snake mirror for the chat-mcp reader) and
   `:RepoSummary {knowledge_id, org_id, branch_name}` (snake mirror
   with `architecture`, `data_flow`, `key_patterns`,
   `major_subsystems`, `purpose`, `summary`). Reuses

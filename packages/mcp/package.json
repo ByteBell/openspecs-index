@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@bb/config": "workspace:*",
+    "@bb/db": "workspace:*",
     "@bb/errors": "workspace:*",
-    "@bb/logger": "workspace:*",
-    "@bb/llm": "workspace:*",
     "@bb/graph-db": "workspace:*",
-    "@bb/mongo": "workspace:*",
+    "@bb/llm": "workspace:*",
+    "@bb/logger": "workspace:*",
     "@bb/types": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "zod": "^4.3.6"

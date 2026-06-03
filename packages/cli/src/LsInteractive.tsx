@@ -39,7 +39,7 @@ export function LsInteractive({ repos, onDone }: LsInteractiveProps): ReactEleme
   const groupedRepos = useMemo(() => {
     const groups: Record<string, RepoEntry[]> = {};
     for (const r of repos) {
-      const key = r.source.kind === "github" ? r.source.repoUrl : r.source.sourcePath;
+      const key = (r.source.kind === "github" ? r.source.repoUrl : r.source.sourcePath) || r.knowledgeId;
       if (!groups[key]) {
         groups[key] = [];
       }

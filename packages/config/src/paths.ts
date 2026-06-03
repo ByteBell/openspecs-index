@@ -33,6 +33,29 @@ export function getConfigPath(): string {
   return path.join(getBytebellHome(), "config.json");
 }
 
+/**
+ * Resolve a configured filesystem path to an absolute one. Expands a leading
+ * `~` to the OS home, resolves a relative value against the bytebell home, and
+ * returns absolute paths unchanged. An empty value stays empty so callers can
+ * still detect "not set" — embedded-mode validation relies on this.
+ */
+export function resolveUnderHome(value: string): string {
+  const v = value.trim();
+  if (v.length === 0) {
+    return "";
+  }
+  if (v === "~") {
+    return os.homedir();
+  }
+  if (v.startsWith("~/") || v.startsWith("~\\")) {
+    return path.join(os.homedir(), v.slice(2));
+  }
+  if (path.isAbsolute(v)) {
+    return v;
+  }
+  return path.join(getBytebellHome(), v);
+}
+
 export function __registerCacheInvalidator(fn: () => void): void {
   cacheInvalidators.push(fn);
 }

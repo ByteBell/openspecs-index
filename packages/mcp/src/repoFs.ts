@@ -1,7 +1,7 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { getBytebellHome, getConfigValue } from "@bb/config";
-import { getKnowledge } from "@bb/mongo";
+import { knowledgeDb } from "@bb/db";
 import { Config, parseGithubOwnerRepo, repositoryDirFor, type RepoLocation } from "@bb/types";
 import { IngestError, KnowledgeNotFoundError } from "@bb/errors";
 
@@ -39,7 +39,7 @@ export class FileReadError extends Error {
  * returns `source.sourcePath` unchanged.
  */
 export async function resolveCloneDir(knowledgeId: string): Promise<string> {
-  const kDoc = await getKnowledge(knowledgeId);
+  const kDoc = await knowledgeDb.getKnowledge(knowledgeId);
   if (kDoc === null) {
     throw new KnowledgeNotFoundError(knowledgeId);
   }

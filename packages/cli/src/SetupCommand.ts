@@ -6,6 +6,7 @@ import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { InstallWizard, type InstallWizardResult } from "./InstallWizard.tsx";
 import { KEY_MAP } from "./keyMap.ts";
+import { applyInfraMode } from "./infraMode.ts";
 import { runBootSequence } from "./bootConfig.ts";
 import { stopServer } from "./serverLifecycle.ts";
 import { postJson, HttpClientError } from "./httpClient.ts";
@@ -84,6 +85,9 @@ function runWizard(): Promise<InstallWizardResult | null> {
 }
 
 function applyConfig(result: InstallWizardResult): void {
+  // Infrastructure mode sets the db/graph/queue providers as a single preset.
+  applyInfraMode(result.infraMode);
+
   const providerEntry = KEY_MAP["llm-provider"];
   if (providerEntry === undefined) {
     throw new Error("internal: KEY_MAP missing 'llm-provider'");

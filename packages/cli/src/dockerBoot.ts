@@ -20,6 +20,7 @@ import {
 } from "./infraPorts.ts";
 import { diagnosePortConflict, promptPortConflict } from "./portConflictPrompt.ts";
 import { removeContainer } from "./dockerPortDiagnostics.ts";
+import { composeServicesNeeded } from "./infraMode.ts";
 
 const MAX_CONFLICT_ROUNDS = 4;
 
@@ -133,10 +134,8 @@ async function safeComposeDown(): Promise<void> {
 }
 
 function composeServicesToStart(skip: Set<"mongo" | "neo4j" | "redis">): readonly ("mongo" | "neo4j" | "redis")[] {
-  if (skip.size === 0) {
-    return ["mongo", "neo4j", "redis"];
-  }
-  return (["mongo", "neo4j", "redis"] as const).filter((s) => !skip.has(s));
+  const needed = composeServicesNeeded();
+  return (["mongo", "neo4j", "redis"] as const).filter((s) => needed.has(s) && !skip.has(s));
 }
 
 function composeServiceFor(service: InfraService): "mongo" | "neo4j" | "redis" {

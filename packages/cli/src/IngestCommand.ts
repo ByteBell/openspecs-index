@@ -7,6 +7,7 @@ import { ensureServerRunning } from "./serverSpawn.ts";
 import { ServerStartTimeoutError } from "@bb/errors";
 import { getJson, HttpClientError, postJson } from "./httpClient.ts";
 import { createProgressBar, createSpinner, error, type ProgressBar } from "./output.ts";
+import { hasIngestProgress, updateIngestBar, type IngestProgressFields } from "./progressLabel.ts";
 
 interface IngestResponse {
   knowledgeId: string;
@@ -57,12 +58,10 @@ async function runIngest(rawPath: string | undefined): Promise<void> {
   }
 }
 
-interface RepoStatus {
+interface RepoStatus extends IngestProgressFields {
   knowledgeId: string;
   state: string;
   fileCount: number;
-  totalFiles?: number;
-  processedFiles?: number;
 }
 
 async function pollJobStatus(knowledgeId: string, jobId: string): Promise<void> {
@@ -74,12 +73,12 @@ async function pollJobStatus(knowledgeId: string, jobId: string): Promise<void> 
     try {
       const status = await getJson<RepoStatus>(`/api/v1/repos/${knowledgeId}`);
 
-      if (status.totalFiles !== undefined && status.totalFiles > 0) {
+      if (hasIngestProgress(status)) {
         if (bar === null) {
           spinner.stop(true, `Starting ingestion for ${knowledgeId}`);
           bar = createProgressBar(`Ingesting ${knowledgeId}`);
         }
-        bar.update(status.processedFiles ?? 0, status.totalFiles, `Ingesting ${knowledgeId}`);
+        updateIngestBar(bar, status, `Ingesting ${knowledgeId}`);
       } else {
         spinner.update(`Ingesting: ${status.state}${status.fileCount > 0 ? ` (${status.fileCount} files)` : ""}`);
       }

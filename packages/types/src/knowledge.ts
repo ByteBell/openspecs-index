@@ -124,7 +124,15 @@ export interface EnrichmentFailure {
 export interface KnowledgeDoc {
   knowledgeId: string;
   source: KnowledgeSource;
-  status: { state: KnowledgeState; totalFiles?: number; processedFiles?: number };
+  status: {
+    state: KnowledgeState;
+    totalFiles?: number;
+    processedFiles?: number;
+    /** Phase-weighted overall progress (0–100). Set by the ingestion progress reporter. */
+    progressPercent?: number;
+    /** Name of the phase currently executing (e.g. "file_analysis", "indexing"). */
+    currentPhase?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
   info: KnowledgeInfo;

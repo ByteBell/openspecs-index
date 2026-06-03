@@ -2,12 +2,14 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
-import { FieldsStage, RepoStage, ConfirmStage } from "./InstallWizardStages.tsx";
+import { FieldsStage, InfraStage, RepoStage, ConfirmStage } from "./InstallWizardStages.tsx";
+import type { InfraMode } from "./infraMode.ts";
 
 export type LlmProviderChoice = "openrouter" | "ollama";
 
 export interface InstallWizardResult {
   provider: LlmProviderChoice;
+  infraMode: InfraMode;
   openrouterApiKey?: string;
   openrouterModel?: string;
   ollamaUrl?: string;
@@ -15,7 +17,7 @@ export interface InstallWizardResult {
   indexUrl?: string;
 }
 
-type Stage = "provider" | "fields" | "repo" | "confirm";
+type Stage = "provider" | "infra" | "fields" | "repo" | "confirm";
 
 interface ProviderItem {
   value: LlmProviderChoice;
@@ -36,6 +38,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
   const { exit } = useApp();
   const [stage, setStage] = useState<Stage>("provider");
   const [providerIdx, setProviderIdx] = useState(0);
+  const [infraMode, setInfraMode] = useState<InfraMode>("embedded");
   const [apiKey, setApiKey] = useState("");
   const [orModel, setOrModel] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
@@ -57,7 +60,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
         return;
       }
       if (key.return) {
-        setStage("fields");
+        setStage("infra");
       }
     }
   });
@@ -95,6 +98,17 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
       ? apiKey.trim().length > 0 && orModel.trim().length > 0
       : ollamaUrl.trim().length > 0 && ollamaModel.trim().length > 0;
 
+  if (stage === "infra") {
+    return (
+      <InfraStage
+        mode={infraMode}
+        onMode={setInfraMode}
+        onBack={() => setStage("provider")}
+        onNext={() => setStage("fields")}
+      />
+    );
+  }
+
   if (stage === "fields") {
     return (
       <FieldsStage
@@ -108,7 +122,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
         ollamaModel={ollamaModel}
         onOllamaModel={setOllamaModel}
         valid={fieldsValid}
-        onBack={() => setStage("provider")}
+        onBack={() => setStage("infra")}
         onNext={() => setStage("repo")}
       />
     );
@@ -128,6 +142,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
   return (
     <ConfirmStage
       provider={provider}
+      infraMode={infraMode}
       apiKey={apiKey}
       orModel={orModel}
       ollamaUrl={ollamaUrl}
@@ -136,7 +151,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
       onBack={() => setStage("repo")}
       onDone={() => {
         exit();
-        const result: InstallWizardResult = { provider };
+        const result: InstallWizardResult = { provider, infraMode };
         if (provider === "openrouter") {
           result.openrouterApiKey = apiKey.trim();
           result.openrouterModel = orModel.trim();

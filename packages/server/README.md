@@ -84,6 +84,10 @@ POST /api/v1/local/index      body: { sourcePath: <abs> }
                               → 422 sourcePath must be absolute
 
 GET  /api/v1/repos            → 200 { repos: [...] }   (sorted updatedAt desc)
+GET  /api/v1/repos/:id        → 200 { knowledgeId, state, fileCount, totalFiles,
+                                      processedFiles, progressPercent, currentPhase,
+                                      failure } (powers CLI poll/progress bar)
+                              → 404 knowledge not found
 
 POST|GET|DELETE /mcp                       Streamable HTTP — owned by @bb/mcp
 GET  /sse                                  legacy SSE stream — owned by @bb/mcp

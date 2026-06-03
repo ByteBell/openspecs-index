@@ -37,7 +37,7 @@ export function createSpinner(initialText: string): Spinner {
 
   const render = () => {
     if (process.stderr.isTTY) {
-      process.stderr.write(`\r${frames[frameIndex]} ${text}`);
+      process.stderr.write(`\r${frames[frameIndex]} ${text}\x1b[K`);
     }
   };
 
@@ -96,7 +96,7 @@ export function createProgressBar(initialText: string): ProgressBar {
       const filled = Math.floor((percent / 100) * width);
       const empty = width - filled;
       const bar = "█".repeat(filled) + "░".repeat(empty);
-      process.stderr.write(`\r${text} [${bar}] ${percent.toFixed(1)}%`);
+      process.stderr.write(`\r${text} [${bar}] ${percent.toFixed(1)}%\x1b[K`);
     }
   };
 

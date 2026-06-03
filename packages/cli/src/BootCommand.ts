@@ -10,12 +10,13 @@ import { applyInfraDefaults, checkPreflight } from "./bootConfig.ts";
 import { SetupForm } from "./SetupForm.tsx";
 import { error, info, success } from "./output.ts";
 import { bringInfraUp, usingHonker } from "./bootInfra.ts";
+import { isEmbedded } from "./infraMode.ts";
 
 export function buildBootCommand(): Command {
   const cmd = new Command("boot");
   cmd
     .description(
-      "Bring up Docker infra (mongo + neo4j + redis/honker per queue-provider) and start the bytebell-server.",
+      "Start the bytebell-server. Non-embedded providers (mongo/neo4j/bullmq) bring up Docker infra first; embedded providers (sqlite/ladybug/honker) need no Docker.",
     )
     .action(runBoot);
   return cmd;
@@ -46,12 +47,25 @@ async function runBoot(): Promise<void> {
     if (entry.redacted) {
       success(`set ${entry.cliKey}=<redacted> (auto-generated)`);
     } else {
-      success(`set ${entry.cliKey} (auto-filled with local-docker default)`);
+      success(`set ${entry.cliKey} (auto-filled with default)`);
     }
   }
 
   const dbProvider = getConfigValue(Config.DbProvider);
   const graphProvider = getConfigValue(Config.GraphProvider);
+
+  // Embedded mode (sqlite + ladybug + honker) needs no Docker — report the
+  // file-based services and skip infra startup entirely.
+  if (isEmbedded()) {
+    info("embedded mode — no Docker required.");
+    const queueDbPath = getConfigValue(Config.QueueDbPath);
+    const resolvedQueue = queueDbPath.length > 0 ? expandTilde(queueDbPath) : path.join(getBytebellHome(), "queue.db");
+    success(`queue  → honker (sqlite: ${resolvedQueue})`);
+    success(`doc    → sqlite`);
+    success(`graph  → ladybug`);
+    process.stdout.write("\nNext: bytebell index <git-url>  or  bytebell ingest [path]\n");
+    return;
+  }
 
   if (graphProvider === GraphProviderType.Neo4j && defaults.neo4jPassword.length === 0) {
     error("internal: neo4j password is empty after applyInfraDefaults — refusing to start docker.");
@@ -59,6 +73,7 @@ async function runBoot(): Promise<void> {
     return;
   }
 
+  info("Docker needed — bringing up infrastructure for the selected providers.");
   const upResult = await bringInfraUp(defaults.neo4jPassword);
   if (upResult === null) {
     return;
@@ -77,7 +92,6 @@ async function runBoot(): Promise<void> {
   if (graphProvider === GraphProviderType.Neo4j) {
     success(`neo4j  → ${upResult.services.neo4j}`);
   }
-  success(`redis  → ${upResult.services.redis}`);
 
   process.stdout.write("\nNext: bytebell index <git-url>  or  bytebell ingest [path]\n");
 }

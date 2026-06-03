@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Config } from "@bb/types";
 import { getConfigValue, isDevMode } from "@bb/config";
 import { getLogsDir } from "@bb/logger";
+import { composeServicesNeeded, type ComposeService } from "./infraMode.ts";
 import {
   ServerStartTimeoutError,
   ServerInfraDownError,
@@ -48,13 +49,20 @@ function parseHostPort(uri: string): { host: string; port: number } | null {
 }
 
 async function checkInfraReachable(): Promise<void> {
-  const checks = [
+  // Only probe the services the active provider combo actually uses. Embedded
+  // mode (sqlite + ladybug + honker) needs none — composeServicesNeeded() is
+  // empty, so we skip the probe entirely.
+  const needed = composeServicesNeeded();
+  const checks: { name: ComposeService; uri: string }[] = [
     { name: "mongo", uri: getConfigValue(Config.MongoUri) },
     { name: "redis", uri: getConfigValue(Config.RedisUrl) },
     { name: "neo4j", uri: getConfigValue(Config.Neo4jUri) },
   ];
   const down: { name: string; uri: string }[] = [];
   for (const check of checks) {
+    if (!needed.has(check.name)) {
+      continue;
+    }
     if (check.uri.length === 0) {
       continue;
     }
@@ -98,7 +106,7 @@ export async function ensureServerRunning(onProgress?: (line: string) => void): 
   throw new ServerStartTimeoutError(logPath, (SPAWN_POLL_INTERVAL_MS * SPAWN_MAX_POLLS) / 1000);
 }
 
-type HealthBody = { mongo?: { ok: boolean }; redis?: { ok: boolean }; neo4j?: { ok: boolean } };
+type HealthBody = { db?: { ok: boolean }; queue?: { ok: boolean }; graph?: { ok: boolean } };
 
 async function isHealthy(): Promise<boolean> {
   const port = getConfigValue(Config.ServerPort);
@@ -116,14 +124,14 @@ async function isHealthy(): Promise<boolean> {
   if (res.status === 503) {
     const body = (await res.json().catch(() => ({}))) as HealthBody;
     const down: string[] = [];
-    if (body.mongo?.ok === false) {
-      down.push("mongo");
+    if (body.db?.ok === false) {
+      down.push("db");
     }
-    if (body.redis?.ok === false) {
-      down.push("redis");
+    if (body.queue?.ok === false) {
+      down.push("queue");
     }
-    if (body.neo4j?.ok === false) {
-      down.push("neo4j");
+    if (body.graph?.ok === false) {
+      down.push("graph");
     }
     if (down.length > 0) {
       throw new ServerInfraDownError(down);

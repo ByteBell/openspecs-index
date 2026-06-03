@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH non-commercial-clause
 import { getJson } from "./httpClient.ts";
 import { createProgressBar, createSpinner, error, type ProgressBar } from "./output.ts";
+import { hasIngestProgress, updateIngestBar, type IngestProgressFields } from "./progressLabel.ts";
 
 export interface IndexResponse {
   knowledgeId: string;
@@ -14,12 +15,10 @@ export interface RepoFailure {
   detail?: string;
 }
 
-export interface RepoStatus {
+export interface RepoStatus extends IngestProgressFields {
   knowledgeId: string;
   state: string;
   fileCount: number;
-  totalFiles?: number;
-  processedFiles?: number;
   failure?: RepoFailure | null;
 }
 
@@ -33,12 +32,12 @@ export async function pollIndexToCompletion(knowledgeId: string, jobId: string):
     try {
       const status = await getJson<RepoStatus>(`/api/v1/repos/${knowledgeId}`);
 
-      if (status.totalFiles !== undefined && status.totalFiles > 0) {
+      if (hasIngestProgress(status)) {
         if (bar === null) {
           spinner.stop(true, `Starting ingestion for ${knowledgeId}`);
           bar = createProgressBar(`Ingesting ${knowledgeId}`);
         }
-        bar.update(status.processedFiles ?? 0, status.totalFiles, `Ingesting ${knowledgeId}`);
+        updateIngestBar(bar, status, `Ingesting ${knowledgeId}`);
       } else {
         spinner.update(`Indexing: ${status.state}${status.fileCount > 0 ? ` (${status.fileCount} files)` : ""}`);
       }

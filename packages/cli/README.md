@@ -24,8 +24,13 @@ indexing, configuration, server lifecycle, and inspection.
 `ingest`, `ls`, `delete`, `stats`.
 
 - `bytebell setup` — interactive first-run wizard. Presents an Ink multi-stage
-  form: (1) pick LLM provider (`openrouter` | `ollama`), (2) enter credentials /
-  model, (3) optionally supply a GitHub repo URL to index after boot, (4) confirm.
+  form: (1) pick LLM provider (`openrouter` | `ollama`), (2) pick infrastructure
+  mode — **Docker** (non-embedded: mongo + neo4j + redis, the default selection,
+  labelled "Docker needed") or **Embedded** (sqlite + ladybug + honker, no Docker,
+  labelled "recommended"),
+  (3) enter credentials / model, (4) optionally supply a GitHub repo URL to index
+  after boot, (5) confirm. The infra mode is a single selector that expands to the
+  three `db/graph/queue` provider keys via `applyInfraMode()` (see `infraMode.ts`).
   On confirm: applies config via `KEY_MAP` setters (same path as `bytebell set`),
   stops any running server, starts a fresh server, prints the MCP endpoint, and
   if a repo URL was given kicks `POST /api/v1/github/index` then polls to
@@ -35,21 +40,33 @@ indexing, configuration, server lifecycle, and inspection.
   `~/.bytebell/config.json` via `@bb/config.setConfigValue`. Type
   coercion + Zod validation + atomic `tmp → fsync → rename`. Sole
   sanctioned write path per [docs/arch.md:140](../../docs/arch.md#L140).
-- `bytebell set` (no args) — Ink setup form. Walks Mongo / Neo4j /
-  Neo4j-user / Neo4j-password / Redis / Port / GitHub-concurrency text
-  fields with field-level format validation, then the provider toggles
-  (Graph provider `neo4j|ladybug`, Doc store `mongo|sqlite`, Queue
-  `bullmq|honker`). On submit, applies every value atomically through
-  the same `setConfigValue` path. Esc cancels.
+- `bytebell set` (no args) — Ink setup form. Presents a single
+  **Infrastructure** toggle (`docker|embedded`, default `docker`, embedded
+  labelled "recommended"). In
+  Docker mode it walks Mongo / Neo4j / Neo4j-user / Neo4j-password /
+  Redis text fields (with field-level format validation) plus Port /
+  GitHub-concurrency / OpenRouter fields; in Embedded mode the
+  mongo/neo4j/redis rows are hidden and not required. On submit, the
+  mode expands to the three provider keys via `applyInfraMode()` and
+  every visible value is applied atomically through the same
+  `setConfigValue` path. Esc cancels.
 - `bytebell boot` — one-command bring-up. Refuses to proceed if
   `openrouter_api_key` or `openrouter_model` is blank (with the
-  matching `bytebell set …` hint). Auto-fills blank infra config keys
-  with local-docker defaults (mongo / neo4j / neo4j-user / redis) and
-  generates a random Neo4j password if one isn't already set. Writes
+  matching `bytebell set …` hint). Whether Docker is started is derived
+  from the active provider combo (`needsDocker()` / `isEmbedded()` in
+  `infraMode.ts`): **embedded** (sqlite + ladybug + honker) skips Docker
+  entirely and goes straight to starting the server; **non-embedded**
+  brings Docker up. Either way it auto-fills blank infra
+  config keys (only for the providers in use): embedded fills the
+  `~/.bytebell` store paths (`sqlite-path` / `ladybug-path` /
+  `queue-db-path` — Ladybug in particular needs a real path or it runs
+  in-memory), Docker fills the mongo/neo4j/redis URIs and generates a
+  random Neo4j password if one isn't already set. In Docker mode it writes
   `infra/docker/.env` (Neo4j password + host ports derived from the
   configured URIs), runs `docker compose -f
-infra/docker/docker-compose.yml up -d`, polls
-  `docker compose ps --format json` until all three services report
+infra/docker/docker-compose.yml up -d` for **only the services the
+  providers require** (mongo/neo4j/redis), polls
+  `docker compose ps --format json` until they report
   `healthy`, then invokes `ensureServerRunning()` (existing helper) to
   spawn `bytebell-server`. Idempotent — re-running on an already-up
   stack is a fast no-op. When a compose host port is already taken,

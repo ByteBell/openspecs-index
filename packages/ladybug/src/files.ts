@@ -37,6 +37,23 @@ export async function bulkUpsertFiles(
     return { writer, path };
   };
 
+  // parquetjs throws "cannot write parquet file with zero rows" when a writer is
+  // closed without any appended rows. Relation tables are routinely empty (a repo
+  // may have files but no classes, no internal imports, etc.), so closing those
+  // writers must not abort the whole upsert. We only COPY tables with count > 0,
+  // so an unfinalized empty parquet file is harmless — and it gets unlinked in the
+  // `finally` below.
+  const closeWriter = async (info: { writer: ParquetWriter }, count: number): Promise<void> => {
+    try {
+      await info.writer.close();
+    } catch (cause: unknown) {
+      if (count > 0) {
+        throw cause;
+      }
+      // empty writer — the zero-rows close error is expected; ignore it.
+    }
+  };
+
   // Generate paths and open all writers upfront
   const fileWriterInfo = await openWriter("files", fileParquetSchema);
   const hasFileRelWriterInfo = await openWriter("has_file_rel", relParquetSchema);
@@ -171,15 +188,15 @@ export async function bulkUpsertFiles(
       }
     }
 
-    // Close all open writers
-    await fileWriterInfo.writer.close();
-    await hasFileRelWriterInfo.writer.close();
-    await containsRelWriterInfo.writer.close();
-    await hasKeywordRelWriterInfo.writer.close();
-    await hasClassRelWriterInfo.writer.close();
-    await hasFunctionRelWriterInfo.writer.close();
-    await hasImportInternalRelWriterInfo.writer.close();
-    await hasImportExternalRelWriterInfo.writer.close();
+    // Close all open writers. Empty relation writers are tolerated (see closeWriter).
+    await closeWriter(fileWriterInfo, fileCount);
+    await closeWriter(hasFileRelWriterInfo, hasFileCount);
+    await closeWriter(containsRelWriterInfo, containsCount);
+    await closeWriter(hasKeywordRelWriterInfo, keywordCount);
+    await closeWriter(hasClassRelWriterInfo, classCount);
+    await closeWriter(hasFunctionRelWriterInfo, functionCount);
+    await closeWriter(hasImportInternalRelWriterInfo, importIntCount);
+    await closeWriter(hasImportExternalRelWriterInfo, importExtCount);
 
     // If no files were written, we are done
     if (fileCount === 0) {

@@ -6,13 +6,24 @@ import type {
   ProgressReporter,
   ProgressReporterInput,
 } from "./types.ts";
+import { fileAnalysisPercent, phaseFloorPercent } from "./phaseWeights.ts";
 
 class DbProgressContext implements ProgressContext {
   private total = 0;
   private processed = 0;
   private lastUpdate = 0;
+  private phase: ProgressPhase = "clone";
 
   constructor(private knowledgeId: string) {}
+
+  private persist(processed: number, total: number | undefined, percent: number): void {
+    knowledgeDb
+      .updateKnowledgeProgress(this.knowledgeId, processed, total, {
+        progressPercent: Math.round(percent),
+        currentPhase: this.phase,
+      })
+      .catch(() => {});
+  }
 
   reporter(input: ProgressReporterInput): ProgressReporter {
     const isFileAnalysis =
@@ -23,7 +34,7 @@ class DbProgressContext implements ProgressContext {
       start: async () => {
         if (isFileAnalysis && input.total.kind === "fixed") {
           this.total += input.total.total;
-          await knowledgeDb.updateKnowledgeProgress(this.knowledgeId, this.processed, this.total);
+          this.persist(this.processed, this.total, fileAnalysisPercent(this.processed, this.total));
         }
       },
       increment: (delta = 1) => {
@@ -32,7 +43,7 @@ class DbProgressContext implements ProgressContext {
           const now = Date.now();
           if (now - this.lastUpdate > 250 || this.processed >= this.total) {
             this.lastUpdate = now;
-            knowledgeDb.updateKnowledgeProgress(this.knowledgeId, this.processed, this.total).catch(() => {});
+            this.persist(this.processed, this.total, fileAnalysisPercent(this.processed, this.total));
           }
         }
       },
@@ -40,7 +51,7 @@ class DbProgressContext implements ProgressContext {
       setTotal: (total) => {
         if (isFileAnalysis) {
           this.total = total;
-          knowledgeDb.updateKnowledgeProgress(this.knowledgeId, this.processed, this.total).catch(() => {});
+          this.persist(this.processed, this.total, fileAnalysisPercent(this.processed, this.total));
         }
       },
       stop: () => {},
@@ -48,13 +59,20 @@ class DbProgressContext implements ProgressContext {
   }
 
   phaseChanged(phase: ProgressPhase) {
+    this.phase = phase;
     if (phase === "clone" || phase === "scan") {
-      knowledgeDb.updateKnowledgeProgress(this.knowledgeId, 0, undefined).catch(() => {});
+      // Reset the file counter at the start of a run; the bar advances to the
+      // phase floor while scanning, before any per-file totals are known.
+      this.persist(0, undefined, phaseFloorPercent(phase));
+      return;
     }
+    // Phases after file analysis (folder_analysis, indexing, enrichment) report
+    // no per-file progress — step the bar to the phase floor on entry.
+    this.persist(this.processed, this.total, phaseFloorPercent(phase));
   }
 
   completed() {
-    knowledgeDb.updateKnowledgeProgress(this.knowledgeId, this.total, this.total).catch(() => {});
+    this.persist(this.total, this.total, 100);
   }
 
   failed() {}

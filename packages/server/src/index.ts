@@ -2,14 +2,20 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import express from "express";
-import { Config, DbProviderType, QueueProviderType, type Config as ConfigEnum } from "@bb/types";
+import { Config, DbProviderType, GraphProviderType, QueueProviderType, type Config as ConfigEnum } from "@bb/types";
 import { getBytebellHome, getConfigValue, HINTS } from "@bb/config";
 import { connectDb } from "@bb/db";
 import { connectGraph, indexesGraph } from "@bb/graph-db";
 import { connectQueue, resumeOrphans } from "@bb/queue";
+// Provider registration is intentional and explicit at this composition root —
+// the public server supports every provider (Docker + embedded), so it imports
+// all of them. A different deployment that only needs a subset (e.g. a Neo4j +
+// Mongo production server) would import only those packages here and would never
+// load the unused drivers/native bindings (e.g. the `@bb/ladybug` core addon).
 import "@bb/mongo";
 import "@bb/sqlite";
 import "@bb/neo4j";
+import "@bb/ladybug";
 import "@bb/queue-bullmq";
 import "@bb/queue-honker";
 
@@ -32,20 +38,41 @@ function checkRequiredConfig(): void {
   const missing: string[] = [];
   const hints: string[] = [];
   const dbProvider = getConfigValue(Config.DbProvider);
+  const graphProvider = getConfigValue(Config.GraphProvider);
   const queueProvider = getConfigValue(Config.QueueProvider);
 
   const required = [...REQUIRED];
-  if (dbProvider !== DbProviderType.Mongo) {
-    const idx = required.indexOf(Config.MongoUri);
+  const remove = (key: ConfigEnum): void => {
+    const idx = required.indexOf(key);
     if (idx !== -1) {
       required.splice(idx, 1);
     }
+  };
+
+  if (dbProvider !== DbProviderType.Mongo) {
+    remove(Config.MongoUri);
+  }
+  if (graphProvider !== GraphProviderType.Neo4j) {
+    // Embedded graph (ladybug) needs no Neo4j connection details.
+    remove(Config.Neo4jUri);
+    remove(Config.Neo4jUser);
+    remove(Config.Neo4jPassword);
   }
   if (queueProvider !== QueueProviderType.Bullmq) {
-    const idx = required.indexOf(Config.RedisUrl);
-    if (idx !== -1) {
-      required.splice(idx, 1);
-    }
+    remove(Config.RedisUrl);
+  }
+
+  // Embedded mode keeps its stores on disk — refuse to boot if any path the
+  // active embedded provider depends on is unset, instead of failing later
+  // with a cryptic file lock / IO error.
+  if (dbProvider === DbProviderType.Sqlite) {
+    required.push(Config.SqlitePath);
+  }
+  if (graphProvider === GraphProviderType.Ladybug) {
+    required.push(Config.LadybugPath);
+  }
+  if (queueProvider === QueueProviderType.Honker) {
+    required.push(Config.QueueDbPath);
   }
 
   for (const key of required) {

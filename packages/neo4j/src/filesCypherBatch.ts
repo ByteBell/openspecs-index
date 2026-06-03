@@ -69,7 +69,7 @@ SET fn.org_id = f.orgId,
     fn.commit_hash = '',
     fn.updated_at = $updatedAt
 WITH fn, f
-MATCH (k2:Knowledge {knowledge_id: f.knowledgeId})
+MATCH (k2:Knowledge {knowledgeId: f.knowledgeId})
 MERGE (k2)-[:HAS_FILE]->(fn)
 `;
 

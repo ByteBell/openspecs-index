@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH non-commercial-clause
-import { Config, DbProviderType, GraphProviderType, QueueProviderType } from "@bb/types";
+import { Config, QueueProviderType } from "@bb/types";
 import { getConfigValue } from "@bb/config";
+import { composeServicesNeeded } from "./infraMode.ts";
 import {
   DockerComposeError,
   DockerHealthTimeoutError,
@@ -31,9 +32,6 @@ export function usingHonker(): boolean {
 
 export async function bringInfraUp(neo4jPassword: string): Promise<UpResult | null> {
   const skipServices = new Set<"mongo" | "neo4j" | "redis">();
-  if (usingHonker()) {
-    skipServices.add("redis");
-  }
   for (let round = 0; round < MAX_CONFLICT_ROUNDS; round += 1) {
     const ports = readInfraPorts();
     const watched = composeServicesToStart(skipServices);
@@ -135,18 +133,7 @@ async function safeComposeDown(): Promise<void> {
 }
 
 function composeServicesToStart(skip: Set<"mongo" | "neo4j" | "redis">): readonly ("mongo" | "neo4j" | "redis")[] {
-  const dbProvider = getConfigValue(Config.DbProvider);
-  const graphProvider = getConfigValue(Config.GraphProvider);
-
-  const needed = new Set<"mongo" | "neo4j" | "redis">();
-  if (dbProvider === DbProviderType.Mongo) {
-    needed.add("mongo");
-  }
-  if (graphProvider === GraphProviderType.Neo4j) {
-    needed.add("neo4j");
-  }
-  needed.add("redis");
-
+  const needed = composeServicesNeeded();
   return (["mongo", "neo4j", "redis"] as const).filter((s) => needed.has(s) && !skip.has(s));
 }
 

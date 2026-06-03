@@ -51,7 +51,7 @@ SET fnode.org_id = $orgId,
     fnode.commit_hash = '',
     fnode.updated_at = $updatedAt
 WITH fnode
-MATCH (k:Knowledge {knowledge_id: $knowledgeId})
+MATCH (k:Knowledge {knowledgeId: $knowledgeId})
 MERGE (k)-[:HAS_FOLDER]->(fnode)
 `;
 
@@ -101,7 +101,7 @@ SET fnode.org_id = fld.orgId,
     fnode.commit_hash = '',
     fnode.updated_at = $updatedAt
 WITH fnode, fld
-MATCH (k:Knowledge {knowledge_id: fld.knowledgeId})
+MATCH (k:Knowledge {knowledgeId: fld.knowledgeId})
 MERGE (k)-[:HAS_FOLDER]->(fnode)
 `;
 

@@ -8,7 +8,7 @@ import {
   readField,
   requiredKeysFor,
 } from "./schema.ts";
-import { __registerCacheInvalidator, getConfigPath } from "./paths.ts";
+import { __registerCacheInvalidator, getConfigPath, resolveUnderHome } from "./paths.ts";
 import { ensureBytebellHome } from "./writer.ts";
 
 let cached: BytebellConfig | null = null;
@@ -47,8 +47,15 @@ export function loadConfig(): BytebellConfig {
   return cached;
 }
 
+/** Path-valued keys whose stored value is resolved to an absolute path on read. */
+const PATH_KEYS: ReadonlySet<Config> = new Set([Config.SqlitePath, Config.LadybugPath, Config.QueueDbPath]);
+
 export function getConfigValue<K extends Config>(key: K): ConfigValue<K> {
-  return readField(loadConfig(), key);
+  const value = readField(loadConfig(), key);
+  if (typeof value === "string" && PATH_KEYS.has(key)) {
+    return resolveUnderHome(value) as ConfigValue<K>;
+  }
+  return value;
 }
 
 export type ConfigCompletenessResult = { ok: true } | { ok: false; missing: Config[]; hints: string[] };

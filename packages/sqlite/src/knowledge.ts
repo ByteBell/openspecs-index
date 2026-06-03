@@ -111,21 +111,28 @@ export async function updateKnowledgeProgress(
   knowledgeId: string,
   processedFiles: number,
   totalFiles?: number,
+  extra?: { progressPercent?: number; currentPhase?: string },
 ): Promise<void> {
   const db = getSqliteDb();
   const now = new Date().toISOString();
-  let result;
+  // Build the json_set assignments dynamically so optional fields are only
+  // written when supplied — keeps file counts and phase metadata independent.
+  const sets = ["'$.status.processedFiles', ?", "'$.updatedAt', ?"];
+  const params: (string | number)[] = [processedFiles, now];
   if (totalFiles !== undefined) {
-    result = db.run(
-      "UPDATE knowledge SET value = json_set(value, '$.status.processedFiles', ?, '$.status.totalFiles', ?, '$.updatedAt', ?) WHERE key = ?",
-      [processedFiles, totalFiles, now, knowledgeId],
-    );
-  } else {
-    result = db.run(
-      "UPDATE knowledge SET value = json_set(value, '$.status.processedFiles', ?, '$.updatedAt', ?) WHERE key = ?",
-      [processedFiles, now, knowledgeId],
-    );
+    sets.push("'$.status.totalFiles', ?");
+    params.push(totalFiles);
   }
+  if (extra?.progressPercent !== undefined) {
+    sets.push("'$.status.progressPercent', ?");
+    params.push(extra.progressPercent);
+  }
+  if (extra?.currentPhase !== undefined) {
+    sets.push("'$.status.currentPhase', ?");
+    params.push(extra.currentPhase);
+  }
+  params.push(knowledgeId);
+  const result = db.run(`UPDATE knowledge SET value = json_set(value, ${sets.join(", ")}) WHERE key = ?`, params);
   if (result.changes === 0) {
     throw new KnowledgeNotFoundError(knowledgeId);
   }

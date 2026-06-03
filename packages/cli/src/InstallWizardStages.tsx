@@ -3,6 +3,66 @@ import type { ReactElement } from "react";
 import { Box, Text, useInput } from "ink";
 import { Field } from "./Field.tsx";
 import type { LlmProviderChoice } from "./InstallWizard.tsx";
+import { INFRA_MODE_OPTIONS as INFRA_OPTIONS, type InfraMode } from "./infraMode.ts";
+
+export interface InfraStageProps {
+  mode: InfraMode;
+  onMode: (m: InfraMode) => void;
+  onBack: () => void;
+  onNext: () => void;
+}
+
+export function InfraStage({ mode, onMode, onBack, onNext }: InfraStageProps): ReactElement {
+  const idx = INFRA_OPTIONS.findIndex((o) => o.value === mode);
+  const current = idx === -1 ? 0 : idx;
+
+  useInput((input, key) => {
+    if (key.escape) {
+      onBack();
+      return;
+    }
+    if (key.upArrow || input === "k") {
+      const next = INFRA_OPTIONS[Math.max(0, current - 1)];
+      if (next !== undefined) {
+        onMode(next.value);
+      }
+      return;
+    }
+    if (key.downArrow || input === "j") {
+      const next = INFRA_OPTIONS[Math.min(INFRA_OPTIONS.length - 1, current + 1)];
+      if (next !== undefined) {
+        onMode(next.value);
+      }
+      return;
+    }
+    if (key.return) {
+      onNext();
+    }
+  });
+
+  return (
+    <Box flexDirection="column" borderStyle="round" paddingX={1} paddingY={0}>
+      <Box marginBottom={1}>
+        <Text bold>How should ByteBell run its databases?</Text>
+      </Box>
+      {INFRA_OPTIONS.map((o, i) => {
+        const selected = i === current;
+        return (
+          <Box key={o.value} flexDirection="column">
+            <Text color={selected ? "cyan" : "white"}>
+              {selected ? "❯ " : "  "}
+              {o.label}
+            </Text>
+            <Text dimColor> {o.hint}</Text>
+          </Box>
+        );
+      })}
+      <Box marginTop={1}>
+        <Text dimColor>[↑/↓] choose [Enter] next [Esc] back</Text>
+      </Box>
+    </Box>
+  );
+}
 
 export interface FieldsStageProps {
   provider: LlmProviderChoice;
@@ -99,6 +159,7 @@ export function RepoStage({ indexUrl, onIndexUrl, onBack, onNext }: RepoStagePro
 
 export interface ConfirmStageProps {
   provider: LlmProviderChoice;
+  infraMode: InfraMode;
   apiKey: string;
   orModel: string;
   ollamaUrl: string;
@@ -110,6 +171,7 @@ export interface ConfirmStageProps {
 
 export function ConfirmStage({
   provider,
+  infraMode,
   apiKey,
   orModel,
   ollamaUrl,
@@ -140,6 +202,10 @@ export function ConfirmStage({
         <Text>
           {" "}
           Provider : <Text color="cyan">{provider}</Text>
+        </Text>
+        <Text>
+          {" "}
+          Infra : <Text color="cyan">{infraMode === "embedded" ? "embedded (no Docker)" : "docker"}</Text>
         </Text>
         {provider === "openrouter" ? (
           <>

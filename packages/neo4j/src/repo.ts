@@ -24,22 +24,21 @@ export interface UpsertRepoNodeInput {
   summary: RepoSummaryPayload;
 }
 
-// Dual-writes :Knowledge (snake_case) alongside :Repo so the chat-mcp
-// list_knowledge reader (which queries (:Knowledge {org_id})) finds every
-// ingested repo. The :Knowledge node also carries the camelCase knowledgeId
-// property so a later upsertKnowledgeNode() call MERGEs into the same node
-// rather than creating a duplicate.
-// Dual-writes :Knowledge (snake_case) + :RepoSummary (snake_case) alongside
-// :Repo so the chat-mcp legacy-schema reader (which queries
-// (:Knowledge {org_id}) and (:Knowledge)-[:HAS_REPO_SUMMARY]->(:RepoSummary))
-// finds every ingested repo. The :Knowledge node carries both knowledge_id
-// (snake) and knowledgeId (camel) on the same node so a later
-// upsertKnowledgeNode() call MERGEs into it rather than creating a duplicate.
+// MERGEs the :Knowledge node on the canonical camelCase knowledgeId — the
+// property the unique constraint is declared on (see indexes.ts) and the key
+// upsertKnowledgeNode() also MERGEs on. Keying every :Knowledge MERGE on the
+// same property is what lets the index-route (which creates the node first via
+// upsertKnowledgeNode) and this worker-side upsert converge on one node instead
+// of racing to CREATE a duplicate that trips the constraint.
+// Alongside :Repo + :RepoSummary, it dual-writes the snake_case mirror
+// properties (knowledge_id, org_id, repo_name, …) so the chat-mcp legacy-schema
+// reader — which queries (:Knowledge {org_id}) and
+// (:Knowledge)-[:HAS_REPO_SUMMARY]->(:RepoSummary) — still finds every repo.
 const UPSERT_REPO = `
-MERGE (k:Knowledge {knowledge_id: $knowledgeId})
+MERGE (k:Knowledge {knowledgeId: $knowledgeId})
 ON CREATE SET k.created_at = $updatedAt
 SET k.org_id = $orgId,
-    k.knowledgeId = $knowledgeId,
+    k.knowledge_id = $knowledgeId,
     k.repository_name = $repoName,
     k.repo_name = $repoName,
     k.display_name = $repoName,
