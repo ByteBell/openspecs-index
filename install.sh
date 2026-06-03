@@ -26,6 +26,8 @@ echo "This installer will:"
 echo "  • clone Bytebell into ./open-ir (the current directory)"
 echo "  • add a global 'bytebell' command"
 echo "  • install project dependencies"
+echo ""
+echo "Recommended default: embedded mode — runs from local files, no Docker required."
 
 # ── 1. prerequisite checks ───────────────────
 
@@ -41,13 +43,10 @@ if ! command -v bun &>/dev/null; then
 fi
 print_ok "Bun $(bun --version)"
 
-if ! command -v docker &>/dev/null; then
-  print_err "Docker is not installed."
-  echo ""
-  echo "  Install Docker Desktop from: https://www.docker.com/products/docker-desktop"
-  echo "  then re-run this script."
-  exit 1
-fi
+# Docker is OPTIONAL. The recommended default (embedded mode: SQLite + Ladybug +
+# Honker) runs entirely from local files under ~/.bytebell and needs no Docker.
+# Docker is only required if you later pick the "Docker" infra mode (Mongo +
+# Neo4j + Redis). So we probe for it but never block the install on it.
 
 # `docker info` can hang if the daemon is wedged or mid-start, so cap it.
 # Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
@@ -61,11 +60,15 @@ check_docker_running() {
   fi
 }
 
-if ! check_docker_running; then
-  print_err "Docker is installed but not running. Start Docker Desktop and retry."
-  exit 1
+if command -v docker &>/dev/null && check_docker_running; then
+  print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',') — available if you choose Docker mode"
+elif command -v docker &>/dev/null; then
+  print_info "Docker is installed but not running — fine, the default embedded mode needs no Docker."
+  print_info "Start Docker Desktop only if you want the optional Docker infra mode."
+else
+  print_info "Docker not found — fine, the recommended embedded mode needs no Docker."
+  print_info "Install Docker Desktop later only if you want the optional Docker infra mode."
 fi
-print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 
 if ! command -v git &>/dev/null; then
   print_err "git is not installed. Install it and retry."

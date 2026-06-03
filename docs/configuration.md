@@ -11,7 +11,20 @@ bytebell set                 # no args → opens the interactive setup form
 
 Values are validated before they are persisted. Keys are defined in [keyMap.ts](../packages/cli/src/keyMap.ts); defaults come from [schema.ts](../packages/config/src/schema.ts). If a required setting is missing, Bytebell either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot.
 
-> **Boot auto-fill:** when the core infrastructure keys are blank, `bytebell boot` fills them with local-Docker defaults (and generates a Neo4j password) before starting the stack. You only need to set them yourself when bringing your own infrastructure.
+> **Boot auto-fill (Docker mode):** when the Mongo/Neo4j/Redis keys are blank, `bytebell boot` fills them with local defaults (and generates a Neo4j password) before starting the containers. You only set them yourself when bringing your own infrastructure.
+
+---
+
+## Infrastructure presets
+
+Bytebell runs in one of two presets, **derived from the `db-provider` / `graph-provider` / `queue-provider` keys** — there is no separate "mode" setting:
+
+| Preset                   | db / graph / queue            | Docker? | Stores                          |
+| ------------------------ | ----------------------------- | ------- | ------------------------------- |
+| **`embedded`** (default) | `sqlite` / `ladybug` / `honker` | **No**  | Local files under `~/.bytebell` |
+| **`docker`**             | `mongo` / `neo4j` / `bullmq`  | Yes     | Containers (or your own)        |
+
+`bytebell setup` lets you pick a preset and sets all three keys at once. Switching to embedded also auto-fills the store paths when they're blank: `sqlite-path` → `~/.bytebell/data.sqlite`, `ladybug-path` → `~/.bytebell/ladybug.lbug`, `queue-db-path` → `~/.bytebell/queue.db`. On `bytebell boot`, Docker is started only for the providers that need it (embedded → none).
 
 ---
 

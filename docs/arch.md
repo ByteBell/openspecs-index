@@ -56,11 +56,18 @@ Several infrastructure and strategy concerns are pluggable behind a provider abs
 
 A disabled provider degrades gracefully — it does not throw at import time. See [configuration.md](configuration.md) for the keys and defaults.
 
+**Infrastructure presets.** Infra mode is not a stored flag — it is _derived_ from the three storage/queue providers ([infraMode.ts](../packages/cli/src/infraMode.ts)). Two coherent presets exist:
+
+- **`embedded`** (recommended default) — SQLite + LadybugDB + Honker. Every store is a local file under `~/.bytebell` (`data.sqlite`, `ladybug.lbug`, `queue.db`); **no Docker**.
+- **`docker`** — Mongo + Neo4j + Redis, brought up as local containers.
+
+`isEmbedded()` is true when no active provider needs a container. `bytebell boot` checks it: in embedded mode it skips Docker entirely; otherwise it starts only the containers the chosen providers require (e.g. choosing Honker drops the Redis container). The `bytebell setup` wizard offers the two presets and defaults to embedded.
+
 ---
 
 ## Ingestion pipeline
 
-Ingestion is **asynchronous**. A request enqueues a BullMQ job; the in-process worker dispatches to the active `IngestionStrategy`.
+Ingestion is **asynchronous**. A request enqueues a job (Honker in embedded mode, BullMQ in Docker); the in-process worker dispatches to the active `IngestionStrategy`.
 
 1. **Submit** — `bytebell index <url>` (remote) or `bytebell ingest <path>` (local directory) posts to the server, which validates the payload and enqueues a job.
 2. **Clone / read** — the worker clones the repo into `~/.bytebell/` (commit-scoped layout) or reads the local tree.
@@ -70,7 +77,7 @@ Ingestion is **asynchronous**. A request enqueues a BullMQ job; the in-process w
 
 Re-indexing is **diff-aware**: `bytebell pull` compares each file's content hash against the prior stored hash and re-analyses only changed files, so LLM cost tracks code churn, not repository size.
 
-New ingestion shapes (AST extraction, dependency-graph extraction) arrive as **new strategies behind the same interface**, never as ad-hoc forks of the worker.
+Two strategies ship today: **`flat-folder`** (the default) analyses every file, then rolls up folder and repo summaries; **`concept-graph`** reuses the per-file analysis but adds an MCP-driven enrichment pass that writes `:Concept` (ontology / business / capability / role / pattern / domain), `:Contract` (interface / schema / event / config), and `:Guidepost` (anomaly / convention / history / warning / starting-point) nodes linked back to files. Further ingestion shapes arrive as **new strategies behind the same interface**, never as ad-hoc forks of the worker.
 
 ---
 
@@ -133,6 +140,6 @@ Knowledge entities are immutable once `PROCESSED`: new versions are written, nev
 
 ## Distribution
 
-Bytebell is **BYO-infra**: the user runs Mongo, Neo4j, and Redis (or lets `bytebell boot` provision a local Docker stack). The engine makes no telemetry or phone-home calls. Distribution is a single Bun process plus the user's chosen data stores — there is no hosted control plane in the OSS edition.
+Bytebell defaults to **embedded** infrastructure — SQLite + LadybugDB + Honker in local files under `~/.bytebell`, so a fresh install runs with **no Docker and no external services**. Users who prefer the server databases choose **Docker mode** (Mongo + Neo4j + Redis), provisioned locally by `bytebell boot` or pointed at their own instances. The engine makes no telemetry or phone-home calls; distribution is a single Bun process plus whichever data stores the user selects — there is no hosted control plane in the OSS edition.
 
 For the enforceable contribution rules and invariants, see [CLAUDE.md](../CLAUDE.md).

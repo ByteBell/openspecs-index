@@ -4,6 +4,18 @@ All notable changes to Bytebell are documented in this file. The format is based
 
 ## [Unreleased]
 
+### Added
+
+- **Embedded infrastructure mode (default) — no Docker.** SQLite (doc store), LadybugDB (graph), and Honker (SQLite-backed queue) run from local files under `~/.bytebell`. `bytebell setup` defaults to embedded; `bytebell boot` skips Docker when no provider needs a container.
+- **Pluggable providers**, settable via `bytebell set` or the setup form: `db-provider` (`mongo`|`sqlite`), `graph-provider` (`neo4j`|`ladybug`), `queue-provider` (`bullmq`|`honker`), `ingestion-strategy` (`flat-folder`|`concept-graph`).
+- **`concept-graph` ingestion strategy** — adds `:Concept`, `:Contract`, and `:Guidepost` semantic nodes via per-file MCP enrichment, alongside the default `flat-folder` strategy.
+- **`bytebell migrate paths`** — reconciles the legacy on-disk layout with the commit-scoped layout (`--dry-run` supported).
+- **`bytebell mcp install`** (auto-wire the MCP endpoint into detected editors) and the **`list_knowledge`** MCP tool.
+
+### Changed
+
+- The active ingestion strategy is now `flat-folder` (default) / `concept-graph`; the earlier `BasicFileAnalysisStrategy` is archived.
+
 ## [0.1.0] — 2026-05-08
 
 ### Added

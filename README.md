@@ -1,98 +1,28 @@
 # Bytebell [bytebell.ai]
 
-## Quickstart
+## Run it in 5 minutes
 
-> Looking for the full CLI reference? Every `bytebell` subcommand, flag, and option lives in **[docs/commands.md](docs/commands.md)**. The Quickstart below is the minimum sequence from zero to a queryable graph.
+> **No database, no Docker.** Bytebell's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
 
-### Prerequisites
-
-- [Bun](https://bun.sh) ≥ 1.1 — runtime + workspace manager.
-- [Docker](https://www.docker.com/) — for the local Mongo + Neo4j + Redis stack `bytebell boot` brings up.
-- An LLM backend — either an [OpenRouter](https://openrouter.ai) API key (default) or a local [Ollama](https://ollama.com) model. Every per-file analysis call goes through the one you pick.
-
-### Install
-
-One command — checks prerequisites, clones the repo, installs dependencies, and links the `bytebell` binary:
+**You need:** [Bun](https://bun.sh) ≥ 1.1, git, and an [OpenRouter](https://openrouter.ai) API key _or_ a local [Ollama](https://ollama.com) model.
 
 ```bash
+# 1 · install — clones the repo, installs deps, links the `bytebell` command
 curl -fsSL https://raw.githubusercontent.com/ByteBell/open-ir/main/install.sh | bash
-```
 
-Verify with `bytebell --help`. (Manual install steps are in [docs/getting-started.md](docs/getting-started.md).)
-
-### Fastest path: `bytebell setup`
-
-```bash
+# 2 · one interactive wizard: LLM provider → infra (Embedded, no Docker) → optional repo.
+#     Then it boots, indexes, and auto-wires the MCP endpoint into your editor.
 bytebell setup
+
+# 3 · restart your editor, then ask it:
+#     "Where is auth handled?"  ·  "Summarize the architecture."
 ```
 
-One interactive command does everything the manual steps below automate: picks your LLM provider, auto-fills and boots the local stack, optionally indexes a repo (handling private-repo tokens and branch selection), and **auto-wires the MCP endpoint into your editor**. See [docs/getting-started.md](docs/getting-started.md) for the full walkthrough.
+`bytebell setup` auto-detects and configures Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code. To wire one by hand: `claude mcp add --transport http bytebell http://127.0.0.1:8080/mcp`. The server registers four MCP tools — `list_knowledge`, `smart_search`, `keyword_lookup`, `retrieve_file` — plus a bundled skill at `bytebell://skills/index`.
 
-The sections below are the manual, step-by-step equivalent — useful if you want to configure each piece yourself or bring your own infrastructure.
+Every command and flag: **[docs/commands.md](docs/commands.md)** · every setting: **[docs/configuration.md](docs/configuration.md)**.
 
-### Configure
-
-Two values Bytebell needs — your OpenRouter API key and model. Set them headlessly:
-
-```bash
-bytebell set openrouter-api-key sk-or-…
-bytebell set openrouter-model anthropic/claude-sonnet-4.6
-```
-
-Or skip this step and run `bytebell boot` straight away — on an interactive terminal it opens a setup form to collect these on first run. Running `bytebell set` with no arguments opens the same form at any time.
-
-There is no `.env` file anywhere. `~/.bytebell/config.json` (mode `0600`) is the single source of truth, and `bytebell set` is the only sanctioned way to write to it. If you already run Mongo / Neo4j / Redis and don't want the Docker stack, see [Bring your own infrastructure](#bring-your-own-infrastructure) below.
-
-### Boot
-
-```bash
-bytebell boot
-```
-
-What happens, in order:
-
-1. **Pre-flight check** — verifies both OpenRouter keys are set. If either is blank and you're in an interactive terminal, Bytebell opens a setup form so you can enter them on the spot, then continues. In a non-interactive context (CI, piped input) it prints the exact `bytebell set …` commands and exits.
-2. **Auto-fill** — fills any missing infra config keys with local-Docker defaults; generates a Neo4j password if one isn't set.
-3. **Stack up** — `docker compose up -d` brings up `bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis` (named volumes — data persists across reboots).
-4. **Health gate** — polls `docker compose ps` until all three services report `healthy`.
-5. **Server up** — spawns `bytebell-server` (HTTP on `127.0.0.1:8080`, MCP at `/mcp`).
-
-First boot pulls images and can take a couple of minutes. Subsequent boots are fast.
-
-### Index a repo
-
-```bash
-bytebell index https://github.com/anthropics/claude-code
-# private repo: add --token <github-pat>; never paste the PAT positionally
-bytebell ls   # watch state: CREATED → QUEUED → INGESTED → PROCESSING → PROCESSED
-```
-
-When the row reads `PROCESSED`, the graph is fully populated and the MCP tools will return results for that repo. Local directories work too: `bytebell ingest /path/to/source-tree`.
-
-### Connect an MCP client
-
-Easiest: **`bytebell mcp install`** auto-detects your installed tools — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and writes the correct MCP entry into each one's config (the JSON shape differs per tool; the command handles that and backs up the file first). `bytebell setup` runs this for you on first boot.
-
-To wire Claude Code by hand:
-
-```bash
-claude mcp add --transport http bytebell http://127.0.0.1:8080/mcp
-```
-
-Or add this under the `mcpServers` key of Claude Desktop's config (or Cursor's `~/.cursor/mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "bytebell": {
-      "type": "http",
-      "url": "http://127.0.0.1:8080/mcp"
-    }
-  }
-}
-```
-
-The server registers `list_knowledge`, `smart_search`, `keyword_lookup`, and `retrieve_file`, plus a bundled skill at `bytebell://skills/index` that the client can fetch and install once per session for the recommended workflow.
+There is no `.env` file anywhere — `~/.bytebell/config.json` (mode `0600`) is the single source of truth, written only by `bytebell set`.
 
 ## What Bytebell does
 
@@ -130,7 +60,7 @@ It is **not** a hosted product, not a chat UI, and not a multi-tenant platform. 
 
 ### Ingest
 
-`bytebell index <url>` (or `bytebell ingest <path>`) submits a job to an in-process BullMQ queue. The worker dispatches to an `IngestionStrategy` — today, `BasicFileAnalysisStrategy` ([packages/ingest-github/src/BasicFileAnalysisStrategy.ts](packages/ingest-github/src/BasicFileAnalysisStrategy.ts)). It clones the repo to `~/.bytebell/repos/<knowledgeId>/`, walks every file, runs a per-file OpenRouter call, and persists raw content to Mongo + the enriched node to Neo4j.
+`bytebell index <url>` (or `bytebell ingest <path>`) submits a job to the in-process queue (Honker in embedded mode, BullMQ in Docker mode). The worker dispatches to an `IngestionStrategy` ([packages/ingest-github/src/strategies/](packages/ingest-github/src/strategies/)) — `flat-folder` by default (file-walk + per-file LLM analysis, plus folder/repo summaries), or `concept-graph` (which additionally extracts `:Concept` / `:Contract` / `:Guidepost` semantic nodes via per-file enrichment). It clones the repo under `~/.bytebell`, walks every file, runs a per-file LLM call, and persists raw content to the doc store (SQLite or Mongo) + the enriched node to the graph store (LadybugDB or Neo4j).
 
 The per-file LLM call returns a single JSON object with this shape:
 
@@ -211,7 +141,7 @@ Full reference, including every flag and option: [docs/commands.md](docs/command
 
 ## Bring your own infrastructure
 
-By default, `bytebell boot` provisions a local Docker stack (`bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis`) with auto-generated credentials. If you already run Mongo, Neo4j, and Redis (or want to use a managed service), set the connection details before booting and the Docker step is skipped:
+By default Bytebell runs in **embedded mode** (SQLite + LadybugDB + Honker) — no Docker. In **Docker mode**, `bytebell boot` provisions a local stack (`bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis`) with auto-generated credentials. If you already run Mongo, Neo4j, and Redis (or want a managed service), set the connection details before booting and the container for any configured service is skipped:
 
 ```bash
 bytebell set mongo          mongodb://user:pass@host:27017/bytebell
@@ -225,7 +155,7 @@ Docker is not required on the host in this mode. See the [Configuration referenc
 
 ## Architecture at a glance
 
-A single Bun-built Express daemon, `bytebell-server`, hosts the ingestion HTTP routes, the MCP transport (Streamable HTTP + SSE), and the BullMQ workers all in-process. The CLI is a thin Ink/React TUI that only ever talks HTTP to that daemon — it never touches Mongo, Neo4j, or Redis directly. Workers run in the server's lifecycle; there is no separate worker fleet.
+A single Bun-built Express daemon, `bytebell-server`, hosts the ingestion HTTP routes, the MCP transport (Streamable HTTP + SSE), and the queue workers all in-process. Storage is pluggable: the default **embedded** preset (SQLite + LadybugDB + Honker) keeps everything in local files under `~/.bytebell` with no Docker, while the **Docker** preset uses Mongo + Neo4j + Redis. The CLI is a thin Ink/React TUI that only ever talks HTTP to the daemon — it never touches the data stores directly. Workers run in the server's lifecycle; there is no separate worker fleet.
 
 For the full PRD — package tiers, state machine, HTTP route catalogue, verification checklist, distribution strategy — see [docs/arch.md](docs/arch.md).
 
