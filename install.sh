@@ -11,6 +11,9 @@ export PATH="$HOME/.bun/bin:$PATH"
 # ─────────────────────────────────────────────
 
 REPO_URL="https://github.com/ByteBell/open-ir"
+# Clone the same branch this installer was published from, so the installed code
+# matches the config schema it writes. Override with BYTEBELL_BRANCH=... if needed.
+REPO_BRANCH="${BYTEBELL_BRANCH:-merge/embedded_prerelease}"
 
 # ── helpers ──────────────────────────────────
 
@@ -51,6 +54,8 @@ print_ok "Bun $(bun --version)"
 # `docker info` can hang if the daemon is wedged or mid-start, so cap it.
 # Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
 check_docker_running() {
+  # `docker info` can hang if the daemon is wedged or mid-start, so cap it.
+  # Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
   if command -v timeout &>/dev/null; then
     timeout 10 docker info >/dev/null 2>&1
   elif command -v gtimeout &>/dev/null; then
@@ -83,7 +88,7 @@ print_step "Cloning Bytebell"
 if [ -d "open-ir/.git" ]; then
   print_info "existing install detected at open-ir/ — leaving it untouched (no git pull)"
 else
-  git clone "$REPO_URL"
+  git clone --branch "$REPO_BRANCH" "$REPO_URL" open-ir
 fi
 cd open-ir
 REPO_DIR="$(pwd)"

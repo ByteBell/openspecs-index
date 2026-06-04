@@ -95,10 +95,13 @@ lastAttemptAt }`) plus `EnrichmentFailureReason` (`"cap-exceeded" |
   hostnames so the path resolver can build a `RepoLocation` for GitLab
   knowledges routed through the GitHub pipeline via an injected
   `SourceFactory`; the union still only has a `github` provider variant,
-  so gitlab projects share the github path segment on disk. Subgroup
-  gitlab URLs (`group/sub/project`) collapse to two segments here — the
-  GitLab factory derives the full namespace itself when building its own
-  `RepoLocation`. The `MetaPathsLayout` interface
+  so gitlab projects share the github path segment on disk. For
+  subgroup-aware gitlab URLs (`group/sub/project`) use the companion
+  `parseGitlabOwnerRepo(repoUrl)`, which collapses every segment except
+  the last into the `owner` namespace (`owner="group/sub"`,
+  `repo="project"`) — matching `deriveOwnerRepo` in the GitLab
+  `SourceFactory`, so the ingest-write and business-context-read disk
+  paths agree for nested projects. The `MetaPathsLayout` interface
   documents the leaf-path shape returned by `bytebellPathsFor`. Lives
   here so `@bb/ingest-github` (writer) and `@bb/mcp` (reader) can
   agree on the layout without one importing the other.

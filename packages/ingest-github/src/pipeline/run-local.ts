@@ -46,7 +46,7 @@ export async function runLocal(
       branch: "local",
       source,
       metaPaths,
-      context: { knowledgeId, orgId, repoId: knowledgeId },
+      context: { knowledgeId, orgId, repoId: knowledgeId, owner: "local", repo: localRepoName(rootDir), commitHash },
     };
     if (usageGuard !== undefined) {
       localStrategyInput.usageGuard = usageGuard;

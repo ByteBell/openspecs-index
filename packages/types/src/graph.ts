@@ -20,6 +20,12 @@ export interface UpsertRepoNodeInput {
   scope: NodeScope;
   repoUrl: string;
   branch: string;
+  /** GitHub owner — persisted to RepoSummary.user_name (matches the on-disk clone path segment). */
+  owner: string;
+  /** Bare repo name — persisted to RepoSummary.repo_name (matches the on-disk clone path segment). */
+  repo: string;
+  /** Resolved commit hash — persisted to RepoSummary.commit_hash and Knowledge.commit_hash. */
+  commitHash: string;
   summary: RepoSummaryPayload;
 }
 

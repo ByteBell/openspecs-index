@@ -47,6 +47,14 @@ export interface PipelineSummary {
   graphNodesWritten: number;
   commitHash: string;
   tokenUsage: { inputTokens: number; outputTokens: number; costUsd: number };
+  /**
+   * True when the pull resolved to a no-op: either the target equals the
+   * current commit, or the diff between them is empty. Consumers carry the
+   * base commit's stats forward instead of recording zeros. Absent on real runs.
+   */
+  noOp?: boolean;
+  /** The previously-indexed commit this no-op was measured against. Set iff `noOp`. */
+  baseCommit?: string;
 }
 
 export interface PipelineDeps {
@@ -93,6 +101,20 @@ export interface ArchiveSinkInput {
 export interface ArchiveSink {
   /** Push a single file's content to an external store. Failures are non-fatal. */
   push(input: ArchiveSinkInput): Promise<void>;
+
+  /**
+   * Seed the current commit's snapshot from a parent commit (copy-forward) so the
+   * new commit folder is a complete, independently-readable tree before changed
+   * files are pushed over it. Optional — sinks that are not commit-namespaced omit
+   * it. Failures are non-fatal.
+   */
+  forkFrom?(fromCommit: string): Promise<void>;
+
+  /**
+   * Remove a file from the current commit's snapshot — used for deleted and
+   * renamed-away paths during a pull. Optional. Failures are non-fatal.
+   */
+  remove?(relativePath: string): Promise<void>;
 }
 
 export interface SourceFactoryInput {
