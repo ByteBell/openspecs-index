@@ -3,6 +3,8 @@ import path from "node:path";
 import { getBytebellHome, isDevMode } from "@bb/config";
 
 const LOGS_DIR_NAME = "logs";
+const REPO_LOGS_DIR_NAME = "repos";
+const ARCHIVE_LOGS_DIR_NAME = "archive";
 const DIR_MODE = 0o700;
 
 /**
@@ -19,6 +21,29 @@ export function getLogsDir(): string {
   return path.join(getBytebellHome(), LOGS_DIR_NAME);
 }
 
+/**
+ * `<logsDir>/repos/` — one `.log` file per in-flight repo index. A file lives
+ * here only while its ingestion is running; `withRepoLog` moves it into the
+ * archive dir once the job settles (success or failure).
+ */
+export function getRepoLogsDir(): string {
+  return path.join(getLogsDir(), REPO_LOGS_DIR_NAME);
+}
+
+/**
+ * `<logsDir>/archive/` — finished per-repo logs, retained for after-the-fact
+ * debugging. This is where you look up "what happened when repo X was indexed".
+ */
+export function getArchiveLogsDir(): string {
+  return path.join(getLogsDir(), ARCHIVE_LOGS_DIR_NAME);
+}
+
 export function ensureLogsDir(): void {
   fs.mkdirSync(getLogsDir(), { recursive: true, mode: DIR_MODE });
+}
+
+/** Ensures both the active (`repos/`) and `archive/` per-repo log dirs exist. */
+export function ensureRepoLogDirs(): void {
+  fs.mkdirSync(getRepoLogsDir(), { recursive: true, mode: DIR_MODE });
+  fs.mkdirSync(getArchiveLogsDir(), { recursive: true, mode: DIR_MODE });
 }

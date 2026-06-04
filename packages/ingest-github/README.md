@@ -24,7 +24,14 @@ and persists per-file results to Mongo (`raw` collection via
 The package owns:
 
 - The `github_index` and `local_ingest` worker handlers (registered via
-  `@bb/queue.registerWorker`)
+  `@bb/queue.registerWorker`). Each handler wraps its `runner.run(...)` in
+  `@bb/logger`'s `withRepoLog(...)`, so the entire run — clone, scan, per-file
+  analysis, and any failure trail — is mirrored to a dedicated per-repo log
+  file at `logs/repos/<label>.log`. That file stays in `repos/` across retries
+  and is moved to `logs/archive/<label>.log` by the queue provider once the job
+  is terminal (`settleRepoLog`). The label is built by
+  `handlers/repo-log-label.ts` (`owner-repo-<shortId>` for GitHub, the dir
+  basename for local).
 - The git clone / fetch lifecycle for one repo per knowledge ID. Commit
   SHA is resolved via the GitHub REST API (`fetchLatestCommitHash`)
   _before_ clone so the clone lands directly in the commit-scoped

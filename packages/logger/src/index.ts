@@ -10,7 +10,10 @@ export {
 } from "./logger.ts";
 export type { LoggerScope, LoggerFactory } from "./logger.ts";
 
-export { getLogsDir, ensureLogsDir } from "./dirs.ts";
+export { getLogsDir, ensureLogsDir, getRepoLogsDir, getArchiveLogsDir, ensureRepoLogDirs } from "./dirs.ts";
+
+export { withRepoLog, settleRepoLog, getActiveRepoLogId } from "./repo-log.ts";
+export type { RepoLogOptions } from "./repo-log.ts";
 
 export type { Logger } from "winston";
 

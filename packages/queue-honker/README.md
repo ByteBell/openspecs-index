@@ -14,6 +14,7 @@ Strategy. Registers itself with `@bb/queue` via side-effect import as the `"honk
 - Emulates BullMQ's stable-jobId dedupe by querying `_honker_live` for an existing row whose payload's `knowledgeId` matches.
 - Cancels knowledge jobs by deleting matching rows from `_honker_live` in a transaction.
 - Runs a 30 s sweeper that calls `queue.sweepExpired()` per `JobType` to move retry-exhausted jobs into `_honker_dead`.
+- Settles per-repo logs (`@bb/logger`'s `settleRepoLog`) at terminal states: on `ack` (success), after the sweep finds a job in `_honker_dead` (retries exhausted), and on cancellation. This is the only place that knows a failed attempt won't be retried, so the in-flight `repos/<label>.log` lingers until then.
 
 ## Public exports
 

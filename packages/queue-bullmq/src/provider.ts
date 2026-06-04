@@ -5,6 +5,7 @@
 import { Queue, Worker, type Job } from "bullmq";
 import { JobType, type JobMessage, type PayloadFor } from "@bb/types";
 import { QueueConnectError, QueueNotConnectedError } from "@bb/errors";
+import { settleRepoLog } from "@bb/logger";
 import { connectRedis, closeRedis, pingRedis, getRedisConnection } from "@bb/redis";
 import { defaultConcurrencyFor, registerQueueProvider } from "@bb/queue";
 import type {
@@ -112,6 +113,17 @@ class BullmqQueueProvider implements IQueueProvider {
         concurrency,
       },
     );
+    // Terminal signals for per-repo log settling (no-op for payloads without a
+    // per-repo log). `completed` = success; `failed` only settles once retries
+    // are exhausted, so a repo mid-retry stays "in progress" in repos/.
+    worker.on("completed", (job: Job<JobMessage<PayloadFor<T>>>) => {
+      settleRepoLog(job.data.knowledgeId);
+    });
+    worker.on("failed", (job: Job<JobMessage<PayloadFor<T>>> | undefined) => {
+      if (job !== undefined && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+        settleRepoLog(job.data.knowledgeId);
+      }
+    });
     this.workers.push(worker);
   }
 
@@ -136,6 +148,8 @@ class BullmqQueueProvider implements IQueueProvider {
         // Leave it; the handler is idempotent and will finish naturally.
       }
     }
+    // Cancellation is terminal — fold any in-flight per-repo log into archive/.
+    settleRepoLog(knowledgeId);
     return { removed };
   }
 

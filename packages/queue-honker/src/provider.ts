@@ -7,7 +7,8 @@
 import { open, type Database, type Job, type JsonValue, type Queue } from "@russellthehippo/honker-node";
 import { JobType, type JobMessage, type PayloadFor } from "@bb/types";
 import { QueueConnectError, QueueNotConnectedError } from "@bb/errors";
-import { logger } from "@bb/logger";
+import { logger, settleRepoLog } from "@bb/logger";
+import { knowledgeIdOf, settleDeadRepoLogs } from "./repo-log-settle.ts";
 import { defaultConcurrencyFor, registerQueueProvider } from "@bb/queue";
 import type {
   FailedJob,
@@ -198,6 +199,9 @@ class HonkerQueueProvider implements IQueueProvider {
       // cleaner not to issue the write.
       if (ownsLease) {
         job.ack();
+        // Terminal success: fold this repo's in-flight log into archive/.
+        // No-op for job types / payloads without a per-repo log.
+        settleRepoLog(knowledgeIdOf(job));
       }
     } catch (err: unknown) {
       const reason = describeError(err);
@@ -228,6 +232,9 @@ class HonkerQueueProvider implements IQueueProvider {
         [...ALL_JOB_TYPES, knowledgeId],
       );
       tx.commit();
+      // Cancellation is terminal for this knowledge — fold any in-flight per-repo
+      // log into archive/ so it doesn't linger as "in progress".
+      settleRepoLog(knowledgeId);
       return { removed };
     } catch (err) {
       try {
@@ -253,6 +260,9 @@ class HonkerQueueProvider implements IQueueProvider {
       } catch (err) {
         logger.warn(`queue-honker: sweepExpired threw: ${describeError(err)}`);
       }
+    }
+    if (this.db !== null) {
+      settleDeadRepoLogs(this.db);
     }
   }
 

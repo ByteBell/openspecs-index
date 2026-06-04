@@ -12,7 +12,7 @@ Implementation of the BullMQ-over-Redis provider that registers itself with `@bb
 
 ```
 priority.ts → @bb/types
-provider.ts → bullmq, @bb/types, @bb/errors, @bb/redis,
+provider.ts → bullmq, @bb/types, @bb/errors, @bb/logger, @bb/redis,
               @bb/queue (registerQueueProvider, defaultConcurrencyFor),
               @bb/queue-core (IQueueProvider + shared types),
               priority.ts

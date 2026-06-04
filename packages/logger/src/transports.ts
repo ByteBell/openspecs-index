@@ -3,6 +3,7 @@ import DailyRotateFile from "winston-daily-rotate-file";
 import { getConfigValue } from "@bb/config";
 import { Config } from "@bb/types";
 import { getLogsDir } from "./dirs.ts";
+import { getActiveRepoLogId } from "./repo-log-context.ts";
 import { buildPrintf, callerFormat, sugarFormat } from "./formats.ts";
 
 const FILE_MODE = 0o600;
@@ -14,6 +15,18 @@ function fileFormat(): winston.Logform.Format {
     winston.format.timestamp(),
     buildPrintf({ colors: false }),
   );
+}
+
+/**
+ * Per-repo transports share the one server logger, so without a filter every
+ * concurrently-indexing repo would write into every repo file. This format
+ * admits a record only when the *active async context* (set by `withRepoLog`)
+ * matches this transport's `knowledgeId`; returning a falsy value makes winston
+ * skip the record for this transport only — the global file/console sinks are
+ * unaffected.
+ */
+function repoFilter(knowledgeId: string): winston.Logform.Format {
+  return winston.format((info) => (getActiveRepoLogId() === knowledgeId ? info : false))();
 }
 
 function consoleFormat(useColors: boolean): winston.Logform.Format {
@@ -39,6 +52,20 @@ export function makeFileTransport(scope: string): DailyRotateFile {
     maxFiles: `${retention}d`,
     options: { mode: FILE_MODE },
     format: fileFormat(),
+  });
+}
+
+/**
+ * A single-file transport for one repo index run. Unlike the scope transport
+ * it does not date-rotate (a run is bounded), and its format is gated by
+ * `repoFilter` so it only captures log lines emitted inside that run's
+ * `withRepoLog` async context.
+ */
+export function makeRepoFileTransport(filePath: string, knowledgeId: string): winston.transports.FileTransportInstance {
+  return new winston.transports.File({
+    filename: filePath,
+    options: { mode: FILE_MODE },
+    format: winston.format.combine(repoFilter(knowledgeId), fileFormat()),
   });
 }
 
