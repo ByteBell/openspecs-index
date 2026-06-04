@@ -46,13 +46,10 @@ if ! command -v bun &>/dev/null; then
 fi
 print_ok "Bun $(bun --version)"
 
-# Docker is OPTIONAL. The recommended default (embedded mode: SQLite + Ladybug +
-# Honker) runs entirely from local files under ~/.bytebell and needs no Docker.
-# Docker is only required if you later pick the "Docker" infra mode (Mongo +
-# Neo4j + Redis). So we probe for it but never block the install on it.
-
-# `docker info` can hang if the daemon is wedged or mid-start, so cap it.
-# Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
+# Docker is OPTIONAL. The recommended default is the embedded stack
+# (SQLite + Ladybug + Honker) which needs no Docker at all. Docker is only
+# required if you later choose "Docker" infra mode in `bytebell setup`
+# (Mongo + Neo4j + Redis). So this is an informational probe, never fatal.
 check_docker_running() {
   # `docker info` can hang if the daemon is wedged or mid-start, so cap it.
   # Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
@@ -65,14 +62,12 @@ check_docker_running() {
   fi
 }
 
-if command -v docker &>/dev/null && check_docker_running; then
-  print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',') — available if you choose Docker mode"
-elif command -v docker &>/dev/null; then
-  print_info "Docker is installed but not running — fine, the default embedded mode needs no Docker."
-  print_info "Start Docker Desktop only if you want the optional Docker infra mode."
+if ! command -v docker &>/dev/null; then
+  print_info "Docker not installed — fine for embedded mode (the default). Only needed if you pick Docker infra mode in 'bytebell setup'."
+elif ! check_docker_running; then
+  print_info "Docker installed but not running — fine for embedded mode (the default). Start Docker Desktop only if you choose Docker infra mode."
 else
-  print_info "Docker not found — fine, the recommended embedded mode needs no Docker."
-  print_info "Install Docker Desktop later only if you want the optional Docker infra mode."
+  print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 fi
 
 if ! command -v git &>/dev/null; then
