@@ -156,7 +156,7 @@ Per-phase cache rules:
 | 3     | `big-file-analysis/<enc>/boundaries.json`                 | Skip skim                     |
 | 4     | `big-file-analysis/<enc>/cut-complete.json` **AND** every `chunks/chunk-N/raw.json` referenced by `totalChunks` | Skip cut. Marker alone is not enough — a partial cut from an interrupted run is detected by counting `raw.json` files. |
 | 5     | `chunks/chunk-N/analysis.json`                            | Skip LLM call                 |
-| 6     | `codeUnits/<safeUnit>.source.json`                        | Skip extraction               |
+| 6     | `codeUnits/<safeUnit>.source.json` (content-addressed by sha256, NOT presence) | Skip rewrite + keep neighbouring analysis on sha match; rewrite + delete stale analysis on sha drift; migrate from sibling chunk on chunk shift. See "Unit-level reuse inside `extract-unit-sources`" below. |
 | 7     | `codeUnits/<safeUnit>.analysis.json`                      | Skip LLM call                 |
 | 8     | `folder-specs/<enc>/spec.json`                            | Phase is pure; idempotent overwrite |
 
@@ -299,17 +299,34 @@ The flow per commit:
 2. `applyDiffInvalidation({ prevMetaRoot, currMetaRoot, diff })`:
    - `cp -R` `file-analysis/` and `big-file-analysis/` from `prevMetaRoot` to
      `currMetaRoot`.
-   - For every `relativePath` in `diff.modified`, `diff.deleted`, and both sides of
-     every `diff.renamed` pair, `rm -rf` its records:
-     - `file-analysis/<enc(rel)>/` (parent + `codeUnits/`)
-     - `file-analysis/<enc(rel)>__*` siblings (legacy per-unit children)
-     - `big-file-analysis/<enc(rel)>/` (boundaries + cut-complete + chunks)
-     - `big-file-analysis/<enc(rel)>:chunk-*` siblings (legacy per-chunk children)
-3. Phases 2–7 then run unchanged. Cached records for unchanged files are still there,
-   so they short-circuit; invalidated paths re-run; added paths run fresh.
-4. `deleteAllForFile(metaPaths, relativePath)` is the same operation exposed as a
-   one-shot for callers that want to wipe one file's artefacts directly (e.g. before
-   re-ingesting).
+   - Two invalidation modes, split by diff status:
+
+     **Modified files + `renamed.newPath` — file-level wipe, keep per-unit dirs.**
+     `rm -rf` only the two directories that hold file-level records:
+     - `file-analysis/<enc(rel)>/` (the `analysis.json`)
+     - `big-file-analysis/<enc(rel)>/` (`boundaries.json`, `cut-complete.json`,
+       `chunks/chunk-N/{raw,analysis}.json`)
+
+     **Preserved**: every per-unit sibling directory —
+     `file-analysis/<enc(rel)>__<qn>/codeUnits/...` and
+     `big-file-analysis/<enc(rel)>:chunk-N__<qn>/chunks/chunk-N/codeUnits/...`.
+
+     **Deleted files + `renamed.oldPath` — full wipe.**
+     `rm -rf` the two file-level directories above AND every per-unit sibling
+     (`file-analysis/<enc(rel)>__*` and `big-file-analysis/<enc(rel)>:chunk-*`).
+     The path will not be revisited by the current commit's pipeline, so nothing
+     under it is worth keeping.
+3. Stages re-run as usual on the now-partial tree:
+   - `analyse-small`, `compute-boundaries`, `cut-big-files`, `analyse-big-chunks`
+     re-do all the file-level work for modified files (their cache files are gone).
+   - `extract-unit-sources` is **content-addressed by sha256** — see below — so it
+     reuses preserved `<qn>.analysis.json` records unit-by-unit instead of always
+     deleting them.
+   - `analyse-units` short-circuits on every unit whose analysis was preserved or
+     migrated. Only units whose source bytes actually changed go to the LLM.
+4. `deleteAllForFile(metaPaths, relativePath)` exposes the **full wipe** as a one-shot
+   for callers that want to delete one file's artefacts directly (e.g. before
+   re-ingesting from scratch).
 
 `added` paths have no cached record, so they need no invalidation step — they just
 appear in the scan manifest as new work.
@@ -317,6 +334,26 @@ appear in the scan manifest as new work.
 Structured INFO lines (`ir/incremental: <prev> → <curr> added=… modified=… …` and
 `ir/incremental: <curr> — no prior indexed commit found, running full first-time
 index`) make the mode visible in logs.
+
+### Unit-level reuse inside `extract-unit-sources`
+
+For every descriptor on every file-analysis record on disk, the stage decides what
+to do per unit by sha256 of the new source slice. Four branches:
+
+| Branch | Condition | Effect |
+| --- | --- | --- |
+| Cache hit | `existing.source.json.sha256 === new.sha256` | Skip the write. The neighbouring `<qn>.analysis.json` (if present) stays — `analyse-units` will hit it via its existing presence check. |
+| Sha drift | `existing.source.json.sha256 !== new.sha256` | Delete the stale `<qn>.analysis.json`; rewrite `<qn>.source.json`. `analyse-units` re-runs for this unit. |
+| Chunk shift (big file only) | No source.json at the new target, but a sibling `<enc(parent):chunk-*__<qn>>` stores a source.json with matching sha. | Migrate the old `<qn>.analysis.json` to the new chunk dir, restamping `relativePath`, `chunkNumber`, `fileId`, `unitId` on the wrapper AND inside the embedded `codeUnit`. Delete the stale sibling directory. Write a fresh `<qn>.source.json` at the new location. |
+| Cold | No existing source.json, no matching sibling. | Write `<qn>.source.json`; `analyse-units` runs fresh. |
+
+The helpers live in
+[`unit-cache.ts`](unit-cache.ts):
+`findReusableBigFileUnitAnalysis`, `migrateAndRestampUnitAnalysis`,
+`removeBigFileUnitTopLevelDir`. Every helper is best-effort — missing files / parse
+failures fall through to "no reuse", which makes the stage fall back to the
+fresh-write path. Functionality is preserved end-to-end: if you wipe every per-unit
+directory between runs, the stage behaves exactly as it did before this change.
 
 ---
 

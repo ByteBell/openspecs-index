@@ -8,9 +8,11 @@
  *      makes cross-run resumption work: after the driver restarts, the in-memory `prevCommit`
  *      is gone but the on-disk `metaRoot` from an earlier run is still there.
  *   2) `applyDiffInvalidation` — copies cached IR artifacts from `prevMetaRoot` into
- *      `currMetaRoot`, then deletes the entries the diff invalidates. After this, phases 2/3/5
- *      see the unchanged file records on disk and skip them; only added / modified / renamed
- *      paths re-run.
+ *      `currMetaRoot`, then invalidates the entries the diff touches. Modified files (and
+ *      `renamed.newPath`) get a partial wipe that KEEPS per-unit directories — so when a unit's
+ *      source slice is byte-identical across the edit, `extract-unit-sources` reuses the
+ *      existing `<qn>.analysis.json` and `analyse-units` skips the LLM call. Deleted files
+ *      (and `renamed.oldPath`) get a full wipe (file-level records AND per-unit siblings).
  *   3) `logCommitDiff` / `logNoPriorCommit` — structured INFO lines so the driver and the logs
  *      both record which mode the run is in.
  *
@@ -72,11 +74,13 @@ export interface ApplyDiffInvalidationResult {
 
 /**
  * Copies cached IR artifacts (`file-analysis`, `big-file-analysis`) from `prevMetaRoot` into
- * `currMetaRoot`, then deletes the entries the diff invalidates so the next phase re-analyses
- * only the changed paths.
+ * `currMetaRoot`, then invalidates the entries the diff touches.
  *
- * `added` paths have no cached record and need no invalidation. `modified`, `deleted`, and both
- * sides of every `renamed` pair are removed.
+ * - `added` paths have no cached record and need no invalidation.
+ * - `modified` paths AND `renamed.newPath` → file-level records removed, per-unit directories
+ *   preserved so `extract-unit-sources` can sha-match and reuse old `<qn>.analysis.json`.
+ * - `deleted` paths AND `renamed.oldPath` → fully wiped (file-level records AND every
+ *   per-unit sibling directory).
  */
 export async function applyDiffInvalidation(
   input: ApplyDiffInvalidationInput,
@@ -93,19 +97,39 @@ export async function applyDiffInvalidation(
     copiedDirs += 1;
   }
 
-  const invalidated = new Set<string>([
+  // Two invalidation modes:
+  //
+  //   - `preserveUnits` (modified files + renamed.newPath): delete only the parent dirs that
+  //     hold file-level records (`analysis.json`, `boundaries.json`, `cut-complete.json`,
+  //     `chunks/chunk-N/{raw,analysis}.json`). KEEP every per-unit sibling directory so the
+  //     `extract-unit-sources` stage can sha-compare the new source slice against the old
+  //     `<qn>.source.json` and reuse the old `<qn>.analysis.json` when content didn't change.
+  //
+  //   - `fullWipe` (deleted files + renamed.oldPath): the parent path will not be revisited
+  //     by the current commit's pipeline, so every artifact for it — parent dirs AND per-unit
+  //     sibling dirs — must go.
+  const preserveUnits = new Set<string>([
     ...input.diff.modified,
+    ...input.diff.renamed.map((r) => r.newPath),
+  ]);
+  const fullWipe = new Set<string>([
     ...input.diff.deleted,
-    ...input.diff.renamed.flatMap((r) => [r.oldPath, r.newPath]),
+    ...input.diff.renamed.map((r) => r.oldPath),
   ]);
 
   const fileAnalysisDir = path.join(input.currMetaRoot, "file-analysis");
   const bigFileAnalysisDir = path.join(input.currMetaRoot, "big-file-analysis");
-  for (const relativePath of invalidated) {
+  for (const relativePath of preserveUnits) {
+    await invalidateFileLevelOnly(fileAnalysisDir, bigFileAnalysisDir, relativePath);
+  }
+  for (const relativePath of fullWipe) {
     await invalidateOnePath(fileAnalysisDir, bigFileAnalysisDir, relativePath);
   }
 
-  return { copiedDirs, invalidatedPaths: invalidated.size };
+  return {
+    copiedDirs,
+    invalidatedPaths: preserveUnits.size + fullWipe.size,
+  };
 }
 
 /**
@@ -130,7 +154,7 @@ async function invalidateOnePath(
 ): Promise<void> {
   const encoded = encodeMetaPath(relativePath);
 
-  // (1) small-file parent (and its codeUnits/)
+  // (1) small-file parent
   await rm(path.join(fileAnalysisDir, encoded), { recursive: true, force: true });
   // (2) small-file per-unit children — siblings prefixed with `${encoded}__`
   await removeSiblingsWithPrefix(fileAnalysisDir, `${encoded}__`);
@@ -139,6 +163,45 @@ async function invalidateOnePath(
   await rm(path.join(bigFileAnalysisDir, encoded), { recursive: true, force: true });
   // (4) big-file per-chunk per-unit children — siblings prefixed with `${encoded}:chunk-`
   await removeSiblingsWithPrefix(bigFileAnalysisDir, `${encoded}:chunk-`);
+}
+
+/**
+ * Modified-file invalidation. Deletes ONLY the directories that hold file-level records.
+ * Keeps every per-unit directory in place so `extract-unit-sources` can sha-compare and
+ * reuse the matching `<qn>.analysis.json` (skipping the per-unit LLM call).
+ *
+ * Concretely, for a file at repo path `lib/foo.ts` (encoded as `lib__SL__foo.ts`):
+ *
+ *   REMOVED
+ *     <metaRoot>/file-analysis/lib__SL__foo.ts/
+ *         analysis.json                                     ← file-analysis result
+ *     <metaRoot>/big-file-analysis/lib__SL__foo.ts/
+ *         boundaries.json                                   ← computed cut points
+ *         cut-complete.json                                 ← phase-4 completion marker
+ *         chunks/chunk-N/raw.json                           ← cut chunk content
+ *         chunks/chunk-N/analysis.json                      ← chunk-level file-analysis result
+ *
+ *   PRESERVED
+ *     <metaRoot>/file-analysis/lib__SL__foo.ts__<qn>/
+ *         codeUnits/<qn>.source.json                        ← per-unit source slice
+ *         codeUnits/<qn>.analysis.json                      ← per-unit deep IR
+ *     <metaRoot>/big-file-analysis/lib__SL__foo.ts:chunk-N__<qn>/
+ *         chunks/chunk-N/codeUnits/<qn>.source.json
+ *         chunks/chunk-N/codeUnits/<qn>.analysis.json
+ *
+ * After this runs, `analyse-small`, `compute-boundaries`, `cut-big-files`, and
+ * `analyse-big-chunks` all re-run for the file. The preserved per-unit directories are then
+ * picked up by `extract-unit-sources`: matching sha256 → reuse the old analysis; mismatch →
+ * delete the stale analysis and let `analyse-units` re-run for that unit only.
+ */
+async function invalidateFileLevelOnly(
+  fileAnalysisDir: string,
+  bigFileAnalysisDir: string,
+  relativePath: string,
+): Promise<void> {
+  const encoded = encodeMetaPath(relativePath);
+  await rm(path.join(fileAnalysisDir, encoded), { recursive: true, force: true });
+  await rm(path.join(bigFileAnalysisDir, encoded), { recursive: true, force: true });
 }
 
 /**
