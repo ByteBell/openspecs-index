@@ -2,8 +2,8 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import express from "express";
-import { Config, DbProviderType, GraphProviderType, QueueProviderType, type Config as ConfigEnum } from "@bb/types";
-import { getBytebellHome, getConfigValue, HINTS } from "@bb/config";
+import { Config, type Config as ConfigEnum } from "@bb/types";
+import { getBytebellHome, getConfigValue, HINTS, infraRequiredKeys } from "@bb/config";
 import { connectDb } from "@bb/db";
 import { connectGraph, indexesGraph } from "@bb/graph-db";
 import { connectQueue, resumeOrphans } from "@bb/queue";
@@ -25,55 +25,22 @@ import { registerRoutes } from "./routes.ts";
 import { installShutdownHandlers } from "./shutdown.ts";
 import { reconcileLegacyLayout } from "./legacyLayout.ts";
 
-const REQUIRED: ConfigEnum[] = [
-  Config.MongoUri,
-  Config.RedisUrl,
-  Config.Neo4jUri,
-  Config.Neo4jUser,
-  Config.Neo4jPassword,
-  Config.OpenrouterApiKey,
-];
-
 function checkRequiredConfig(): void {
   const missing: string[] = [];
   const hints: string[] = [];
-  const dbProvider = getConfigValue(Config.DbProvider);
-  const graphProvider = getConfigValue(Config.GraphProvider);
-  const queueProvider = getConfigValue(Config.QueueProvider);
 
-  const required = [...REQUIRED];
-  const remove = (key: ConfigEnum): void => {
-    const idx = required.indexOf(key);
-    if (idx !== -1) {
-      required.splice(idx, 1);
-    }
-  };
-
-  if (dbProvider !== DbProviderType.Mongo) {
-    remove(Config.MongoUri);
-  }
-  if (graphProvider !== GraphProviderType.Neo4j) {
-    // Embedded graph (ladybug) needs no Neo4j connection details.
-    remove(Config.Neo4jUri);
-    remove(Config.Neo4jUser);
-    remove(Config.Neo4jPassword);
-  }
-  if (queueProvider !== QueueProviderType.Bullmq) {
-    remove(Config.RedisUrl);
-  }
-
-  // Embedded mode keeps its stores on disk — refuse to boot if any path the
-  // active embedded provider depends on is unset, instead of failing later
-  // with a cryptic file lock / IO error.
-  if (dbProvider === DbProviderType.Sqlite) {
-    required.push(Config.SqlitePath);
-  }
-  if (graphProvider === GraphProviderType.Ladybug) {
-    required.push(Config.LadybugPath);
-  }
-  if (queueProvider === QueueProviderType.Honker) {
-    required.push(Config.QueueDbPath);
-  }
+  // Infra requirements are derived from the active provider combo by the shared
+  // `infraRequiredKeys` helper (single source of truth with the CLI preflight),
+  // so embedded mode (sqlite + ladybug + honker) is never asked for a
+  // Mongo/Neo4j/Redis URL and refuses to boot only on a missing on-disk path.
+  const required: ConfigEnum[] = [
+    ...infraRequiredKeys({
+      db: getConfigValue(Config.DbProvider),
+      graph: getConfigValue(Config.GraphProvider),
+      queue: getConfigValue(Config.QueueProvider),
+    }),
+    Config.OpenrouterApiKey,
+  ];
 
   for (const key of required) {
     const value = getConfigValue(key);

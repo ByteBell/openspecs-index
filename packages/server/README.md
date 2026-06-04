@@ -109,11 +109,16 @@ POST /sse/messages?sessionId=…             legacy SSE messages — owned by @b
 
 1. **Bind localhost only.** `app.listen(port, "127.0.0.1")`. v0 OSS is
    single-tenant local — no remote connections.
-2. **Boot fails fast on missing config.** Required keys are
-   `Config.MongoUri`, `Config.RedisUrl`, `Config.Neo4jUri`,
-   `Config.Neo4jUser`, `Config.Neo4jPassword`,
-   `Config.OpenrouterApiKey`. Missing → `ServerConfigError` with the
-   matching `bytebell set …` hints, exit 1.
+2. **Boot fails fast on missing config.** Infra requirements are derived
+   from the active provider triple via `infraRequiredKeys` (`@bb/config`) —
+   the single source of truth shared with the CLI preflight. The default
+   (embedded) triple `sqlite` + `ladybug` + `honker` requires only the
+   on-disk store paths (`Config.SqlitePath`, `Config.LadybugPath`,
+   `Config.QueueDbPath`); the Docker triple `mongo` + `neo4j` + `bullmq`
+   requires `Config.MongoUri`, `Config.Neo4jUri`/`Neo4jUser`/`Neo4jPassword`,
+   and `Config.RedisUrl`. `Config.OpenrouterApiKey` is always required.
+   Missing → `ServerConfigError` with the matching `bytebell set …` hints,
+   exit 1.
 3. **Knowledge doc creation precedes enqueue and is dual-written.** Each
    ingest route calls `upsertKnowledge` (Mongo) + `upsertKnowledgeNode`
    (Neo4j) with `state: CREATED` before the publisher

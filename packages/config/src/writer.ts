@@ -1,5 +1,13 @@
 import fs from "node:fs";
-import { configSchema, Config, type BytebellConfig, type ConfigValue, DEFAULT_CONFIG, writeField } from "./schema.ts";
+import {
+  configSchema,
+  Config,
+  type BytebellConfig,
+  type ConfigValue,
+  DEFAULT_CONFIG,
+  pinLegacyInfraProviders,
+  writeField,
+} from "./schema.ts";
 import { __isSeeded } from "./loader.ts";
 import { getBytebellHome, getConfigPath, __notifyConfigChanged } from "./paths.ts";
 
@@ -41,8 +49,13 @@ export function ensureBytebellHome(): void {
     return;
   }
   const raw = JSON.parse(fs.readFileSync(getConfigPath(), "utf8")) as Record<string, unknown>;
+  // Pin legacy Docker installs to their existing providers BEFORE we fill in
+  // missing keys with schema defaults — otherwise the absent provider keys would
+  // bake in the embedded combo and orphan the user's Mongo/Neo4j. See
+  // pinLegacyInfraProviders for the full rationale.
+  const pinned = pinLegacyInfraProviders(raw);
   const expected = Object.keys(configSchema.shape);
-  if (expected.some((k) => !(k in raw))) {
+  if (pinned || expected.some((k) => !(k in raw))) {
     atomicWrite(configSchema.parse(raw));
     __notifyConfigChanged();
   }

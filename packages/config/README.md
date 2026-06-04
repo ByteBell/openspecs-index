@@ -47,6 +47,17 @@ default | `ollama`), `ollama_url` (default `http://localhost:11434`),
 `ollama_model` (free-form, empty default — user picks any model their
 local Ollama daemon has pulled).
 
+Infra-provider keys (the active backend triple): `db_provider`
+(`sqlite` **default** | `mongo`), `graph_provider` (`ladybug` **default** |
+`neo4j`), `queue_provider` (`honker` **default** | `bullmq`). The defaults
+form the **embedded** preset — SQLite + Ladybug + Honker, zero Docker and no
+Redis. `infraRequiredKeys(infra)` derives which connection/path keys are
+mandatory from this triple, and is the single source of truth shared by the
+CLI preflight and the server boot check (so embedded installs are never asked
+for a Mongo/Neo4j/Redis URL). Embedded store paths (`sqlite_path`,
+`ladybug_path`, `queue_db_path`) default empty and are auto-filled under
+`~/.bytebell` on boot.
+
 Ingestion-strategy keys (ConceptGraphStrategy): `ingestion.strategy`
 (`flat-folder` default | `concept-graph`), `enrichment.model` (empty
 default — strategy refuses to start if unset and `ingestion.strategy

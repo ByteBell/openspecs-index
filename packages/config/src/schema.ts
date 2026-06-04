@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Config } from "@bb/types";
+import { Config, DbProviderType, GraphProviderType, QueueProviderType } from "@bb/types";
 
 export { Config };
 
@@ -56,9 +56,12 @@ export const configSchema = z
     "skip.decision.enabled": z.boolean().default(true),
     "skip.decision.max.chars.for.llm": z.number().int().positive().default(4000),
     "skip.decision.cache.path": z.string().default(""),
-    db_provider: z.string().default("mongo"),
-    graph_provider: z.string().default("neo4j"),
-    queue_provider: z.string().default("bullmq"),
+    // Embedded is the default infra: SQLite + Ladybug + Honker, zero Docker and
+    // no Redis. A fresh install never reaches for Mongo/Neo4j/Redis unless the
+    // user explicitly switches to the Docker preset (`bytebell set …` / setup).
+    db_provider: z.string().default("sqlite"),
+    graph_provider: z.string().default("ladybug"),
+    queue_provider: z.string().default("honker"),
     queue_db_path: z.string().default(""),
     sqlite_path: z.string().default(""),
     ladybug_path: z.string().default(""),
@@ -130,21 +133,81 @@ export type ConfigValueMap = {
 
 export type ConfigValue<K extends Config> = ConfigValueMap[K];
 
-export const REQUIRED_KEYS: readonly Config[] = [
-  Config.MongoUri,
-  Config.Neo4jUri,
-  Config.Neo4jUser,
-  Config.Neo4jPassword,
-  Config.RedisUrl,
-];
-
 const PROVIDER_REQUIRED_KEYS: Readonly<Record<LlmProvider, readonly Config[]>> = {
   openrouter: [Config.OpenrouterApiKey],
   ollama: [Config.OllamaUrl, Config.OllamaModel],
 };
 
-export function requiredKeysFor(provider: LlmProvider): readonly Config[] {
-  return [...REQUIRED_KEYS, ...PROVIDER_REQUIRED_KEYS[provider]];
+/** The active infra provider combo (db / graph / queue). */
+export interface InfraProviders {
+  db: string;
+  graph: string;
+  queue: string;
+}
+
+/**
+ * The infra config keys the active provider combo actually requires. Embedded
+ * providers (sqlite / ladybug / honker) require only their on-disk path; Docker
+ * providers (mongo / neo4j / bullmq) require their connection details. This is
+ * the single source of truth shared by the CLI preflight (`@bb/cli`) and the
+ * server boot check (`@bb/server`) so the two can never drift — and the reason
+ * an embedded install is never asked for a Redis/Mongo/Neo4j URL.
+ */
+export function infraRequiredKeys(infra: InfraProviders): readonly Config[] {
+  const keys: Config[] = [];
+  if (infra.db === DbProviderType.Mongo) {
+    keys.push(Config.MongoUri);
+  } else if (infra.db === DbProviderType.Sqlite) {
+    keys.push(Config.SqlitePath);
+  }
+  if (infra.graph === GraphProviderType.Neo4j) {
+    keys.push(Config.Neo4jUri, Config.Neo4jUser, Config.Neo4jPassword);
+  } else if (infra.graph === GraphProviderType.Ladybug) {
+    keys.push(Config.LadybugPath);
+  }
+  if (infra.queue === QueueProviderType.Bullmq) {
+    keys.push(Config.RedisUrl);
+  } else if (infra.queue === QueueProviderType.Honker) {
+    keys.push(Config.QueueDbPath);
+  }
+  return keys;
+}
+
+export function requiredKeysFor(provider: LlmProvider, infra: InfraProviders): readonly Config[] {
+  return [...infraRequiredKeys(infra), ...PROVIDER_REQUIRED_KEYS[provider]];
+}
+
+/**
+ * One-time upgrade reconciliation for configs written before embedded became the
+ * default. A pre-existing Docker install has `mongo_uri` / `neo4j_uri` /
+ * `redis_url` set on disk but no `db_provider` / `graph_provider` /
+ * `queue_provider` keys (those were read-time defaults, or — for the queue —
+ * did not exist yet). Left untouched, the absent keys now default to the
+ * embedded combo (sqlite / ladybug / honker), so the server would silently boot
+ * against empty embedded stores and orphan the user's populated Mongo/Neo4j.
+ *
+ * So: when a provider key is ABSENT from the raw on-disk config and its matching
+ * Docker connection key is present and non-empty, pin the provider to the Docker
+ * value. Keys the user set explicitly are never touched, and a fresh install
+ * (no connection keys) keeps the embedded default. Mutates `raw` in place;
+ * returns true if anything was pinned (so the caller knows to persist).
+ */
+export function pinLegacyInfraProviders(raw: Record<string, unknown>): boolean {
+  const hasValue = (key: Config): boolean => typeof raw[key] === "string" && (raw[key] as string).length > 0;
+  let pinned = false;
+  if (!(Config.DbProvider in raw) && hasValue(Config.MongoUri)) {
+    raw[Config.DbProvider] = DbProviderType.Mongo;
+    pinned = true;
+  }
+  if (!(Config.GraphProvider in raw) && hasValue(Config.Neo4jUri)) {
+    raw[Config.GraphProvider] = GraphProviderType.Neo4j;
+    pinned = true;
+  }
+  if (!(Config.QueueProvider in raw) && hasValue(Config.RedisUrl)) {
+    raw[Config.QueueProvider] = QueueProviderType.Bullmq;
+    pinned = true;
+  }
+  return pinned;
 }
 
 export const HINTS: Readonly<Record<Config, string>> = {

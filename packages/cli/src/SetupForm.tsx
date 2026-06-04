@@ -114,7 +114,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
   const [values, setValues] = useState<Record<string, string>>(() => loadInitial());
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const isDocker = (values["infra-mode"] ?? "docker") === "docker";
+  const isDocker = (values["infra-mode"] ?? "embedded") === "docker";
   const visibleRows = ROWS.filter((r) => isDocker || r.infra !== true);
 
   const errors: Record<string, string | null> = {};
@@ -131,7 +131,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
     }
     if (key.return && allValid && submitError === null) {
       try {
-        applyInfraMode((values["infra-mode"] ?? "docker") as InfraMode);
+        applyInfraMode((values["infra-mode"] ?? "embedded") as InfraMode);
         for (const row of visibleRows) {
           const entry = KEY_MAP[row.cliKey];
           if (entry === undefined) {
@@ -155,7 +155,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
       <ToggleField
         id="infra-mode"
         label="Infrastructure"
-        value={values["infra-mode"] ?? "docker"}
+        value={values["infra-mode"] ?? "embedded"}
         options={MODE_OPTIONS}
         onChange={(next) => setValues((prev) => ({ ...prev, "infra-mode": next }))}
       />

@@ -63,7 +63,8 @@ export type ConfigCompletenessResult = { ok: true } | { ok: false; missing: Conf
 export function isConfigComplete(): ConfigCompletenessResult {
   const cfg = loadConfig();
   const missing: Config[] = [];
-  for (const key of requiredKeysFor(cfg.llm_provider)) {
+  const infra = { db: cfg.db_provider, graph: cfg.graph_provider, queue: cfg.queue_provider };
+  for (const key of requiredKeysFor(cfg.llm_provider, infra)) {
     const value = readField(cfg, key);
     if (typeof value === "string" && value.length === 0) {
       missing.push(key);

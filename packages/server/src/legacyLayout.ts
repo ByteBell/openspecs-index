@@ -10,11 +10,19 @@ import { hasLegacyLayout, migrateLegacyPaths } from "@bb/path-migration";
 // connected, since it needs the knowledge list to decide what is recoverable.
 //
 //   1. Migrate every knowledge with a DB record into the commit-scoped layout.
-//   2. Delete legacy dirs with no DB record (orphans) and log them as abandoned
-//      — this is what lets boot self-heal after a DB reset.
+//   2. Delete legacy dirs with no DB record (orphans) and log them as abandoned.
 //   3. Refuse to boot only if legacy dirs remain that DO back a live knowledge
 //      but could not be migrated (missing commitId / repoUrl). Those carry data
 //      we must not silently destroy; the operator resolves them by hand.
+//
+// Safety guard: if the knowledge DB is EMPTY but legacy dirs exist, we refuse to
+// boot instead of treating every dir as an orphan and deleting it. An empty DB
+// alongside on-disk repos is ambiguous — it can be a deliberate reset, but it is
+// also exactly what a misconfigured / switched provider looks like (an upgrade
+// that flipped the active db/graph provider leaves the real records in the
+// previous store, unreachable rather than gone). Auto-deleting there would
+// destroy data. The operator opts into pruning explicitly via `bytebell migrate
+// paths`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function reconcileLegacyLayout(): Promise<void> {
@@ -25,6 +33,9 @@ export async function reconcileLegacyLayout(): Promise<void> {
 
   const orgId = getConfigValue(Config.OrgId);
   const knowledgeDocs = await knowledgeDb.listKnowledge({ limit: 100_000 });
+  if (knowledgeDocs.length === 0) {
+    throw new LayoutMigrationRequiredError(path.join(home, "repos", ".meta"));
+  }
   const summary = await migrateLegacyPaths({ home, orgId, knowledgeDocs, dryRun: false });
 
   for (const moved of summary.migrated) {
