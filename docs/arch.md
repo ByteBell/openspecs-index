@@ -12,7 +12,7 @@ This document describes **what** the system is and **why** it is shaped this way
 
 The system ships **two deployables** from one Bun workspace:
 
-- **`bytebell-server`** — a single Express daemon that hosts the ingestion HTTP routes, the MCP transport (Streamable HTTP + SSE), and the BullMQ workers, all in one process. It binds to `127.0.0.1`.
+- **`bytebell-server`** — a single Express daemon that hosts ingestion, the MCP transport (Streamable HTTP + SSE), and the queue workers, all in one process. It binds to `127.0.0.1`.
 - **`bytebell`** — an Ink/React terminal UI driven by commander subcommands. It is a thin HTTP client over the server; it never touches Mongo, Neo4j, or Redis directly.
 
 ```
@@ -89,28 +89,6 @@ CREATED → QUEUED → INGESTED → PROCESSING → PROCESSED
 ```
 
 States are explicit enums, never inferred from side effects. Every transition is persisted before the next phase begins. The lifecycle is surfaced by `bytebell ls` and the dashboard's Repos pane. Jobs are idempotent and retryable; retries do not duplicate side effects.
-
----
-
-## HTTP route catalogue
-
-All routes are local and unauthenticated (single-tenant, `orgId="local"`); the CLI resolves every command to one of these. Source: [routes.ts](../packages/server/src/routes.ts).
-
-| Route                             | Purpose                                           |
-| --------------------------------- | ------------------------------------------------- |
-| `GET /health`                     | Liveness probe                                    |
-| `POST /api/v1/github/index`       | Enqueue a remote-repo ingestion job               |
-| `POST /api/v1/github/probe`       | Check repo access and resolve the default branch  |
-| `POST /api/v1/github/pull`        | Enqueue a diff-aware re-index against branch HEAD |
-| `GET /api/v1/github/<id>/commits` | Recent commit history for a knowledge entry       |
-| `POST /api/v1/local/index`        | Enqueue ingestion of a local directory            |
-| `GET /api/v1/repos`               | List knowledge entries with state                 |
-| `GET /api/v1/repos/<id>`          | Poll one entry's ingestion progress               |
-| `DELETE /api/v1/repos/<id>`       | Remove an entry from all stores + pending jobs    |
-| `GET /api/v1/stats`               | Ingestion totals, per-repo and per-commit usage   |
-| `GET /api/v1/mcp/stats`           | MCP request + token usage                         |
-| `POST/GET/DELETE /mcp`            | MCP transport (Streamable HTTP)                   |
-| `GET /sse`, `POST /sse/messages`  | Legacy MCP SSE transport                          |
 
 ---
 

@@ -1,4 +1,4 @@
-# Get started in 5 minutes
+# Get started
 
 **Ask questions about any codebase — straight from Claude Code, Cursor, and other AI assistants.** Point Bytebell at a repo and your AI tools can answer _"where is auth handled?"_ or _"how does caching work here?"_ with real, grounded answers from the actual code.
 
@@ -105,10 +105,11 @@ Full reference: [commands.md](commands.md). All settings: [configuration.md](con
 
 <a id="docker-mode"></a>
 
-<details>
-<summary><strong>Docker mode</strong> (Mongo + Neo4j + Redis instead of embedded)</summary>
+## Running with Docker instead (optional)
 
-Prefer the server databases? Choose **Docker** at the infra step of `bytebell setup`, or switch any time:
+**Everything above uses embedded mode — the recommended default, no Docker.** You only need this section if you'd rather run the server databases (Mongo + Neo4j + Redis).
+
+Choose **Docker** at the infrastructure step of `bytebell setup`, or switch any time:
 
 ```bash
 bytebell set db-provider mongo
@@ -119,8 +120,6 @@ bytebell set queue-provider bullmq
 Then `bytebell boot` brings up the local Docker stack (`bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis`) with named volumes, waits for healthchecks, and starts the server. Docker Desktop / engine must be running.
 
 Already run your own Mongo / Neo4j / Redis? Set their connection details first (`bytebell set mongo …`, `neo4j …`, `redis …`) and `bytebell boot` skips the containers for any service you've configured. See [configuration.md](configuration.md).
-
-</details>
 
 <details>
 <summary><strong>Under the hood</strong> (optional — you don't need this to use Bytebell)</summary>

@@ -1,7 +1,5 @@
 # Bytebell [bytebell.ai]
 
-## Run it in 5 minutes
-
 > **No database, no Docker.** Bytebell's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
 
 **You need:** [Bun](https://bun.sh) ≥ 1.1, git, and an [OpenRouter](https://openrouter.ai) API key _or_ a local [Ollama](https://ollama.com) model.
@@ -18,7 +16,7 @@ bytebell setup
 #     "Where is auth handled?"  ·  "Summarize the architecture."
 ```
 
-`bytebell setup` auto-detects and configures Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code. To wire one by hand: `claude mcp add --transport http bytebell http://127.0.0.1:8080/mcp`. The server registers four MCP tools — `list_knowledge`, `smart_search`, `keyword_lookup`, `retrieve_file` — plus a bundled skill at `bytebell://skills/index`.
+`bytebell setup` auto-detects and wires Bytebell into Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code for you.
 
 Every command and flag: **[docs/commands.md](docs/commands.md)** · every setting: **[docs/configuration.md](docs/configuration.md)**.
 
@@ -28,10 +26,10 @@ There is no `.env` file anywhere — `~/.bytebell/config.json` (mode `0600`) is 
 
 You point `bytebell` at a repo. It clones the source, walks every file, and for each file calls an LLM (via OpenRouter) to extract a structured `FileAnalysis`: a one-paragraph **purpose**, a longer **summary** of what the file does and how it fits the architecture, a **business context** line tying it to the product domain, plus the file's classes, functions, keywords, and imports.
 
-Those outputs are persisted into two stores:
+Those outputs are persisted into two stores — by default the **embedded** ones, no Docker:
 
-- **Neo4j** receives a `:File` node enriched with `purpose`, `summary`, `businessContext`, `language`, `sha`, and `sizeBytes`, linked via `:HAS_CLASS`, `:HAS_FUNCTION`, `:HAS_KEYWORD`, `:HAS_IMPORT_INTERNAL`, and `:HAS_IMPORT_EXTERNAL` to deduplicated child nodes shared across the whole graph. Fulltext indexes cover purpose+summary, business context, keyword names, and class/function signatures.
-- **MongoDB** receives the raw file content, language, SHA256, and the full `FileAnalysis` JSON for cite-back and exact retrieval.
+- A **graph store** (LadybugDB by default, or Neo4j) receives a `:File` node enriched with `purpose`, `summary`, `businessContext`, `language`, `sha`, and `sizeBytes`, linked via `:HAS_CLASS`, `:HAS_FUNCTION`, `:HAS_KEYWORD`, `:HAS_IMPORT_INTERNAL`, and `:HAS_IMPORT_EXTERNAL` to deduplicated child nodes shared across the whole graph. Fulltext indexes cover purpose+summary, business context, keyword names, and class/function signatures.
+- A **doc store** (SQLite by default, or MongoDB) receives the raw file content, language, SHA256, and the full `FileAnalysis` JSON for cite-back and exact retrieval.
 
 LLM clients then query that graph through four MCP tools — `list_knowledge`, `smart_search`, `keyword_lookup`, `retrieve_file` — which together cover repo enumeration, fused semantic + structural search, reverse entity-to-file lookup, and targeted content reads. They let an agent answer questions like _"Which files implement our retry/backoff policy and where is it configured?"_ without reading the entire repo into context.
 
@@ -39,13 +37,13 @@ LLM clients then query that graph through four MCP tools — `list_knowledge`, `
 flowchart LR
     CLI["bytebell CLI / TUI"] -- HTTP --> Server["bytebell-server<br/>(Express)"]
     Client["MCP-capable LLM client<br/>Claude Code, Cursor, …"] -- MCP --> Server
-    Server -- enqueues --> Q["BullMQ in-process worker"]
+    Server -- enqueues --> Q["in-process queue worker"]
     Q --> Strategy["IngestionStrategy<br/>per-file LLM"]
-    Strategy -- LLM call --> OR["OpenRouter"]
-    Strategy -- raw + analysis --> Mongo[("MongoDB")]
-    Strategy -- enriched node --> Neo[("Neo4j")]
-    Server -. retrieval .-> Mongo
-    Server -. retrieval .-> Neo
+    Strategy -- LLM call --> OR["OpenRouter / Ollama"]
+    Strategy -- raw + analysis --> Doc[("doc store<br/>SQLite · Mongo")]
+    Strategy -- enriched node --> Graph[("graph store<br/>LadybugDB · Neo4j")]
+    Server -. retrieval .-> Doc
+    Server -. retrieval .-> Graph
 ```
 
 ## Who this is for
@@ -122,42 +120,15 @@ flowchart TD
 
 Most well-formed code questions resolve in 2–4 tool calls. No re-clone, no full-file dumps, no embeddings round-trip.
 
-## Day-to-day commands
+## Storage backends
 
-| Command                                                       | Purpose                                                                            |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `bytebell setup`                                              | Interactive first-run wizard: provider, boot, optional index, MCP auto-install.    |
-| `bytebell ls`                                                 | List indexed knowledge entries with state.                                         |
-| `bytebell stats`                                              | Ingestion totals, per-repo breakdown, per-commit token usage.                      |
-| `bytebell mcp install`                                        | Auto-detect installed editors and register the MCP endpoint in their config.       |
-| `bytebell mcp stats`                                          | MCP usage: input/output tokens, monthly breakdown.                                 |
-| `bytebell pull`                                               | Re-index a previously-added GitHub repo at branch HEAD (diff-aware).               |
-| `bytebell delete`                                             | Picker; cancels jobs, drops the Knowledge subgraph from Neo4j, removes Mongo rows. |
-| `bytebell shutdown`                                           | Stop the server. Docker keeps running.                                             |
-| `bytebell boot`                                               | Warm restart.                                                                      |
-| `docker compose -f infra/docker/docker-compose.yml down [-v]` | Stop containers (and optionally drop volumes — destroys all indexed data).         |
-
-Full reference, including every flag and option: [docs/commands.md](docs/commands.md).
-
-## Bring your own infrastructure
-
-By default Bytebell runs in **embedded mode** (SQLite + LadybugDB + Honker) — no Docker. In **Docker mode**, `bytebell boot` provisions a local stack (`bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis`) with auto-generated credentials. If you already run Mongo, Neo4j, and Redis (or want a managed service), set the connection details before booting and the container for any configured service is skipped:
-
-```bash
-bytebell set mongo          mongodb://user:pass@host:27017/bytebell
-bytebell set neo4j          bolt://host:7687
-bytebell set neo4j-user     neo4j
-bytebell set neo4j-password <your-password>
-bytebell set redis          redis://host:6379
-```
-
-Docker is not required on the host in this mode. See the [Configuration reference](#configuration-reference) for the full key list.
+Bytebell runs **embedded** by default (SQLite + LadybugDB + Honker, no Docker). Switch to **Docker mode** (Mongo + Neo4j + Redis), or point Bytebell at your own database instances — at setup or any time via `bytebell set`. The steps are in **[docs/getting-started.md](docs/getting-started.md#docker-mode)**; every key is in **[docs/configuration.md](docs/configuration.md)**.
 
 ## Architecture at a glance
 
-A single Bun-built Express daemon, `bytebell-server`, hosts the ingestion HTTP routes, the MCP transport (Streamable HTTP + SSE), and the queue workers all in-process. Storage is pluggable: the default **embedded** preset (SQLite + LadybugDB + Honker) keeps everything in local files under `~/.bytebell` with no Docker, while the **Docker** preset uses Mongo + Neo4j + Redis. The CLI is a thin Ink/React TUI that only ever talks HTTP to the daemon — it never touches the data stores directly. Workers run in the server's lifecycle; there is no separate worker fleet.
+A single Bun-built Express daemon, `bytebell-server`, hosts ingestion, the MCP transport (Streamable HTTP + SSE), and the queue workers all in-process. Storage is pluggable: the default **embedded** preset (SQLite + LadybugDB + Honker) keeps everything in local files under `~/.bytebell` with no Docker, while the **Docker** preset uses Mongo + Neo4j + Redis. The CLI is a thin Ink/React TUI that only ever talks HTTP to the daemon — it never touches the data stores directly. Workers run in the server's lifecycle; there is no separate worker fleet.
 
-For the full PRD — package tiers, state machine, HTTP route catalogue, verification checklist, distribution strategy — see [docs/arch.md](docs/arch.md).
+For the full PRD — package tiers, the provider seam, ingestion strategies, the state machine, and distribution — see [docs/arch.md](docs/arch.md).
 
 ## Configuration reference
 

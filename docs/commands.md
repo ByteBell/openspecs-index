@@ -1,131 +1,54 @@
-# Bytebell CLI — Commands Reference
+# Bytebell CLI — Commands
 
-The `bytebell` binary is the Ink/commander TUI front-end. It never touches Mongo / Neo4j / Redis directly — every command resolves to an HTTP call against the local `bytebell-server` daemon, auto-starting it in the background when needed.
+`bytebell` is the interactive CLI. Commands start the local Bytebell instance in the background automatically when needed — you never manage it by hand.
 
 ```
 bytebell [command] [...args]
 ```
 
-Global flags: `-V, --version`, `-h, --help`.
+Run `bytebell --help` or `bytebell <command> --help` for the live list. Global flags: `-V, --version`, `-h, --help`.
 
-### `bytebell --help`
+## Quick reference
 
-The output below is what commander prints in the current build (registration order from [packages/cli/src/index.ts](../packages/cli/src/index.ts)). If your installed binary shows a shorter list, it predates the additions and you should rebuild the CLI.
-
-```
-Usage: bytebell [options] [command]
-
-Bytebell — local knowledge engine TUI
-
-Options:
-  -V, --version              output the version number
-  -h, --help                 display help for command
-
-Commands:
-  set [key] [value]          Write a value to ~/.bytebell/config.json. With no args, opens the interactive setup form.
-  setup                      Interactive first-run wizard: configure LLM provider, then boot.
-  boot                       Bring up Docker infra (mongo + neo4j + redis) and start the bytebell-server.
-  shutdown                   Stop the bytebell-server (docker infra is left running).
-  server                     Manage the bytebell-server daemon.
-  index [options] <git-url>  Index a remote git repository.
-  ingest [path]              Ingest a local directory (defaults to the current working directory).
-  pull [options] [knowledge-id]
-                             Re-index a previously added GitHub repo at the branch's current HEAD.
-  ls                         List indexed knowledge entries.
-  delete                     Pick an indexed knowledge entry and delete it from Mongo + Neo4j.
-  stats                      Show ingestion totals, per-repo breakdown, and per-commit token usage.
-  mcp                        Manage and view MCP usage.
-  migrate                    One-off migrations between on-disk layouts.
-  help [command]             display help for command
-```
-
-Per-command help is available as `bytebell <command> --help`, e.g.:
-
-```
-$ bytebell index --help
-Usage: bytebell index [options] <git-url>
-
-Index a remote git repository.
-
-Arguments:
-  git-url          https URL of the repository
-
-Options:
-  --branch <name>  branch to index (defaults to 'main' on the server)
-  --token <pat>    GitHub PAT for private repos
-  --verbose        stream the server log file to the terminal during the run (set log level via `bytebell set log-level debug` for finer-grained output)
-  -h, --help       display help for command
-```
-
-```
-$ bytebell pull --help
-Usage: bytebell pull [options] [knowledge-id]
-
-Re-index a previously added GitHub repo at the branch's current HEAD.
-
-Arguments:
-  knowledge-id     knowledge id (omit to pick interactively from the indexed repos)
-
-Options:
-  --commit <sha>   specific commit hash to anchor against (defaults to branch HEAD)
-  --token <pat>    GitHub PAT for private repos
-  --verbose        stream the server log file to the terminal during the run
-  -h, --help       display help for command
-```
-
-```
-$ bytebell mcp --help
-Usage: bytebell mcp [options] [command]
-
-Manage and view MCP usage.
-
-Commands:
-  install          Detect installed coding tools and register the bytebell MCP endpoint in their config.
-  stats            Show input/output token stats for MCP
-  help [command]   display help for command
-```
-
-| Command         | Purpose                                                                  |
-| --------------- | ------------------------------------------------------------------------ |
-| `set`           | Write a value to `~/.bytebell/config.json` (interactive form if no args) |
-| `setup`         | Interactive first-run wizard: configure LLM provider, boot, optional index, MCP install |
-| `boot`          | Start Docker infra (mongo + neo4j + redis) and the bytebell-server       |
-| `shutdown`      | Stop the bytebell-server (Docker infra is left running)                  |
-| `server`        | Manage the bytebell-server daemon                                        |
-| `index`         | Index a remote git repository                                            |
-| `pull`          | Re-index a previously added GitHub repo at branch HEAD (or a given SHA)  |
-| `ingest`        | Ingest a local directory                                                 |
-| `ls`            | List indexed knowledge entries                                           |
-| `delete`        | Pick an entry and delete it from Mongo + Neo4j                           |
-| `stats`         | Show ingestion totals, per-repo breakdown, per-commit token usage        |
-| `mcp`           | Parent command for MCP usage subcommands                                 |
-| `mcp install`   | Detect installed editors and register the MCP endpoint in their config   |
-| `mcp stats`     | Show input/output token stats for MCP (global + monthly breakdown)       |
-| `migrate paths` | Reconcile the legacy on-disk repo layout with the commit-scoped layout   |
+| Command               | What it does                                                                  |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `setup`               | First-run wizard: LLM provider, infra (embedded/Docker), optional index, editor wiring. **Start here.** |
+| `set [key] [value]`   | Write a setting (no args → interactive form). Keys: [configuration.md](configuration.md). |
+| `boot`                | Start Bytebell (embedded → no Docker; Docker mode → brings up containers first). |
+| `shutdown`            | Stop Bytebell.                                                                |
+| `index <git-url>`     | Index a remote git repository.                                               |
+| `ingest [path]`       | Index a local directory (defaults to the current directory).                 |
+| `pull [knowledge-id]` | Re-index a previously added GitHub repo at branch HEAD (diff-aware).          |
+| `ls`                  | List indexed repos and their state.                                          |
+| `delete`              | Pick an indexed repo and remove it.                                          |
+| `stats`               | Ingestion totals, per-repo and per-commit token usage.                       |
+| `mcp install`         | Detect installed editors and wire in the MCP endpoint.                       |
+| `mcp stats`           | MCP request and token usage.                                                 |
+| `migrate paths`       | One-off on-disk layout migration (`--dry-run` supported).                    |
 
 ---
 
 ## `bytebell setup`
 
-Interactive first-run wizard ([SetupCommand.ts](../packages/cli/src/SetupCommand.ts)). Requires an interactive terminal — it refuses to run when stdin is piped. Walks through, in order:
+Interactive first-run wizard (requires a terminal — it won't run piped). It walks you through, in order:
 
-1. **Provider** — pick OpenRouter (enter API key + model) or Ollama (URL + model) in the Ink wizard.
-2. **Apply config** — writes the chosen provider keys to `~/.bytebell/config.json`.
-3. **Boot** — stops any running server, then runs the full boot sequence (Docker infra + `bytebell-server`).
-4. **Optional index** — if you supplied a repo URL in the wizard, indexes it and streams progress.
-5. **MCP install** — runs `mcp install` to register the endpoint in detected editors; prints the manual `claude mcp add …` line if none were auto-configured.
+1. **LLM provider** — OpenRouter (API key + model) or Ollama (URL + model).
+2. **Infrastructure** — **Embedded** (SQLite + LadybugDB + Honker, no Docker; the recommended default) or **Docker** (Mongo + Neo4j + Redis).
+3. **Repo** — optionally paste a GitHub URL to index right away.
+
+It then boots Bytebell, indexes your repo, and wires the MCP endpoint into your detected editors.
 
 ```
 bytebell setup
 ```
 
-The recommended path for a first run: one command takes you from nothing to a queryable, editor-wired graph. Every step it automates is also available standalone (`set`, `boot`, `index`, `mcp install`).
+One command from nothing to a queryable, editor-wired graph. Every step it automates is also available standalone (`set`, `boot`, `index`, `mcp install`).
 
 ---
 
 ## `bytebell set [key] [value]`
 
-Writes to `~/.bytebell/config.json`. Run with no arguments to launch the interactive Ink setup form ([SetupForm.tsx](../packages/cli/src/SetupForm.tsx)). Headless form takes a key from the table below and a value; values are validated before they are persisted.
+Writes a setting to `~/.bytebell/config.json`. Run with no arguments to open the interactive form. Values are validated before they're saved.
 
 ```
 bytebell set port 7777
@@ -133,58 +56,38 @@ bytebell set openrouter-api-key sk-or-v1-...
 bytebell set                 # opens the interactive form
 ```
 
-For the full list of valid keys — every key with its validation, default, and whether it is redacted in output — see **[configuration.md](configuration.md)** (the canonical reference, generated from [keyMap.ts](../packages/cli/src/keyMap.ts)).
-
-This is the only sanctioned write path to `config.json` (manual edits work but are not advertised). There is no `.env` file — see [CLAUDE.md](../CLAUDE.md) "Rule of Env Vars".
+This is the only sanctioned way to write config — there is no `.env` file. The full key list (validation, defaults, redaction) is in **[configuration.md](configuration.md)**.
 
 ---
 
 ## `bytebell boot`
 
-End-to-end "start everything" command ([BootCommand.ts](../packages/cli/src/BootCommand.ts)).
+Starts Bytebell. Runs a preflight first (and prints the exact `bytebell set …` to fix anything missing).
 
-1. Runs preflight (refuses to boot when required config is missing — prints the exact `bytebell set …` to fix it).
-2. Auto-fills local-Docker defaults for `mongo`, `neo4j`, `neo4j-user`, `neo4j-password`, `redis` if absent.
-3. Brings up the docker-compose stack (mongo + neo4j + redis) and waits for healthchecks.
-4. Starts `bytebell-server` in the background, prints the MCP endpoint URL.
+- **Embedded mode** (default): no Docker — the stores are local files under `~/.bytebell`.
+- **Docker mode**: brings up the containers your providers need (mongo / neo4j / redis), waits for health, then starts the server.
 
 ```
 bytebell boot
 ```
 
-Output ends with `MCP endpoint: http://127.0.0.1:<port>/mcp` and a hint to run `bytebell index` or `bytebell ingest` next.
+Output ends with the MCP endpoint URL (`http://127.0.0.1:<port>/mcp`) and a hint to run `bytebell index` or `bytebell ingest` next.
 
 ---
 
 ## `bytebell shutdown`
 
-Sends `SIGTERM` to the running server (PID read from `~/.bytebell/pid`) and waits up to 30 s for it to drain ([ShutdownCommand.ts](../packages/cli/src/ShutdownCommand.ts)). Does **not** stop Docker infra — prints the `docker compose -f … down` command to do so manually.
+Stops Bytebell. In Docker mode the containers are left running (it prints the `docker compose … down` command to stop them).
 
 ```
 bytebell shutdown
-```
-
-If the PID file is stale or absent, exits cleanly.
-
----
-
-## `bytebell server`
-
-Daemon management. Currently exposes one subcommand:
-
-### `bytebell server start`
-
-Runs `bun --bun packages/server/src/index.ts` in the **foreground** with stdio inherited (Ctrl+C to stop). Used for development / debugging — the other commands all auto-start the server in the background instead.
-
-```
-bytebell server start
 ```
 
 ---
 
 ## `bytebell index <git-url> [options]`
 
-Clones a remote git repository on the server and runs the active `IngestionStrategy` against it ([IndexCommand.ts](../packages/cli/src/IndexCommand.ts)).
+Clones a remote git repository and indexes it. URL must be `https://…`.
 
 ```
 bytebell index https://github.com/owner/repo
@@ -193,185 +96,141 @@ bytebell index https://github.com/owner/private --token ghp_xxx
 bytebell index https://github.com/owner/repo --verbose
 ```
 
-Options:
+| Option            | Description                                                            |
+| ----------------- | --------------------------------------------------------------------- |
+| `--branch <name>` | Branch to index (defaults to the repo's default branch)               |
+| `--token <pat>`   | GitHub PAT for private repos                                           |
+| `--verbose`       | Stream the log to the terminal during the run (pair with `set log-level debug` for more detail) |
 
-| Option            | Description                                                                                                |
-| ----------------- | ---------------------------------------------------------------------------------------------------------- |
-| `--branch <name>` | Branch to index (defaults to `main` on the server)                                                         |
-| `--token <pat>`   | GitHub PAT for private repos                                                                               |
-| `--verbose`       | Stream the server log file to the terminal during the run. For finer-grained output set `log-level debug`. |
+A spinner / progress bar tracks the job until it reaches `PROCESSED` or `FAILED`.
 
-Auto-starts the server, then `POST /api/v1/github/index`, then polls `/api/v1/repos/<knowledgeId>` every 1.5 s, rendering a spinner / progress bar until the state reaches `PROCESSED` or `FAILED`. URL must be `https://…`.
+---
+
+## `bytebell ingest [path]`
+
+Indexes a local directory — defaults to the current working directory. Progress UI is identical to `index`.
+
+```
+bytebell ingest                       # ingest the current directory
+bytebell ingest /abs/path/to/repo
+bytebell ingest ./relative/path
+```
 
 ---
 
 ## `bytebell pull [knowledge-id] [options]`
 
-Re-indexes a previously added **GitHub** repo at the branch's current HEAD ([PullCommand.ts](../packages/cli/src/PullCommand.ts)). Pull does not apply to `local:` ingests — the picker filters them out.
+Re-indexes a previously added **GitHub** repo at the branch's current HEAD (diff-aware — only changed files are re-analysed). Does not apply to local ingests.
 
 ```
 bytebell pull                                # interactive multi-select picker
-bytebell pull 1ee3bac7-...                   # pull one knowledgeId by id
-bytebell pull 1ee3bac7-... --commit deadbee  # anchor to a specific SHA
+bytebell pull 1ee3bac7-...                   # pull one repo by id
+bytebell pull 1ee3bac7-... --commit deadbee  # anchor to a specific commit SHA
 bytebell pull --token ghp_xxx                # private repo
 bytebell pull --verbose                      # tail server logs during the run
 ```
 
-Options:
-
-| Option           | Description                                                      |
+| Option           | Description                                                       |
 | ---------------- | ---------------------------------------------------------------- |
-| `--commit <sha>` | Specific commit hash to anchor against (defaults to branch HEAD) |
+| `--commit <sha>` | Specific commit to anchor against (defaults to branch HEAD)      |
 | `--token <pat>`  | GitHub PAT for private repos                                     |
-| `--verbose`      | Stream the server log file to the terminal during the run        |
+| `--verbose`      | Stream the log to the terminal during the run                    |
 
-When no `knowledge-id` is supplied, an Ink picker opens listing every GitHub-sourced entry:
-
-```
-Select repos to pull  (0 selected)
-▶ [ ] github:owner/repo PROCESSED  1ee3bac7…  8 files
-  [ ] github:owner/other PROCESSED  d259915c…  7 files
-
-[↑/↓ or j/k] move  [Space] toggle  [Enter] confirm  [Esc] cancel
-```
-
-The picker is **multi-select** — toggle as many repos as you want, then `Enter`. The CLI enqueues every selection in parallel via `POST /api/v1/github/pull` and polls each job concurrently. If the target commit already matches the latest indexed commit, the server short-circuits and the CLI prints `No-op: knowledge <id> already at commit <sha>`.
-
-Ingests a local directory — defaults to the current working directory ([IngestCommand.ts](../packages/cli/src/IngestCommand.ts)).
-
-```
-bytebell ingest                       # ingest CWD
-bytebell ingest /abs/path/to/repo
-bytebell ingest ./relative/path
-```
-
-Validates that the path exists and is a directory before calling `POST /api/v1/local/index`. Polling and progress UI are identical to `index`.
+With no id, a multi-select picker lists every GitHub repo — toggle as many as you want and re-index them in parallel. If a repo is already at the target commit, it's a no-op.
 
 ---
 
 ## `bytebell ls`
 
-Lists indexed knowledge entries by calling `GET /api/v1/repos` ([LsCommand.ts](../packages/cli/src/LsCommand.ts)).
+Lists indexed repos as `ID | SOURCE | STATE | UPDATED | FILES`. Source shows as `github:<slug>[@branch]` or `local:<path>`. State follows the lifecycle `CREATED → QUEUED → INGESTED → PROCESSING → PROCESSED` (or `FAILED`).
 
 ```
 bytebell ls
 ```
 
-Renders a table of `ID | SOURCE | STATE | UPDATED | FILES`. Source is rendered as `github:<slug>[@branch]` or `local:<path>`. State follows the lifecycle: `CREATED → QUEUED → INGESTED → PROCESSING → PROCESSED` (or `FAILED`).
-
 ---
 
 ## `bytebell delete`
 
-Interactive picker (Ink) over the `ls` output that issues `DELETE /api/v1/repos/<knowledgeId>` for the chosen entry ([DeleteCommand.ts](../packages/cli/src/DeleteCommand.ts)). Removes Mongo file rows, Neo4j nodes, raw artefacts, stats rows, and any pending BullMQ jobs.
+Interactive picker over the `ls` output. Removes the chosen repo entirely — file rows, graph nodes, raw artefacts, stats, and any pending jobs.
 
 ```
 bytebell delete
 ```
 
-Confirmation message reports counts: `removed <slug> (raw: N, stats: N, jobs: N)`.
-
 ---
 
 ## `bytebell stats`
 
-Hits `GET /api/v1/stats` and renders three sections ([StatsCommand.ts](../packages/cli/src/StatsCommand.ts)):
+Renders three sections:
+
+- **TOTALS** — repos, files, input/output tokens, estimated cost (USD).
+- **REPOS** — per-repo breakdown: `NAME | TYPE | FILES | INPUT | OUTPUT | COST`.
+- **COMMITS** — per-commit token usage.
 
 ```
 bytebell stats
 ```
 
-- **TOTALS** — total repos, files, input tokens, output tokens, estimated cost (USD).
-- **REPOS** — per-repo breakdown grouped by repository: `NAME | TYPE | FILES | INPUT | OUTPUT | COST`.
-- **COMMITS** — per-commit token usage: `NAME | COMMIT | INPUT | OUTPUT | COST | TIME (ms) | FILES`.
-
-`COST` is rendered as `$0.000000` or `unknown` when pricing data is missing.
+`COST` shows `$0.000000` or `unknown` when pricing data is missing (e.g. Ollama).
 
 ---
 
 ## `bytebell mcp`
 
-Parent command for MCP-related views ([McpCommand.ts](../packages/cli/src/McpCommand.ts)).
-
 ### `bytebell mcp install`
 
-Detects installed coding tools — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and writes the bytebell MCP endpoint (`http://127.0.0.1:<port>/mcp`) into each one's config, backing up the file first ([mcpInstall.ts](../packages/cli/src/mcpInstall.ts)). The JSON shape differs per tool; the command handles each. `bytebell setup` runs this automatically on first boot.
+Detects installed editors — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and writes the Bytebell MCP endpoint into each one's config, backing up the file first. `bytebell setup` runs this for you on first boot.
 
 ```
 bytebell mcp install
 ```
 
-If no editors are detected, prints the manual `claude mcp add --transport http bytebell http://127.0.0.1:<port>/mcp` command.
-
----
+If no editors are detected, it prints the manual `claude mcp add --transport http bytebell http://127.0.0.1:<port>/mcp` command.
 
 ### `bytebell mcp stats`
-
-Hits `GET /api/v1/mcp/stats` and renders:
-
-- **Global MCP Usage** — total requests, input tokens, output tokens, total tokens.
-- **Monthly Usage by Identity** — per-identity / per-month rows: `Identity | Period | Reqs | In Tokens | Out Tokens | Total`.
 
 ```
 bytebell mcp stats
 ```
 
-When no monthly rows exist, prints `No monthly usage records found.`
+Renders global MCP usage (requests + input/output tokens) and a monthly per-identity breakdown.
 
 ---
 
 ## `bytebell migrate paths`
 
-One-off on-disk layout reconciliation ([MigratePathsCommand.ts](../packages/cli/src/MigratePathsCommand.ts)). Migrates the legacy `~/.bytebell/repos/.meta/<knowledgeId>/` tree to the commit-scoped `~/.bytebell/orgs/<orgId>/<provider>/<knowledgeId>/<owner>/<repo>/<commit>/...` layout. Knowledge with a database record is migrated; legacy directories with no record are abandoned (deleted).
+One-off on-disk layout reconciliation: migrates the legacy `~/.bytebell/repos/.meta/<id>/` tree to the commit-scoped `~/.bytebell/orgs/…` layout. Repos with a database record are migrated; orphaned directories are removed.
 
 ```
 bytebell migrate paths            # run the migration
-bytebell migrate paths --dry-run  # print what would change without touching disk
+bytebell migrate paths --dry-run  # show what would change without touching disk
 ```
 
-| Option      | Description                                    |
-| ----------- | ---------------------------------------------- |
-| `--dry-run` | Print what would change without touching disk. |
-
-The same reconciliation runs automatically at server boot — this command is for running it ahead of time or inspecting it with `--dry-run`.
+The same reconciliation runs automatically on boot — this command just lets you run it ahead of time or inspect it with `--dry-run`.
 
 ---
 
 ## Lifecycle quick-start
 
 ```
-bytebell set                          # interactive first-run config
-bytebell boot                         # docker + server
+bytebell setup                        # first run: provider + infra + optional index + editor wiring
 bytebell index https://github.com/owner/repo
 bytebell ls
 bytebell pull                         # re-index against branch HEAD
 bytebell stats
-bytebell mcp stats
-bytebell delete                       # pick an entry to remove
-bytebell shutdown                     # stop the server (docker stays up)
+bytebell shutdown                     # stop Bytebell
 ```
 
 ---
 
 ## The `--verbose` flag
 
-Available on `bytebell index` and `bytebell pull` ([logTailer.ts](../packages/cli/src/logTailer.ts)).
+Available on `bytebell index` and `bytebell pull`. When set, the CLI tails the Bytebell log file (`~/.bytebell/logs/server-YYYY-MM-DD.log`) to the terminal alongside the progress bar for the duration of the job.
 
-- When set, the CLI **tails the active server log file** (`~/.bytebell/logs/server-YYYY-MM-DD.log`) and streams new lines to the terminal alongside the spinner / progress bar for the duration of the job.
-- The flag controls **what you see**, not **what is logged**. The server's log level is independent — set it via `bytebell set log-level <level>` (one of the `LOG_LEVELS` from [@bb/config](../packages/config/)). For finer-grained output, run `bytebell set log-level debug` first, then re-run with `--verbose`.
-- The tailer is started after the server is up and stopped automatically when the command finishes (success, failure, or Ctrl+C).
-- Verbose output is only the server log; client-side spinners and progress bars are unaffected.
+The flag controls **what you see**, not what's logged — the log level is separate. For more detail, run `bytebell set log-level debug` first, then re-run with `--verbose`.
 
 ```
 bytebell set log-level debug
 bytebell index https://github.com/owner/repo --verbose
-bytebell pull --verbose
 ```
-
----
-
-## Notes
-
-- Every command auto-starts `bytebell-server` in the background if it is not already running; logs are written to `~/.bytebell/logs/server-YYYY-MM-DD.log`.
-- The `--help` text printed by `commander` may lag this document while features are added — the source files under [packages/cli/src/](../packages/cli/src/) are authoritative.
-- All HTTP routes referenced above are documented (OpenAPI) on the server side per the "Rule of API Logging & Documentation" in [CLAUDE.md](../CLAUDE.md).
