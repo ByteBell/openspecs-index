@@ -18,6 +18,12 @@ export interface StoreFlatAnalysisInput {
   scope: NodeScope;
   payload: GithubIndexPayload;
   branch: string;
+  /** GitHub owner — persisted to RepoSummary.user_name (matches the on-disk clone path). */
+  owner: string;
+  /** Bare repo name — persisted to RepoSummary.repo_name (matches the on-disk clone path). */
+  repo: string;
+  /** Resolved commit hash — persisted to RepoSummary.commit_hash / Knowledge.commit_hash. */
+  commitHash: string;
   metaPaths: MetaPaths;
   cache: FileAnalysisCache;
   progressContext?: ProgressContext;
@@ -43,6 +49,9 @@ export async function storeFlatAnalysis(input: StoreFlatAnalysisInput): Promise<
       scope: input.scope,
       repoUrl: input.payload.repoUrl,
       branch: input.branch,
+      owner: input.owner,
+      repo: input.repo,
+      commitHash: input.commitHash,
       summary: {
         purpose: repoSummary.purpose,
         summary: repoSummary.summary,
@@ -59,6 +68,9 @@ export async function storeFlatAnalysis(input: StoreFlatAnalysisInput): Promise<
       scope: input.scope,
       repoUrl: input.payload.repoUrl,
       branch: input.branch,
+      owner: input.owner,
+      repo: input.repo,
+      commitHash: input.commitHash,
       summary: emptyRepoSummaryPayload(),
     });
   }

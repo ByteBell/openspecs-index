@@ -18,6 +18,12 @@ export interface StorePullInput {
   scope: NodeScope;
   payload: GithubIndexPayload;
   branch: string;
+  /** GitHub owner — persisted to RepoSummary.user_name (matches the on-disk clone path). */
+  owner: string;
+  /** Bare repo name — persisted to RepoSummary.repo_name (matches the on-disk clone path). */
+  repo: string;
+  /** Resolved commit hash — persisted to RepoSummary.commit_hash / Knowledge.commit_hash. */
+  commitHash: string;
   metaPaths: MetaPaths;
   diff: DiffResult;
   affectedFolders: Set<string>;
@@ -64,6 +70,9 @@ export async function storePullAnalysis(input: StorePullInput): Promise<StorePul
       scope: input.scope,
       repoUrl: input.payload.repoUrl,
       branch: input.branch,
+      owner: input.owner,
+      repo: input.repo,
+      commitHash: input.commitHash,
       summary: {
         purpose: repoSummary.purpose,
         summary: repoSummary.summary,

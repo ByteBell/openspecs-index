@@ -57,5 +57,6 @@ export {
   metaOutputRootFor,
   bytebellPathsFor,
   parseGithubOwnerRepo,
+  parseGitlabOwnerRepo,
 } from "./path-layout.ts";
 export type { RepoLocation, MetaPathsLayout } from "./path-layout.ts";

@@ -174,6 +174,9 @@ async function runGithub(
       knowledgeId,
       orgId,
       repoId: knowledgeId,
+      owner: parsed.owner,
+      repo: parsed.repo,
+      commitHash,
     };
     const llmCallContext = llmCallContextFromPayload(payload);
     if (llmCallContext !== undefined) {

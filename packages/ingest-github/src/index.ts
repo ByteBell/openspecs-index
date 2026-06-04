@@ -166,6 +166,10 @@ export type {
   PipelineSummary,
 } from "./types/pipeline.ts";
 export type { DiffResult, RenamedFile } from "./pipeline/git-diff.ts";
+// Provider-agnostic pull-diff helpers (deepen a shallow clone, then diff two
+// commits with a merge-base fallback). Reused by provider wrappers (e.g. GitLab)
+// whose pull factory must compute the changed-file set itself.
+export { materialiseEndpoints, computePullDiff } from "./pipeline/pull-diff-resolver.ts";
 export type { CondensedFileAnalysis } from "./types/condensed-file-analysis.ts";
 export {
   fetchLatestCommitHash,
