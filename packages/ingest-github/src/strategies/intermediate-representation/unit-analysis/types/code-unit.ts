@@ -150,7 +150,7 @@ export interface CodeUnit {
   exampleIoPairs: ExampleIoPair[];
   testReferences: string[];
   /** 1-2 sentence statement of intent — what the unit guarantees, not how. */
-  behaviorSummary: string;
+  summary: string;
   /** Literals that are part of the unit's contract (regex, error codes, format strings, ABI fragments). */
   specLiterals: SpecLiteral[];
   /** Constants the unit declares as part of its public contract. */

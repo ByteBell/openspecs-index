@@ -22,6 +22,8 @@ import type { IrBigFileChunkRaw } from "#src/strategies/intermediate-representat
 import {
   listRawChunkNumbers,
   readBoundaries,
+  readCutComplete,
+  saveCutComplete,
   saveRawChunk,
 } from "#src/strategies/intermediate-representation/storage.ts";
 
@@ -73,8 +75,13 @@ export async function cutBigFiles(input: CutBigFilesInput): Promise<CutBigFilesR
           return;
         }
 
+        // Cache hit requires BOTH: the cut-complete marker AND the on-disk chunk count
+        // matches the marker's recorded `totalChunks`. A bare `existing.length > 0` check
+        // would treat a partially-cut file from an interrupted prior run as cached and
+        // permanently lose chunks beyond what was already on disk.
+        const complete = await readCutComplete(input.metaPaths, entry.relativePath);
         const existing = await listRawChunkNumbers(input.metaPaths, entry.relativePath);
-        if (existing.length > 0) {
+        if (complete !== null && existing.length === complete.totalChunks) {
           cached += 1;
           totalChunks += existing.length;
           reporter?.increment(1, { fileName: entry.relativePath });
@@ -100,6 +107,9 @@ export async function cutBigFiles(input: CutBigFilesInput): Promise<CutBigFilesR
           };
           await saveRawChunk(input.metaPaths, raw);
         }
+        // Stamp the completion marker only AFTER every chunk is on disk so a crash mid-cut
+        // leaves no marker and the next run treats this file as un-cut.
+        await saveCutComplete(input.metaPaths, entry.relativePath, chunks.length);
         totalChunks += chunks.length;
         cut += 1;
         logger.info(`ir/cut-big-files: ${entry.relativePath} → ${chunks.length} chunk(s)`);

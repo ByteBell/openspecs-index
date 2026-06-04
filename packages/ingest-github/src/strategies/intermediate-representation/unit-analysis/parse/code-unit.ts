@@ -77,7 +77,7 @@ export function parseCodeUnit(raw: Record<string, unknown>, descriptor: UnitDesc
     verbatimBlocks: parseVerbatimBlocks(raw["verbatim_blocks"]),
     exampleIoPairs: parseExampleIoPairs(raw["example_io_pairs"]),
     testReferences: pickStringArray(raw["test_references"]),
-    behaviorSummary: pickString(raw["behavior_summary"], ""),
+    summary: pickString(raw["summary"], pickString(raw["behavior_summary"], "")),
     specLiterals: parseSpecLiterals(raw["spec_literals"]),
     declaredConstants: parseNamedConstants(raw["declared_constants"]),
     specTests: parseSpecTests(raw["spec_tests"]),

@@ -47,15 +47,52 @@ export function withConcurrency(maxConcurrent: number): ConcurrencyLimiter {
   });
 }
 
+export interface RunInPoolOptions {
+  /**
+   * Called whenever a task enters or leaves the active set, with the limiter's live in-flight
+   * worker count. Use this to feed `ProgressReporter.setActive(...)` so the bar shows real
+   * pool occupancy instead of the cap. Fire-and-forget — exceptions thrown by the callback
+   * are swallowed so a buggy reporter doesn't take down the pool.
+   */
+  onActiveChange?: (active: number) => void;
+}
+
 export async function runInPool<T>(
   concurrency: number,
   items: Iterable<T> | AsyncIterable<T>,
   task: (item: T) => Promise<void>,
+  opts: RunInPoolOptions = {},
 ): Promise<void> {
   const limit = withConcurrency(concurrency);
+  const fire = (): void => {
+    if (opts.onActiveChange === undefined) {
+      return;
+    }
+    try {
+      opts.onActiveChange(limit.activeCount());
+    } catch {
+      // ignore — reporter errors must not abort the pool
+    }
+  };
+  const wrapped = async (item: T): Promise<void> => {
+    fire();
+    try {
+      await task(item);
+    } finally {
+      // limiter decrements `active` AFTER our finally runs (in drain), so emit (count - 1)
+      // to reflect the post-decrement state the next enqueue will see.
+      try {
+        if (opts.onActiveChange !== undefined) {
+          opts.onActiveChange(Math.max(0, limit.activeCount() - 1));
+        }
+      } catch {
+        // ignore
+      }
+    }
+  };
   const promises: Promise<void>[] = [];
   for await (const item of items) {
-    promises.push(limit(() => task(item)));
+    promises.push(limit(() => wrapped(item)));
   }
   await Promise.all(promises);
 }

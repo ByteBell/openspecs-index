@@ -20,6 +20,7 @@ import {
   bigFileDirFor,
   bigFileRawChunkPath,
   chunkDirFor,
+  cutCompletePath,
   fileAnalysisRecordPath,
   fileDirFor,
   unitAnalysisRecordPath,
@@ -76,6 +77,34 @@ export async function readFileAnalysisRecordIfPresent(
   relativePath: string,
 ): Promise<IrFileAnalysisRecord | null> {
   return readJsonIfPresent<IrFileAnalysisRecord>(fileAnalysisRecordPath(metaPaths, relativePath));
+}
+
+/** Persisted marker that phase 4 wrote every chunk for one big file. See {@link cutCompletePath}. */
+export interface IrCutCompleteRecord {
+  relativePath: string;
+  totalChunks: number;
+  completedAt: string;
+}
+
+export async function saveCutComplete(
+  metaPaths: MetaPaths,
+  relativePath: string,
+  totalChunks: number,
+): Promise<void> {
+  await mkdir(bigFileDirFor(metaPaths, relativePath), { recursive: true, mode: DIR_MODE });
+  const record: IrCutCompleteRecord = {
+    relativePath,
+    totalChunks,
+    completedAt: new Date().toISOString(),
+  };
+  await writeFile(cutCompletePath(metaPaths, relativePath), JSON.stringify(record, null, 2), "utf8");
+}
+
+export async function readCutComplete(
+  metaPaths: MetaPaths,
+  relativePath: string,
+): Promise<IrCutCompleteRecord | null> {
+  return readJsonIfPresent<IrCutCompleteRecord>(cutCompletePath(metaPaths, relativePath));
 }
 
 export async function saveBoundaries(metaPaths: MetaPaths, boundaries: IrBigFileBoundaries): Promise<void> {

@@ -58,7 +58,7 @@ export const UNIT_IR_JSON_SHAPE = `Return JSON with EXACTLY these keys (set null
   "member_unit_ids": ["unit_ids of child units"],
 
   "_behaviour": "Behaviour contract — what a re-implementer must preserve:",
-  "behavior_summary": "1-2 sentence intent: given X this unit ensures Y. NOT a description of the implementation.",
+  "summary": "1-2 sentence intent: given X this unit ensures Y. NOT a description of the implementation. REQUIRED for every unit_kind — never empty.",
   "preconditions": ["conditions required on entry"],
   "postconditions": ["conditions guaranteed on normal exit"],
   "invariants": ["properties that hold throughout"],
@@ -119,7 +119,7 @@ export const UNIT_IR_FIELDS_BLOCK = `=== Surface contract ===
 
 === Behaviour contract ===
 
-- behavior_summary  : 1-2 sentences. Intent only — what the unit guarantees, not how. Sign-off
+- summary           : 1-2 sentences. Intent only — what the unit guarantees, not how. Sign-off
                       anchor for human review.
 - preconditions     : What MUST hold on entry. Caller's obligation.
 - postconditions    : What MUST hold on normal exit. Unit's obligation.

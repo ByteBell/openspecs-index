@@ -50,10 +50,17 @@ import { deriveFolderSpecs } from "./phases/derive-folder-specs.ts";
 
 export interface IrStrategyDeps {
   progressContextFactory?: ProgressContextFactory;
+  /**
+   * Optional override for phase 7 (analyse-units) parallelism. When omitted, units run at the
+   * same `Config.LlmConcurrency` as the file-analysis phases. Useful when the units model has a
+   * lower rate limit than the file-analysis model.
+   */
+  unitsConcurrency?: number;
 }
 
 export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
   const progressContextFactory = deps.progressContextFactory ?? nullProgressContextFactory;
+  const unitsConcurrencyOverride = deps.unitsConcurrency;
   return {
     name: "intermediate-representation",
     async execute(input: StrategyInput): Promise<StrategyResult> {
@@ -160,7 +167,7 @@ export function createIrStrategy(deps: IrStrategyDeps = {}): IngestStrategy {
         const unitsInput: Parameters<typeof analyseUnits>[0] = {
           knowledgeId,
           metaPaths,
-          concurrency: llmConcurrency,
+          concurrency: unitsConcurrencyOverride ?? llmConcurrency,
           progressContext,
         };
         if (unitsCallContext !== undefined) {

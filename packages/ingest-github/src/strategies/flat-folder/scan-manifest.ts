@@ -23,13 +23,21 @@ export interface ScanManifestSummary {
 
 export interface ScanManifest {
   generatedAt: string;
+  /**
+   * The git commit the manifest was built from. Used by `scanAndClassify` as the cache key:
+   * if an existing manifest's commitHash matches the current source reader's commit, the
+   * scan is skipped entirely. Optional for backward-compat with manifests written before
+   * the cache was introduced; those manifests force a fresh re-scan.
+   */
+  commitHash?: string;
   summary: ScanManifestSummary;
   entries: ScanManifestEntry[];
 }
 
-export function emptyManifest(): ScanManifest {
+export function emptyManifest(commitHash?: string): ScanManifest {
   return {
     generatedAt: new Date().toISOString(),
+    ...(commitHash !== undefined ? { commitHash } : {}),
     summary: { totalFiles: 0, smallCount: 0, bigCount: 0, oversizedCount: 0, totalTokens: 0, estimatedBigChunks: 0 },
     entries: [],
   };

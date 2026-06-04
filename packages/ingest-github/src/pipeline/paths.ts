@@ -106,6 +106,17 @@ export function bigFileChunkDir(metaPaths: MetaPaths, relativePath: string): str
   return path.join(bigFileDirFor(metaPaths, relativePath), "chunks");
 }
 
+/**
+ * Per-big-file cut-completion marker. Lives at `<bigFileDir>/cut-complete.json` next to
+ * `boundaries.json` and the `chunks/` dir. Phase 4 writes it once every chunk for the file
+ * is on disk; phase-4 cache check requires presence AND its `totalChunks` count to match
+ * the number of `chunk-N/raw.json` files actually present. Without this marker a partial
+ * cut left by an interrupted run would be mistaken for a complete one.
+ */
+export function cutCompletePath(metaPaths: MetaPaths, relativePath: string): string {
+  return path.join(bigFileDirFor(metaPaths, relativePath), "cut-complete.json");
+}
+
 /** Per-chunk directory `<bigFileDir>/chunks/chunk-N/`. */
 export function chunkDirFor(metaPaths: MetaPaths, relativePath: string, chunkNumber: number): string {
   return path.join(bigFileChunkDir(metaPaths, relativePath), `chunk-${String(chunkNumber)}`);

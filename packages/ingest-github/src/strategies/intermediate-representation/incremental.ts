@@ -20,7 +20,7 @@
  * benchmark replayer) use these helpers instead.
  */
 import fs from "node:fs";
-import { cp, rm } from "node:fs/promises";
+import { cp, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { logger } from "@bb/logger";
 import { encodeMetaPath } from "#src/pipeline/paths.ts";
@@ -99,19 +99,73 @@ export async function applyDiffInvalidation(
     ...input.diff.renamed.flatMap((r) => [r.oldPath, r.newPath]),
   ]);
 
+  const fileAnalysisDir = path.join(input.currMetaRoot, "file-analysis");
+  const bigFileAnalysisDir = path.join(input.currMetaRoot, "big-file-analysis");
   for (const relativePath of invalidated) {
-    const encoded = encodeMetaPath(relativePath);
-    const removals = [
-      path.join(input.currMetaRoot, "file-analysis", `${encoded}.json`),
-      path.join(input.currMetaRoot, "big-file-analysis", `${encoded}.boundaries.json`),
-      path.join(input.currMetaRoot, "big-file-analysis", "chunks", encoded),
-    ];
-    for (const target of removals) {
-      await rm(target, { recursive: true, force: true });
-    }
+    await invalidateOnePath(fileAnalysisDir, bigFileAnalysisDir, relativePath);
   }
 
   return { copiedDirs, invalidatedPaths: invalidated.size };
+}
+
+/**
+ * Removes every cached artifact attached to one parent `relativePath`. Layout reminder
+ * (must stay in sync with `pipeline/paths.ts`):
+ *
+ *   <metaRoot>/file-analysis/<enc(rel)>/                  → small-file analysis.json + codeUnits/
+ *   <metaRoot>/file-analysis/<enc(rel)>__<qn>/            → small-file per-unit sources / analyses
+ *   <metaRoot>/big-file-analysis/<enc(rel)>/              → boundaries.json + cut-complete.json + chunks/
+ *   <metaRoot>/big-file-analysis/<enc(rel)>:chunk-N__<qn>/→ big-file per-unit sources / analyses
+ *
+ * For (2) and (4) the children are sibling directories named `<enc(rel)>__…` and
+ * `<enc(rel)>:chunk-…` — `rm`'ing the parent does NOT touch them, so we enumerate the
+ * sibling listing and rm-by-prefix instead. The previous implementation tried to remove
+ * `<enc(rel)>.json` / `<enc(rel)>.boundaries.json` / `chunks/<enc(rel)>` paths that don't
+ * exist in the current layout, so cross-commit invalidation never actually deleted anything.
+ */
+async function invalidateOnePath(
+  fileAnalysisDir: string,
+  bigFileAnalysisDir: string,
+  relativePath: string,
+): Promise<void> {
+  const encoded = encodeMetaPath(relativePath);
+
+  // (1) small-file parent (and its codeUnits/)
+  await rm(path.join(fileAnalysisDir, encoded), { recursive: true, force: true });
+  // (2) small-file per-unit children — siblings prefixed with `${encoded}__`
+  await removeSiblingsWithPrefix(fileAnalysisDir, `${encoded}__`);
+
+  // (3) big-file parent (boundaries + cut-complete + every chunk-N/)
+  await rm(path.join(bigFileAnalysisDir, encoded), { recursive: true, force: true });
+  // (4) big-file per-chunk per-unit children — siblings prefixed with `${encoded}:chunk-`
+  await removeSiblingsWithPrefix(bigFileAnalysisDir, `${encoded}:chunk-`);
+}
+
+/**
+ * `rm -rf <parentDir>/<name>` for every direct child of `parentDir` whose name starts with
+ * `prefix`. Silently skips when the parent directory does not exist (a never-cut big file
+ * has no big-file-analysis dir at all). Failures on individual entries log and continue —
+ * one stuck path must not abort the rest of the invalidation pass.
+ */
+async function removeSiblingsWithPrefix(parentDir: string, prefix: string): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await readdir(parentDir);
+  } catch {
+    return;
+  }
+  for (const name of entries) {
+    if (!name.startsWith(prefix)) {
+      continue;
+    }
+    const target = path.join(parentDir, name);
+    try {
+      await rm(target, { recursive: true, force: true });
+    } catch (cause: unknown) {
+      const msg = cause instanceof Error ? cause.message : String(cause);
+      logger.warn(`applyDiffInvalidation: could not remove ${target}: ${msg}`);
+    }
+  }
 }
 
 export interface LogCommitDiffInput {

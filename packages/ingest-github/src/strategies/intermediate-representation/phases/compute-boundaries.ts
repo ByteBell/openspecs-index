@@ -127,7 +127,7 @@ export async function computeBigFileBoundaries(input: ComputeBoundariesInput): P
         logger.warn(`ir/compute-boundaries: failed for ${entry.relativePath}: ${describe(cause)}`);
         reporter?.increment(1, { fileName: entry.relativePath });
       }
-    });
+    }, { onActiveChange: (n) => reporter?.setActive?.(n) });
   } finally {
     reporter?.stop();
   }

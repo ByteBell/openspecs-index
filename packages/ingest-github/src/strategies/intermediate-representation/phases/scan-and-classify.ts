@@ -21,6 +21,7 @@ import { makeSkipDecider } from "#src/pipeline/skip-decisions/index.ts";
 import { classifyByTokens } from "#src/strategies/flat-folder/big-file/detector.ts";
 import {
   emptyManifest,
+  readScanManifest,
   writeScanManifest,
   type ScanManifest,
   type ScanManifestEntry,
@@ -43,7 +44,27 @@ export interface ScanAndClassifyResult {
 export async function scanAndClassify(input: ScanAndClassifyInput): Promise<ScanAndClassifyResult> {
   const contextWindowLimit = getConfigValue(Config.ContextWindowLimit);
   const maxTokensPerChunk = getConfigValue(Config.MaxTokensPerChunk);
-  const manifest = emptyManifest();
+
+  // Cache hit: an existing manifest stamped with the current commit is authoritative — every
+  // downstream phase keys off (relativePath, commit) anyway, so skipping the rescan is safe.
+  // Manifests written before the cache (no commitHash field) always force a fresh scan.
+  const sourceCommit = input.source.commitHash;
+  const existingManifest = await readScanManifest(input.metaPaths);
+  if (
+    existingManifest !== null &&
+    existingManifest.commitHash !== undefined &&
+    existingManifest.commitHash === sourceCommit &&
+    sourceCommit.length > 0
+  ) {
+    logger.info(
+      `ir/scan-and-classify CACHED commit=${sourceCommit.slice(0, 12)} ` +
+        `total=${existingManifest.summary.totalFiles} small=${existingManifest.summary.smallCount} ` +
+        `big=${existingManifest.summary.bigCount} oversized=${existingManifest.summary.oversizedCount}`,
+    );
+    return { manifest: existingManifest };
+  }
+
+  const manifest = emptyManifest(sourceCommit);
 
   const repositoryHint =
     input.source.localRepoDir.length > 0 ? path.basename(input.source.localRepoDir) : input.knowledgeId;

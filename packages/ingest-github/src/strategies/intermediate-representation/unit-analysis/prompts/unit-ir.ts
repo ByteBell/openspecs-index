@@ -20,10 +20,21 @@ regeneration in a different language. Per businessLogic.md:
   - ORACLE    = a small set of \`spec_tests\` that pin the contract so any implementation can
                 be checked against the SAME tests.
 
-Fields are ADAPTIVE: fill what applies to this unit_kind, set the rest to null/[]/{}. Do NOT
-invent. Preserve contract-relevant inline literals EXACTLY (regex patterns, error codes,
-format strings, ABI fragments, enum values) in \`spec_literals\`. Do NOT emit the full unit
-source or large code blocks — the source is already known.
+EVERY FIELD IS MANDATORY. The output JSON MUST contain every key listed in the JSON shape
+below. When a field does not apply to this unit_kind, you MUST still emit the key with an
+explicit empty value: \`[]\` for arrays, \`{}\` for objects, \`null\` for nullable scalars,
+\`""\` for required strings (only where the spec says non-empty is required). NEVER omit a
+key. A downstream validator rejects responses with missing keys and the call is retried —
+wasted tokens for you.
+
+Required non-empty strings (validator will reject empty values):
+- \`summary\` — REQUIRED for every unit regardless of kind. 1-2 sentences stating what the
+  unit guarantees / what role it plays. Even a config block, data service, or type-only
+  declaration has a one-line role — name it.
+
+Do NOT invent. Preserve contract-relevant inline literals EXACTLY (regex patterns, error
+codes, format strings, ABI fragments, enum values) in \`spec_literals\`. Do NOT emit the
+full unit source or large code blocks — the source is already known.
 
 For BEHAVIOURAL units (function / method / modifier / macro / constructor):
 - Fill preconditions, postconditions, invariants, edge_cases, error_policy, state_mutations,

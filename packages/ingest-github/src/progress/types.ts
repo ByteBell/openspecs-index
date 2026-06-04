@@ -43,6 +43,12 @@ export interface ProgressReporter {
   /** Grow the denominator when the work set is a streaming iterator. */
   incrementSeen(delta?: number): void;
   setTotal(total: number): void;
+  /**
+   * Live in-flight worker count. Optional; renderers that don't surface it can ignore the
+   * call. Use this when the phase wants the bar to reflect actual pool occupancy (e.g. via
+   * `runInPool`'s `onActiveChange`) instead of the cap.
+   */
+  setActive?(active: number): void;
   stop(): void;
 }
 

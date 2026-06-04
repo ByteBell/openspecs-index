@@ -98,14 +98,18 @@ export async function extractUnitSources(input: ExtractUnitSourcesInput): Promis
       const tag = chunkNumber === null ? relativePath : `${relativePath}#chunk-${String(chunkNumber)}`;
       try {
         for (const descriptor of record.analysis.units) {
+          // Cache key MUST mirror the save side below: the record is persisted under
+          // `<unitFileId>/codeUnits/...`, NOT under the parent's relativePath. Using
+          // relativePath here makes the check always miss and re-extracts every unit
+          // on every re-run.
+          const unitFileId = unitFileIdOf(descriptor.unitId);
           if (
-            await hasUnitSourceRecord(input.metaPaths, relativePath, chunkNumber, descriptor.qualifiedName)
+            await hasUnitSourceRecord(input.metaPaths, unitFileId, chunkNumber, descriptor.qualifiedName)
           ) {
             cached += 1;
             continue;
           }
           const source = descriptor.source;
-          const unitFileId = unitFileIdOf(descriptor.unitId);
           const unitRecord: IrUnitSourceRecord = {
             relativePath: unitFileId,
             chunkNumber,

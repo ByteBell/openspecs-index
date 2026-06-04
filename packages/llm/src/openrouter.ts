@@ -14,7 +14,7 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
  * hammer a struggling provider, capped so a stuck call cannot hold the pool indefinitely.
  */
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
-const ATTEMPTS_PER_MODEL = 2;
+const ATTEMPTS_PER_MODEL = 3;
 
 function backoffDelay(attemptIdx: number): number {
   const delay = BACKOFF_MS[Math.min(attemptIdx, BACKOFF_MS.length - 1)];

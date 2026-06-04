@@ -139,7 +139,7 @@ export async function analyseSmallFiles(input: AnalyseSmallInput): Promise<Analy
         logger.warn(`ir/analyse-small: failed for ${entry.relativePath}: ${describe(cause)}`);
         reporter?.increment(1, { fileName: entry.relativePath });
       }
-    });
+    }, { onActiveChange: (n) => reporter?.setActive?.(n) });
   } finally {
     reporter?.stop();
   }

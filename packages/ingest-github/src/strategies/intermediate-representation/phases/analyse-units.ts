@@ -35,6 +35,7 @@ import {
   readUnitSourceRecordIfPresent,
   saveUnitAnalysisRecord,
 } from "#src/strategies/intermediate-representation/storage.ts";
+import { buildUnitFileId } from "#src/strategies/intermediate-representation/file-analysis/unit-id.ts";
 
 export interface AnalyseUnitsInput {
   knowledgeId: string;
@@ -93,9 +94,12 @@ export async function analyseUnits(input: AnalyseUnitsInput): Promise<AnalyseUni
         continue;
       }
       for (const descriptor of parent.analysis.units) {
+        // Phase 6 saves the unit source under `<unitFileId>/codeUnits/…` where
+        // unitFileId = `${parentRelPath}__${qualifiedName}`. Read it back with the same key.
+        const unitFileId = buildUnitFileId(entry.relativePath, descriptor.qualifiedName);
         const source = await readUnitSourceRecordIfPresent(
           input.metaPaths,
-          entry.relativePath,
+          unitFileId,
           null,
           descriptor.qualifiedName,
         );
@@ -112,9 +116,12 @@ export async function analyseUnits(input: AnalyseUnitsInput): Promise<AnalyseUni
         continue;
       }
       for (const descriptor of parent.analysis.units) {
+        // Chunk file node id matches analyse-big-chunks: `${relativePath}:chunk-N`.
+        const chunkFileNodeId = `${entry.relativePath}:chunk-${String(chunkNumber)}`;
+        const unitFileId = buildUnitFileId(chunkFileNodeId, descriptor.qualifiedName);
         const source = await readUnitSourceRecordIfPresent(
           input.metaPaths,
-          entry.relativePath,
+          unitFileId,
           chunkNumber,
           descriptor.qualifiedName,
         );
@@ -144,7 +151,10 @@ export async function analyseUnits(input: AnalyseUnitsInput): Promise<AnalyseUni
       const tag = `${relativePath}${chunkLabel}::${source.qualifiedName}`;
       try {
         if (
-          await hasUnitAnalysisRecord(input.metaPaths, relativePath, chunkNumber, source.qualifiedName)
+          // Cache key mirrors the save side: analysis record lives under source.fileId (the
+          // unitFileId), NOT the parent file's relativePath. Using relativePath here would
+          // make the check miss every existing record.
+          await hasUnitAnalysisRecord(input.metaPaths, source.fileId, chunkNumber, source.qualifiedName)
         ) {
           cached += 1;
           reporter?.increment(1, { fileName: tag });
@@ -196,7 +206,7 @@ export async function analyseUnits(input: AnalyseUnitsInput): Promise<AnalyseUni
         logger.warn(`ir/analyse-units: ${tag} failed: ${msg}`);
         reporter?.increment(1, { fileName: tag });
       }
-    });
+    }, { onActiveChange: (n) => reporter?.setActive?.(n) });
   } finally {
     reporter?.stop();
   }

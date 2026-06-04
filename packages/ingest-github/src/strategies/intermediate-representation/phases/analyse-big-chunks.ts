@@ -147,7 +147,7 @@ export async function analyseBigChunks(input: AnalyseBigChunksInput): Promise<An
         logger.warn(`ir/analyse-big-chunks: ${tag} failed: ${describe(cause)}`);
         reporter?.increment(1, { fileName: tag });
       }
-    });
+    }, { onActiveChange: (n) => reporter?.setActive?.(n) });
   } finally {
     reporter?.stop();
   }
