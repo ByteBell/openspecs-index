@@ -8,7 +8,7 @@ export async function transitionState(knowledgeId: string, state: KnowledgeState
   await knowledgeGraph.setKnowledgeStateInGraph(knowledgeId, state).catch(() => undefined);
 }
 
-export function emptyPullSummary(commitHash: string): PipelineSummary {
+export function emptyPullSummary(commitHash: string, baseCommit: string): PipelineSummary {
   return {
     filesAnalyzed: 0,
     foldersSummarised: 0,
@@ -16,5 +16,7 @@ export function emptyPullSummary(commitHash: string): PipelineSummary {
     graphNodesWritten: 0,
     commitHash,
     tokenUsage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+    noOp: true,
+    baseCommit,
   };
 }

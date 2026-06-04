@@ -1,14 +1,21 @@
-import { Config, KnowledgeState, type GithubPullPayload, type JobMessage, type UsageGuard } from "@bb/types";
-import type { NodeScope } from "@bb/types";
+import {
+  Config,
+  KnowledgeState,
+  type GithubPullPayload,
+  type JobMessage,
+  type UsageGuard,
+  type NodeScope,
+} from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { withConcurrency } from "./concurrency.ts";
 import { knowledgeDb } from "@bb/db";
 import { knowledgeGraph, filesGraph } from "@bb/graph-db";
 import type { PipelineSummary } from "#src/types/pipeline.ts";
 import { resolveOrgId, llmCallContextFromPayload } from "./context.ts";
-import { IngestError, KnowledgeNotFoundError, UsageLimitExceededError } from "@bb/errors";
+import { IngestError, UsageLimitExceededError } from "@bb/errors";
 import { classifyFailure } from "./failure-classifier.ts";
 import { transitionState, emptyPullSummary } from "./pull-helpers.ts";
+import { preflightPull } from "./pull-preflight.ts";
 import { logger } from "@bb/logger";
 import { pathsFor } from "./paths.ts";
 import { parseGithubRepo } from "#src/githubUrl.ts";
@@ -35,8 +42,6 @@ import {
   buildFileAnalysisUserPrompt,
 } from "#src/strategies/flat-folder/prompts/file-analysis.ts";
 
-const COMMIT_HASH_RE = /^[0-9a-f]{40}$/u;
-
 export async function runPull(
   msg: JobMessage<GithubPullPayload>,
   pullFactory?: PullFactory,
@@ -44,34 +49,7 @@ export async function runPull(
   usageGuard?: UsageGuard,
 ): Promise<PipelineSummary> {
   const { knowledgeId } = msg.payload;
-  if (msg.payload.targetCommitHash !== undefined && !COMMIT_HASH_RE.test(msg.payload.targetCommitHash)) {
-    throw new IngestError(
-      knowledgeId,
-      `targetCommitHash must be a 40-character hex SHA, got: ${msg.payload.targetCommitHash}`,
-    );
-  }
-
-  const kDoc = await knowledgeDb.getKnowledge(knowledgeId);
-  if (kDoc === null) {
-    throw new KnowledgeNotFoundError(knowledgeId);
-  }
-  if (kDoc.source.kind !== "github") {
-    throw new IngestError(knowledgeId, `pull is only supported for github knowledge (kind=${kDoc.source.kind})`);
-  }
-  const currentCommit = kDoc.source.commitId ?? "";
-  if (currentCommit.length === 0) {
-    throw new IngestError(
-      knowledgeId,
-      "pull requires a previously-indexed commit; this knowledge has no commitId. Run github_index first.",
-    );
-  }
-
-  const branch = kDoc.info.branch ?? "main";
-  const repoUrl = kDoc.info.repoUrl;
-  if (repoUrl === undefined || repoUrl.length === 0) {
-    throw new IngestError(knowledgeId, "pull requires knowledge.info.repoUrl");
-  }
-  const gitToken = msg.payload.gitToken;
+  const { currentCommit, branch, repoUrl, gitToken } = await preflightPull(msg, pullFactory);
 
   clearCancellation(knowledgeId);
   await transitionState(knowledgeId, KnowledgeState.Processing);
@@ -79,7 +57,6 @@ export async function runPull(
 
   try {
     throwIfCancelled(knowledgeId);
-
     // Parse owner/repo up front — the resolver needs them to build the
     // commit-scoped path under the new layout.
     const parsed = parseGithubRepo(repoUrl);
@@ -87,7 +64,6 @@ export async function runPull(
       throw new IngestError(knowledgeId, `could not parse owner/repo from repoUrl=${repoUrl}`);
     }
     const orgId = resolveOrgId({});
-
     // Resolves target SHA via GitHub REST (or operator-supplied), clones into
     // the commit-scoped `repository/` dir, computes the diff. See
     // `pull-source-resolver.ts` for the dance.
@@ -106,9 +82,25 @@ export async function runPull(
     if (resolution.kind === "noop") {
       logger.info(`pull: ${knowledgeId} already at ${resolution.targetCommit.slice(0, 12)}; no-op`);
       await transitionState(knowledgeId, KnowledgeState.Processed);
-      return emptyPullSummary(resolution.targetCommit);
+      return emptyPullSummary(resolution.targetCommit, currentCommit);
     }
     const { source, diff, targetCommit, location, archiveSink } = resolution;
+    // Copy-forward the raw-file snapshot: seed the target commit's archive folder
+    // from the parent so it is a complete tree before changed files are pushed
+    // over it, then drop deleted / renamed-away paths. No-ops for sinks that are
+    // not commit-namespaced; failures are non-fatal (matches the archive contract).
+    if (archiveSink !== undefined) {
+      try {
+        await archiveSink.forkFrom?.(currentCommit);
+        for (const removed of [...diff.deleted, ...diff.renamed.map((r) => r.oldPath)]) {
+          await archiveSink.remove?.(removed);
+        }
+      } catch (cause: unknown) {
+        logger.warn(
+          `pull: archive copy-forward ${currentCommit.slice(0, 12)} -> ${targetCommit.slice(0, 12)} failed (non-fatal): ${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      }
+    }
 
     throwIfCancelled(knowledgeId);
     await filesGraph.snapshotFilesToVersion({ knowledgeId, commitHash: currentCommit }).catch((cause: unknown) => {
@@ -232,10 +224,31 @@ export async function runPull(
       scope,
       payload: { knowledgeId, repoUrl, branch },
       branch,
+      owner: parsed.owner,
+      repo: parsed.repo,
+      commitHash: targetCommit,
       metaPaths,
       diff,
       affectedFolders,
     });
+
+    // No-op (for stats): the pull spent no LLM tokens and upserted nothing — there was
+    // nothing that needed analysis. Covers an empty diff, a diff whose changed files were
+    // all filtered out as non-analyzable (lockfiles, docs, binaries, …), AND a delete-only
+    // pull (deletions consume no tokens). Any real deletions were already applied to the
+    // graph by `storePullAnalysis` above; we only avoid recording a misleading zero entry.
+    // Keep the knowledge anchored at `currentCommit` (do NOT advance via setKnowledgeCommit)
+    // and report a no-op so the enterprise mirror carries the base commit's stats forward.
+    const noAnalysisPerformed =
+      totalInputTokens === 0 && totalOutputTokens === 0 && stored.filesUpserted === 0 && stored.foldersUpserted === 0;
+    if (noAnalysisPerformed) {
+      await transitionState(knowledgeId, KnowledgeState.Processed);
+      progressContext.completed("github_pull complete (no-op)");
+      logger.info(
+        `pull: ${knowledgeId} ${currentCommit.slice(0, 12)} -> ${targetCommit.slice(0, 12)} no analyzable changes; no-op`,
+      );
+      return emptyPullSummary(targetCommit, currentCommit);
+    }
 
     await knowledgeDb.setKnowledgeCommit(
       knowledgeId,

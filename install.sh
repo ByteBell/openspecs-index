@@ -11,6 +11,9 @@ export PATH="$HOME/.bun/bin:$PATH"
 # ─────────────────────────────────────────────
 
 REPO_URL="https://github.com/ByteBell/open-ir"
+# Clone the same branch this installer was published from, so the installed code
+# matches the config schema it writes. Override with BYTEBELL_BRANCH=... if needed.
+REPO_BRANCH="${BYTEBELL_BRANCH:-merge/embedded_prerelease}"
 
 # ── helpers ──────────────────────────────────
 
@@ -43,14 +46,13 @@ if ! command -v bun &>/dev/null; then
 fi
 print_ok "Bun $(bun --version)"
 
-# Docker is OPTIONAL. The recommended default (embedded mode: SQLite + Ladybug +
-# Honker) runs entirely from local files under ~/.bytebell and needs no Docker.
-# Docker is only required if you later pick the "Docker" infra mode (Mongo +
-# Neo4j + Redis). So we probe for it but never block the install on it.
-
-# `docker info` can hang if the daemon is wedged or mid-start, so cap it.
-# Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
+# Docker is OPTIONAL. The recommended default is the embedded stack
+# (SQLite + Ladybug + Honker) which needs no Docker at all. Docker is only
+# required if you later choose "Docker" infra mode in `bytebell setup`
+# (Mongo + Neo4j + Redis). So this is an informational probe, never fatal.
 check_docker_running() {
+  # `docker info` can hang if the daemon is wedged or mid-start, so cap it.
+  # Prefer GNU `timeout`/`gtimeout`; fall back to a plain call where neither exists.
   if command -v timeout &>/dev/null; then
     timeout 10 docker info >/dev/null 2>&1
   elif command -v gtimeout &>/dev/null; then
@@ -60,14 +62,12 @@ check_docker_running() {
   fi
 }
 
-if command -v docker &>/dev/null && check_docker_running; then
-  print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',') — available if you choose Docker mode"
-elif command -v docker &>/dev/null; then
-  print_info "Docker is installed but not running — fine, the default embedded mode needs no Docker."
-  print_info "Start Docker Desktop only if you want the optional Docker infra mode."
+if ! command -v docker &>/dev/null; then
+  print_info "Docker not installed — fine for embedded mode (the default). Only needed if you pick Docker infra mode in 'bytebell setup'."
+elif ! check_docker_running; then
+  print_info "Docker installed but not running — fine for embedded mode (the default). Start Docker Desktop only if you choose Docker infra mode."
 else
-  print_info "Docker not found — fine, the recommended embedded mode needs no Docker."
-  print_info "Install Docker Desktop later only if you want the optional Docker infra mode."
+  print_ok "Docker $(docker --version | awk '{print $3}' | tr -d ',')"
 fi
 
 if ! command -v git &>/dev/null; then
@@ -83,7 +83,7 @@ print_step "Cloning Bytebell"
 if [ -d "open-ir/.git" ]; then
   print_info "existing install detected at open-ir/ — leaving it untouched (no git pull)"
 else
-  git clone "$REPO_URL"
+  git clone --branch "$REPO_BRANCH" "$REPO_URL" open-ir
 fi
 cd open-ir
 REPO_DIR="$(pwd)"

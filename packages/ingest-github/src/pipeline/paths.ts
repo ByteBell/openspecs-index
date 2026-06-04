@@ -8,6 +8,7 @@ import {
   metaOutputRootFor,
   orgsRootFor,
   parseGithubOwnerRepo,
+  parseGitlabOwnerRepo,
   repositoryDirFor,
   type RepoLocation as KernelRepoLocation,
 } from "@bb/types";
@@ -122,7 +123,11 @@ async function repoLocationFor(knowledgeId: string, commitHash?: string): Promis
   if (repoUrl === undefined || repoUrl.length === 0) {
     throw new Error(`paths: knowledge ${knowledgeId} has no info.repoUrl`);
   }
-  const parsed = parseGithubOwnerRepo(repoUrl);
+  // GitLab projects can be nested in subgroups, so its owner/repo derivation
+  // differs from GitHub (subgroups collapse into the owner namespace). Both
+  // providers share the on-disk `provider: "github"` segment — the GitLab
+  // ingester writes there too — so only the owner/repo split is host-specific.
+  const parsed = repoUrl.includes("gitlab.com") ? parseGitlabOwnerRepo(repoUrl) : parseGithubOwnerRepo(repoUrl);
   if (parsed === null) {
     throw new Error(`paths: could not parse owner/repo from ${repoUrl}`);
   }

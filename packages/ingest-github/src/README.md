@@ -66,11 +66,14 @@ Domain (composes infra: `@bb/config`, `@bb/llm`, `@bb/mongo`, `@bb/neo4j`,
   that route through this pipeline via an injected `SourceFactory`. The
   kernel `RepoLocation` only has a `github` provider variant today; gitlab
   projects therefore share the github path segment on disk. Subgroup gitlab
-  URLs (`group/sub/project`) collapse to `{ owner: group, repo: sub }` here
-  — consumers that need the full namespace derive it themselves (the GitLab
-  source-factory does this when building its own `RepoLocation`). The same
-  loosening is mirrored in the kernel duplicate `parseGithubOwnerRepo` in
-  `@bb/types/src/path-layout.ts` so both implementations stay consistent.
+  URLs (`group/sub/project`) collapse to `{ owner: group, repo: sub }` in
+  this pull-only helper. For the knowledgeId-keyed resolver
+  ([pipeline/paths.ts](pipeline/paths.ts) `repoLocationFor`) — which the
+  business-context reader uses — gitlab.com URLs now go through the
+  subgroup-aware `parseGitlabOwnerRepo` in `@bb/types/src/path-layout.ts`
+  (`owner="group/sub"`, `repo="project"`) so the read path matches the GitLab
+  source-factory's `deriveOwnerRepo` and resolves the same on-disk directory
+  for nested projects.
 - **[README.md](README.md)** — this file.
 
 ## Subtrees

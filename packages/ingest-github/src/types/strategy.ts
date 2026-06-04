@@ -7,6 +7,12 @@ export interface StrategyContext {
   knowledgeId: string;
   orgId: string;
   repoId: string;
+  /** GitHub owner (e.g. "Dead-Bytes") — same value the clone path used. */
+  owner: string;
+  /** Bare repo name (e.g. "testing") — same value the clone path used. */
+  repo: string;
+  /** Resolved commit hash the clone is checked out to. */
+  commitHash: string;
   /**
    * Per-job LLM credential overrides extracted from the job payload. When
    * present, phases pass these to every `askLLM` / `askJsonLLM` call so the

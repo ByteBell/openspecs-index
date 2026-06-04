@@ -21,6 +21,12 @@ export interface UpsertRepoNodeInput {
   scope: NodeScope;
   repoUrl: string;
   branch: string;
+  /** GitHub owner — persisted to RepoSummary.user_name (matches the on-disk clone path segment). */
+  owner: string;
+  /** Bare repo name — persisted to RepoSummary.repo_name (matches the on-disk clone path segment). */
+  repo: string;
+  /** Resolved commit hash — persisted to RepoSummary.commit_hash and Knowledge.commit_hash. */
+  commitHash: string;
   summary: RepoSummaryPayload;
 }
 
@@ -43,6 +49,7 @@ SET k.org_id = $orgId,
     k.repo_name = $repoName,
     k.display_name = $repoName,
     k.branch_name = $branch,
+    k.commit_hash = $commitHash,
     k.updated_at = $updatedAt
 MERGE (r:Repo {orgId: $orgId, knowledgeId: $knowledgeId, repoId: $repoId})
 SET r.repoUrl = $repoUrl,
@@ -57,8 +64,9 @@ SET r.repoUrl = $repoUrl,
 MERGE (k)-[:HAS_REPO]->(r)
 MERGE (rs:RepoSummary {knowledge_id: $knowledgeId, org_id: $orgId, branch_name: $branch})
 ON CREATE SET rs.generated_at = $updatedAt
-SET rs.repo_name = $repoName,
-    rs.commit_hash = '',
+SET rs.repo_name = $repo,
+    rs.user_name = $owner,
+    rs.commit_hash = $commitHash,
     rs.architecture = $architecture,
     rs.data_flow = $dataFlow,
     rs.key_patterns = $keyPatterns,
@@ -90,6 +98,9 @@ export async function upsertRepoNode(input: UpsertRepoNodeInput): Promise<void> 
     repoId: scope.repoId,
     repoUrl: input.repoUrl,
     repoName: repoNameFromGithubUrl(input.repoUrl),
+    owner: input.owner,
+    repo: input.repo,
+    commitHash: input.commitHash,
     branch: input.branch,
     purpose: input.summary.purpose,
     summary: input.summary.summary,

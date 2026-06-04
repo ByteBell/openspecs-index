@@ -133,3 +133,39 @@ export function parseGithubOwnerRepo(repoUrl: string): { owner: string; repo: st
     return null;
   }
 }
+
+/**
+ * Pure URL parser for GitLab repo URLs that preserves subgroups. GitLab
+ * projects can be nested arbitrarily deep (`group/subgroup/project`); the
+ * canonical project path is "everything up to the last segment as the owner
+ * namespace, last segment as the repo". Returns `null` for non-gitlab.com
+ * hosts or paths with fewer than two segments.
+ *
+ * This MUST stay consistent with `deriveOwnerRepo` in
+ * `@bytebell/.../ingest-gitlab/src/source-factory.ts`, which is what the GitLab
+ * ingester uses to choose the on-disk `<owner>/<repo>` directory segments. The
+ * business-context reader resolves the same path via `repoLocationFor`, so the
+ * two derivations must agree or enrichment reads miss the directory.
+ */
+export function parseGitlabOwnerRepo(repoUrl: string): { owner: string; repo: string } | null {
+  if (repoUrl.length === 0) {
+    return null;
+  }
+  try {
+    const url = new URL(repoUrl);
+    if (!url.hostname.endsWith("gitlab.com")) {
+      return null;
+    }
+    const segments = url.pathname.split("/").filter((s) => s.length > 0);
+    if (segments.length < 2) {
+      return null;
+    }
+    const repoRaw = segments[segments.length - 1];
+    if (repoRaw === undefined) {
+      return null;
+    }
+    return { owner: segments.slice(0, -1).join("/"), repo: repoRaw.replace(/\.git$/u, "") };
+  } catch {
+    return null;
+  }
+}
