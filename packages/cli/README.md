@@ -40,6 +40,17 @@ indexing, configuration, server lifecycle, and inspection.
   `~/.bytebell/config.json` via `@bb/config.setConfigValue`. Type
   coercion + Zod validation + atomic `tmp → fsync → rename`. Sole
   sanctioned write path per [docs/arch.md:140](../../docs/arch.md#L140).
+- `bytebell set mode <docker|embedded>` — preset switch (not a single
+  config key). Sets the three `db/graph/queue` provider keys at once via
+  `applyInfraMode()` and then auto-fills the per-service config the new
+  providers need (`applyInfraDefaults()` in `infraDefaults.ts`): **docker**
+  fills the mongo/neo4j/redis URIs, neo4j user and a random neo4j password;
+  **embedded** fills the sqlite/ladybug/queue file paths under
+  `~/.bytebell`. Values the user already set are left untouched, so the
+  switch is non-destructive. With no value it toggles to the other preset
+  (like the provider toggle keys). This is the headless equivalent of the
+  setup form's Infrastructure selector — switching mode no longer requires
+  setting each service key by hand.
 - `bytebell set` (no args) — Ink setup form. Presents a single
   **Infrastructure** toggle (`docker|embedded`, default `docker`, embedded
   labelled "recommended"). In
@@ -47,9 +58,11 @@ indexing, configuration, server lifecycle, and inspection.
   Redis text fields (with field-level format validation) plus Port /
   GitHub-concurrency / OpenRouter fields; in Embedded mode the
   mongo/neo4j/redis rows are hidden and not required. On submit, the
-  mode expands to the three provider keys via `applyInfraMode()` and
+  mode expands to the three provider keys via `applyInfraMode()` (which
+  also auto-fills any per-service default the providers need) and then
   every visible value is applied atomically through the same
-  `setConfigValue` path. Esc cancels.
+  `setConfigValue` path — so explicit form entries override the
+  auto-filled defaults. Esc cancels.
 - `bytebell boot` — one-command bring-up. Refuses to proceed if
   `openrouter_api_key` or `openrouter_model` is blank (with the
   matching `bytebell set …` hint). Whether Docker is started is derived
