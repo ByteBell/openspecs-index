@@ -28,7 +28,9 @@ Bytebell runs in one of two presets, **derived from the `db-provider` / `graph-p
 
 ---
 
-## Core infrastructure
+## Docker-mode infrastructure
+
+These apply only in **Docker mode** (or when bringing your own Mongo / Neo4j / Redis). The default **embedded** stack uses none of them — its stores are local files (see [Storage & queue backends](#storage--queue-backends)). `port` is the local server / MCP port and applies to both modes.
 
 | Key              | Sets                    | Default                          | Notes                          |
 | ---------------- | ----------------------- | -------------------------------- | ------------------------------ |
@@ -64,15 +66,17 @@ Bytebell runs in one of two presets, **derived from the `db-provider` / `graph-p
 
 ## Storage & queue backends
 
-| Key                  | Sets                          | Default       | Notes                              |
-| -------------------- | ----------------------------- | ------------- | ---------------------------------- |
-| `db-provider`        | Document store backend        | `mongo`       | toggle: `mongo` ⇄ `sqlite`         |
-| `graph-provider`     | Graph store backend           | `neo4j`       | toggle: `neo4j` ⇄ `ladybug`        |
-| `queue-provider`     | Job queue backend             | `bullmq`      | toggle: `bullmq` ⇄ `honker`        |
-| `ingestion-strategy` | Active ingestion strategy     | `flat-folder` | toggle: `flat-folder` ⇄ `concept-graph` |
-| `queue-db-path`      | Queue DB path (non-Redis queue) | _(blank)_   |                                    |
-| `sqlite-path`        | SQLite DB path (db=sqlite)    | _(blank)_     |                                    |
-| `ladybug-path`       | LadybugDB path (graph=ladybug) | _(blank)_    |                                    |
+`bytebell setup` configures the **embedded** stack — the default: `sqlite` / `ladybug` / `honker`, all local files. (If you skip `setup`, the raw config fallback is the Docker stack: `mongo` / `neo4j` / `bullmq`.)
+
+| Key                  | Sets                            | Default (embedded)         | Toggle                          |
+| -------------------- | ------------------------------- | -------------------------- | ------------------------------- |
+| `db-provider`        | Document store backend          | **`sqlite`**               | `sqlite` ⇄ `mongo`              |
+| `graph-provider`     | Graph store backend             | **`ladybug`**              | `ladybug` ⇄ `neo4j`             |
+| `queue-provider`     | Job queue backend               | **`honker`**               | `honker` ⇄ `bullmq`             |
+| `ingestion-strategy` | Active ingestion strategy       | `flat-folder`              | `flat-folder` ⇄ `concept-graph` |
+| `sqlite-path`        | SQLite DB path (embedded)       | `~/.bytebell/data.sqlite`  | auto-filled by setup            |
+| `ladybug-path`       | LadybugDB path (embedded)       | `~/.bytebell/ladybug.lbug` | auto-filled by setup            |
+| `queue-db-path`      | Honker queue DB path (embedded) | `~/.bytebell/queue.db`     | auto-filled by setup            |
 
 ---
 

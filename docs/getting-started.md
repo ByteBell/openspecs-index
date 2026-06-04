@@ -48,7 +48,7 @@ bytebell setup
 The wizard asks a few quick things, then takes over:
 
 1. **LLM provider** — OpenRouter (paste an API key + model like `anthropic/claude-sonnet-4.6`) or a local Ollama model (free).
-2. **Infrastructure** — **Embedded (no Docker)** is the default and recommended: SQLite + LadybugDB + Honker, all local files. Or choose **Docker** (Mongo + Neo4j + Redis).
+2. **Infrastructure** — **Embedded (no Docker)** is the default: SQLite + LadybugDB + Honker, all local files. Or choose **Docker** (Mongo + Neo4j + Redis).
 3. **Repo** — paste a GitHub URL to index now, or skip and add one later. Private repo? It'll ask for a token. Want a specific branch? It'll let you pick.
 
 From there it runs on its own — **boots Bytebell, indexes your repo, and shows live progress.** The part that feels like magic:
@@ -107,7 +107,7 @@ Full reference: [commands.md](commands.md). All settings: [configuration.md](con
 
 ## Running with Docker instead (optional)
 
-**Everything above uses embedded mode — the recommended default, no Docker.** You only need this section if you'd rather run the server databases (Mongo + Neo4j + Redis).
+**Everything above uses embedded mode — the default, no Docker.** You only need this section if you'd rather run the server databases (Mongo + Neo4j + Redis).
 
 Choose **Docker** at the infrastructure step of `bytebell setup`, or switch any time:
 

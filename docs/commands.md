@@ -33,7 +33,7 @@ Run `bytebell --help` or `bytebell <command> --help` for the live list. Global f
 Interactive first-run wizard (requires a terminal — it won't run piped). It walks you through, in order:
 
 1. **LLM provider** — OpenRouter (API key + model) or Ollama (URL + model).
-2. **Infrastructure** — **Embedded** (SQLite + LadybugDB + Honker, no Docker; the recommended default) or **Docker** (Mongo + Neo4j + Redis).
+2. **Infrastructure** — **Embedded** (SQLite + LadybugDB + Honker, no Docker; the default) or **Docker** (Mongo + Neo4j + Redis).
 3. **Repo** — optionally paste a GitHub URL to index right away.
 
 It then boots Bytebell, indexes your repo, and wires the MCP endpoint into your detected editors.

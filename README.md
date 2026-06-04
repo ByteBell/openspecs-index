@@ -1,6 +1,31 @@
-# Bytebell [bytebell.ai]
+<div align="center">
 
-> **No database, no Docker.** Bytebell's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
+<!-- Hero banner — drop your image at docs/assets/bytebell-banner.png, then uncomment:
+<img src="docs/assets/bytebell-banner.png" alt="Bytebell" width="680" />        to be made
+-->
+
+# Bytebell
+
+### A code knowledge graph for your AI coding agent
+
+**Local-first** &nbsp;·&nbsp; **Embedded by Default** &nbsp;·&nbsp; **No Telemetry**
+
+[**Get Started**](docs/getting-started.md) &nbsp;·&nbsp; [Commands](docs/commands.md) &nbsp;·&nbsp; [Configuration](docs/configuration.md) &nbsp;·&nbsp; [Architecture](docs/arch.md) &nbsp;·&nbsp; [Comparison](comparison.md) &nbsp;·&nbsp; [bytebell.ai](https://bytebell.ai)
+
+[![license](https://img.shields.io/badge/license-AGPL--3.0%20%2B%20NC-1f6feb?style=flat-square)](LICENSE)
+&nbsp;[![Bun](https://img.shields.io/badge/runtime-Bun%20%E2%89%A5%201.1-14151a?style=flat-square&logo=bun&logoColor=white)](https://bun.sh)
+&nbsp;[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.base.json)
+&nbsp;[![MCP](https://img.shields.io/badge/MCP-ready-8a2be2?style=flat-square)](docs/getting-started.md)
+
+</div>
+
+---
+
+> Your AI agent can't read your whole codebase, so it guesses. **Bytebell builds it a queryable map.** Point `bytebell` at a repo and it builds an LLM-enriched knowledge graph — every file's purpose, summary, business context, classes, and imports — then serves it over **MCP** to Claude Code, Cursor, and any MCP client. Everything runs on your machine; nothing leaves it except the calls to the model you choose.
+
+## Run it in 5 minutes
+
+> Bytebell's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
 
 **You need:** [Bun](https://bun.sh) ≥ 1.1, git, and an [OpenRouter](https://openrouter.ai) API key _or_ a local [Ollama](https://ollama.com) model.
 

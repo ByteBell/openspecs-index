@@ -48,9 +48,9 @@ Kernel            types, errors
 
 Several infrastructure and strategy concerns are pluggable behind a provider abstraction, selected by configuration rather than by code change:
 
-- **Document store** — `db-provider`: Mongo (default) or SQLite.
-- **Graph store** — `graph-provider`: Neo4j (default) or LadybugDB.
-- **Queue** — `queue-provider`: BullMQ (default) or Honker.
+- **Document store** — `db-provider`: SQLite (embedded, default) or Mongo.
+- **Graph store** — `graph-provider`: LadybugDB (embedded, default) or Neo4j.
+- **Queue** — `queue-provider`: Honker (embedded, default) or BullMQ.
 - **Ingestion strategy** — `ingestion-strategy`: flat-folder (default) or concept-graph.
 - **LLM backend** — `llm-provider`: OpenRouter (default) or Ollama.
 
@@ -58,10 +58,10 @@ A disabled provider degrades gracefully — it does not throw at import time. Se
 
 **Infrastructure presets.** Infra mode is not a stored flag — it is _derived_ from the three storage/queue providers ([infraMode.ts](../packages/cli/src/infraMode.ts)). Two coherent presets exist:
 
-- **`embedded`** (recommended default) — SQLite + LadybugDB + Honker. Every store is a local file under `~/.bytebell` (`data.sqlite`, `ladybug.lbug`, `queue.db`); **no Docker**.
+- **`embedded`** (default) — SQLite + LadybugDB + Honker. Every store is a local file under `~/.bytebell` (`data.sqlite`, `ladybug.lbug`, `queue.db`); **no Docker**.
 - **`docker`** — Mongo + Neo4j + Redis, brought up as local containers.
 
-`isEmbedded()` is true when no active provider needs a container. `bytebell boot` checks it: in embedded mode it skips Docker entirely; otherwise it starts only the containers the chosen providers require (e.g. choosing Honker drops the Redis container). The `bytebell setup` wizard offers the two presets and defaults to embedded.
+`isEmbedded()` is true when no active provider needs a container. `bytebell boot` checks it: in embedded mode it skips Docker entirely; otherwise it starts only the containers the chosen providers require (e.g. choosing Honker drops the Redis container). The `bytebell setup` wizard offers the two presets and defaults to **embedded**. (At the raw config-schema level, if you skip `setup`, the providers fall back to the Docker stack.)
 
 ---
 
