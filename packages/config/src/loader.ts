@@ -8,7 +8,7 @@ import {
   readField,
   requiredKeysFor,
 } from "./schema.ts";
-import { __registerCacheInvalidator, getConfigPath } from "./paths.ts";
+import { __registerCacheInvalidator, getConfigPath, getApiKeyPath } from "./paths.ts";
 import { ensureBytebellHome } from "./writer.ts";
 
 let cached: BytebellConfig | null = null;
@@ -43,8 +43,24 @@ export function loadConfig(): BytebellConfig {
   ensureBytebellHome();
   const raw = fs.readFileSync(getConfigPath(), "utf8");
   const parsed: unknown = JSON.parse(raw);
-  cached = configSchema.parse(parsed);
+  const cfg = configSchema.parse(parsed);
+  if (cfg.openrouter_api_key.length === 0) {
+    const fromPem = readApiKeyPem();
+    if (fromPem.length > 0) {
+      cfg.openrouter_api_key = fromPem;
+    }
+  }
+  cached = cfg;
   return cached;
+}
+
+function readApiKeyPem(): string {
+  try {
+    const content = fs.readFileSync(getApiKeyPath(), "utf8").trim();
+    return content.length > 0 ? content : "";
+  } catch {
+    return "";
+  }
 }
 
 export function getConfigValue<K extends Config>(key: K): ConfigValue<K> {

@@ -9,6 +9,7 @@ export { setConfigValue, ensureBytebellHome, ConfigSeededError } from "./writer.
 export {
   getBytebellHome,
   getConfigPath,
+  getApiKeyPath,
   isDevMode,
   setBytebellHomeResolver,
   __setBytebellHomeForTests,

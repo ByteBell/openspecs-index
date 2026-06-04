@@ -1,5 +1,6 @@
-import { LLM_PROVIDERS, LOG_LEVELS, setConfigValue, type LlmProvider, type LogLevel } from "@bb/config";
+import { LLM_PROVIDERS, LOG_LEVELS, setConfigValue, type LlmProvider, type LogLevel, getApiKeyPath } from "@bb/config";
 import { Config } from "@bb/types";
+import fs from "node:fs";
 
 type Setter = (raw: string) => void;
 
@@ -103,7 +104,11 @@ export const KEY_MAP: Record<string, KeyEntry> = {
   "openrouter-api-key": {
     configKey: Config.OpenrouterApiKey,
     redact: true,
-    setter: (s) => setConfigValue(Config.OpenrouterApiKey, s),
+    setter: (s) => {
+      const pemPath = getApiKeyPath();
+      fs.writeFileSync(pemPath, s, { mode: 0o600 });
+      setConfigValue(Config.OpenrouterApiKey, "");
+    },
   },
   "openrouter-model": {
     configKey: Config.OpenrouterModel,
