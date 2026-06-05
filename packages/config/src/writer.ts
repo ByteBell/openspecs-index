@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { configSchema, Config, type BytebellConfig, type ConfigValue, DEFAULT_CONFIG, writeField } from "./schema.ts";
+import { encryptSensitiveFields } from "./crypto.ts";
 import { __isSeeded } from "./loader.ts";
 import { getBytebellHome, getConfigPath, __notifyConfigChanged } from "./paths.ts";
 
@@ -22,7 +23,8 @@ function readConfigFile(): BytebellConfig {
 function atomicWrite(cfg: BytebellConfig): void {
   const target = getConfigPath();
   const tmp = `${target}.tmp`;
-  const json = `${JSON.stringify(cfg, null, 2)}\n`;
+  const encrypted = encryptSensitiveFields(cfg as Record<string, unknown>);
+  const json = `${JSON.stringify(encrypted, null, 2)}\n`;
   const fd = fs.openSync(tmp, "w", FILE_MODE);
   try {
     fs.writeSync(fd, json);

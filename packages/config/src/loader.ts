@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { decryptSensitiveFields } from "./crypto.ts";
 import {
   configSchema,
   Config,
@@ -43,7 +44,8 @@ export function loadConfig(): BytebellConfig {
   ensureBytebellHome();
   const raw = fs.readFileSync(getConfigPath(), "utf8");
   const parsed: unknown = JSON.parse(raw);
-  cached = configSchema.parse(parsed);
+  const decrypted = decryptSensitiveFields(parsed as Record<string, unknown>);
+  cached = configSchema.parse(decrypted);
   return cached;
 }
 
