@@ -64,7 +64,7 @@ export function makeFileTransport(scope: string): DailyRotateFile {
 export function makeRepoFileTransport(filePath: string, knowledgeId: string): winston.transports.FileTransportInstance {
   return new winston.transports.File({
     filename: filePath,
-    options: { mode: FILE_MODE },
+    options: { flags: "a", mode: FILE_MODE },
     format: winston.format.combine(repoFilter(knowledgeId), fileFormat()),
   });
 }

@@ -22,6 +22,10 @@ export interface RepoLogOptions {
 interface ActiveRepoLog {
   readonly activePath: string;
   readonly stem: string;
+  /** True while a `withRepoLog` run owns an open transport on `activePath`. */
+  running: boolean;
+  /** A settle fired while `running` — the move is deferred to the run's finally. */
+  settlePending: boolean;
 }
 
 /**
@@ -60,7 +64,7 @@ export async function withRepoLog<T>(opts: RepoLogOptions, fn: () => Promise<T>)
   ensureRepoLogDirs();
   const stem = sanitize(opts.label);
   const activePath = path.join(getRepoLogsDir(), `${stem}.log`);
-  activeByKnowledge.set(opts.knowledgeId, { activePath, stem });
+  activeByKnowledge.set(opts.knowledgeId, { activePath, stem, running: true, settlePending: false });
   appendBanner(activePath, opts.knowledgeId);
   const logger = getLogger("server");
   const transport = makeRepoFileTransport(activePath, opts.knowledgeId);
@@ -70,6 +74,17 @@ export async function withRepoLog<T>(opts: RepoLogOptions, fn: () => Promise<T>)
   } finally {
     logger.remove(transport);
     await flushTransport(transport);
+    // The transport is now detached and flushed, so the file is no longer being
+    // written. If a settle arrived mid-run (e.g. a cancel of an in-flight job),
+    // honour it now — moving the file while the transport was still open would
+    // archive a file that's still being written (and throws on Windows).
+    const entry = activeByKnowledge.get(opts.knowledgeId);
+    if (entry !== undefined) {
+      entry.running = false;
+      if (entry.settlePending) {
+        finalizeSettle(opts.knowledgeId);
+      }
+    }
   }
 }
 
@@ -81,23 +96,58 @@ export async function withRepoLog<T>(opts: RepoLogOptions, fn: () => Promise<T>)
  * Safe to call repeatedly and for any knowledgeId: it is a no-op when no
  * in-flight log is registered (e.g. job types that don't use `withRepoLog`, or
  * a second settle signal for an already-archived run).
+ *
+ * If the run is still executing (a cancel raced the handler), the move is
+ * deferred to that run's `finally` rather than yanking the file out from under
+ * an open transport.
  */
 export function settleRepoLog(knowledgeId: string): void {
   const entry = activeByKnowledge.get(knowledgeId);
   if (entry === undefined) {
     return;
   }
-  activeByKnowledge.delete(knowledgeId);
-  if (!fs.existsSync(entry.activePath)) {
+  if (entry.running) {
+    // The run still owns an open transport on activePath. Defer the move to
+    // withRepoLog's finally (which runs after flush + detach). Marking instead
+    // of moving avoids renaming a file that is still being appended to.
+    entry.settlePending = true;
     return;
   }
-  // Labels embed the knowledgeId, so the archive name is unique per job — a
-  // plain rename can't clobber another repo's consolidated log.
+  finalizeSettle(knowledgeId);
+}
+
+/**
+ * Performs the actual `repos/` → `archive/` move for a settled, no-longer-running
+ * entry. The registry entry is forgotten **only after** the move succeeds, so a
+ * failed move (cross-device, locked file on Windows) leaves the file in `repos/`
+ * with its entry intact for a later settle signal to retry — rather than being
+ * orphaned by a delete that ran before the move.
+ */
+function finalizeSettle(knowledgeId: string): void {
+  const entry = activeByKnowledge.get(knowledgeId);
+  if (entry === undefined) {
+    return;
+  }
+  if (!fs.existsSync(entry.activePath)) {
+    activeByKnowledge.delete(knowledgeId);
+    return;
+  }
   const archivePath = path.join(getArchiveLogsDir(), `${entry.stem}.log`);
   try {
-    fs.renameSync(entry.activePath, archivePath);
+    if (fs.existsSync(archivePath)) {
+      // A prior run already archived this repo (the stem is knowledgeId-derived,
+      // so a re-index reuses it). Append this run's lines onto the existing
+      // archive so it stays the one durable, in-order record per repo instead of
+      // being clobbered by a plain rename.
+      fs.appendFileSync(archivePath, fs.readFileSync(entry.activePath), { mode: FILE_MODE });
+      fs.unlinkSync(entry.activePath);
+    } else {
+      fs.renameSync(entry.activePath, archivePath);
+    }
+    activeByKnowledge.delete(knowledgeId);
   } catch {
-    // Best-effort: leave the file in repos/ rather than throw from a queue hook.
+    // Best-effort: keep both the file and its registry entry so the next settle
+    // signal can retry, rather than throwing from a queue hook.
   }
 }
 

@@ -71,6 +71,20 @@ It is idempotent and a no-op for knowledgeIds without an in-flight per-repo log
 the queue knows whether a failed attempt will be retried — the per-attempt
 handler just throws.
 
+Two safety properties govern the move:
+
+- **Never moves a file that's still being written.** If `settleRepoLog` fires
+  while a `withRepoLog` run is still executing (a cancel that races the handler),
+  the move is _deferred_ to that run's `finally` — which runs after the transport
+  is detached and flushed. The file is not renamed out from under an open stream
+  (which would also throw on Windows).
+- **Append-merges, never clobbers.** If an `archive/<label>.log` already exists
+  (a re-index reuses the knowledgeId-derived stem), the run's lines are appended
+  onto it rather than overwriting — so the archive stays the single, in-order
+  record across re-submissions. The in-flight registry entry is forgotten **only
+  after** the move succeeds, so a failed move leaves the file in `repos/` for a
+  later settle to retry instead of orphaning it.
+
 `logger` (the default export) is a Proxy that lazily resolves to
 `getLogger("server")` on every access — necessary because the resolved logger
 may change after `seedLoggerFactory` is called by a parent process.
@@ -121,10 +135,12 @@ handled gracefully.
    never lines from a concurrent run sharing the same process and logger.
 7. **Repo logs are additive.** `withRepoLog` only _adds_ a transport; it never
    removes or mutates the scope/console sinks, so the global log is unaffected.
-8. **A repo is in exactly one of `repos/` or `archive/`.** `withRepoLog` never
-   archives; `settleRepoLog` moves the single file. While a job lives (including
-   between retries) it is in `repos/`; once terminal it is in `archive/`.
-   Settlement is the queue's call — only it knows if a failed attempt will retry.
+8. **A repo is in exactly one of `repos/` or `archive/`.** While a job lives
+   (including between retries) it is in `repos/`; once terminal it is in
+   `archive/`. Settlement is the queue's call — only it knows if a failed attempt
+   will retry. `settleRepoLog` performs the move, but defers it to the run's
+   `finally` if the run is still executing, so the file is never moved while its
+   transport is open.
 
 ## Data ownership
 
