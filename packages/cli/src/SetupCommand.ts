@@ -95,6 +95,7 @@ function applyConfig(result: InstallWizardResult): void {
   providerEntry.setter(result.provider);
 
   if (result.provider === "openrouter") {
+    // keyEntry.setter routes the API key to the OS keychain (see keyMap.ts).
     const keyEntry = KEY_MAP["openrouter-api-key"];
     const modelEntry = KEY_MAP["openrouter-model"];
     if (keyEntry === undefined) {

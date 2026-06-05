@@ -86,6 +86,8 @@ export function applyInfraDefaults(): ApplyDefaultsResult {
       continue;
     }
     const value = entry.computeDefault();
+    // Secret keys (e.g. an auto-generated Neo4j password) route to the OS keychain
+    // via their KEY_MAP setter, so a routine boot leaves no plaintext secret.
     const setter = KEY_MAP[entry.cliKey];
     if (setter === undefined) {
       throw new Error(`internal: KEY_MAP entry "${entry.cliKey}" missing`);

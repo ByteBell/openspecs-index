@@ -6,10 +6,13 @@ import {
   type ConfigValue,
   HINTS,
   readField,
+  writeField,
   requiredKeysFor,
 } from "./schema.ts";
+import { SecretSource } from "@bb/types";
 import { __registerCacheInvalidator, getConfigPath, resolveUnderHome } from "./paths.ts";
 import { ensureBytebellHome } from "./writer.ts";
+import { getSecret, SECRET_KEYS } from "./keychain.ts";
 
 let cached: BytebellConfig | null = null;
 let seeded = false;
@@ -43,8 +46,51 @@ export function loadConfig(): BytebellConfig {
   ensureBytebellHome();
   const raw = fs.readFileSync(getConfigPath(), "utf8");
   const parsed: unknown = JSON.parse(raw);
-  cached = configSchema.parse(parsed);
+  cached = overlaySecrets(configSchema.parse(parsed));
   return cached;
+}
+
+/**
+ * For each secret key left empty in `config.json`, overlay the value stored in
+ * the OS keychain. A non-empty plaintext value always wins (legacy / warned
+ * fallback), so every downstream reader sees the resolved secret transparently.
+ */
+function overlaySecrets(cfg: BytebellConfig): BytebellConfig {
+  let next = cfg;
+  for (const key of SECRET_KEYS) {
+    const current = readField(next, key);
+    if (typeof current === "string" && current.length === 0) {
+      const secret = getSecret(key);
+      if (secret !== null && secret.length > 0) {
+        next = writeField(next, key, secret as ConfigValue<typeof key>);
+      }
+    }
+  }
+  return next;
+}
+
+/**
+ * Where a secret's live value comes from — see {@link SecretSource}. A non-empty
+ * plaintext value in `config.json` wins (and is a security smell boot warns
+ * about); otherwise the OS keychain; otherwise it is unset.
+ */
+export function getSecretSource(key: Config): SecretSource {
+  if (readPlaintextSecret(key).length > 0) {
+    return SecretSource.Plaintext;
+  }
+  const secret = getSecret(key);
+  return secret !== null && secret.length > 0 ? SecretSource.Keychain : SecretSource.Missing;
+}
+
+/** Read a secret's raw plaintext value straight from `config.json`, bypassing the keychain overlay. */
+function readPlaintextSecret(key: Config): string {
+  try {
+    const parsed = configSchema.parse(JSON.parse(fs.readFileSync(getConfigPath(), "utf8")));
+    const value = readField(parsed, key);
+    return typeof value === "string" ? value : "";
+  } catch {
+    return "";
+  }
 }
 
 /** Path-valued keys whose stored value is resolved to an absolute path on read. */

@@ -154,7 +154,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.Neo4jUser]: "bytebell set neo4j-user <user>",
   [Config.Neo4jPassword]: "bytebell set neo4j-password <pwd>",
   [Config.RedisUrl]: "bytebell set redis <url>",
-  [Config.OpenrouterApiKey]: "bytebell keys set",
+  [Config.OpenrouterApiKey]: "bytebell set openrouter-api-key <key>",
   [Config.OpenrouterModel]: "bytebell models set <model-id>",
   [Config.OpenrouterFallbackModel1]: "bytebell set openrouter-fallback-model-1 <model-id>",
   [Config.OpenrouterFallbackModel2]: "bytebell set openrouter-fallback-model-2 <model-id>",

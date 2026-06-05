@@ -1,4 +1,4 @@
-import { LLM_PROVIDERS, LOG_LEVELS, setConfigValue, type LlmProvider, type LogLevel } from "@bb/config";
+import { LLM_PROVIDERS, LOG_LEVELS, setConfigValue, storeSecret, type LlmProvider, type LogLevel } from "@bb/config";
 import { Config, DbProviderType, GraphProviderType, IngestionStrategyType, QueueProviderType } from "@bb/types";
 
 type Setter = (raw: string) => void;
@@ -90,7 +90,8 @@ export const KEY_MAP: Record<string, KeyEntry> = {
   "neo4j-password": {
     configKey: Config.Neo4jPassword,
     redact: true,
-    setter: (s) => setConfigValue(Config.Neo4jPassword, s),
+    // Secret: store in the OS keychain (plaintext fallback only without a backend).
+    setter: (s) => storeSecret(Config.Neo4jPassword, s),
   },
   redis: {
     configKey: Config.RedisUrl,
@@ -120,7 +121,8 @@ export const KEY_MAP: Record<string, KeyEntry> = {
   "openrouter-api-key": {
     configKey: Config.OpenrouterApiKey,
     redact: true,
-    setter: (s) => setConfigValue(Config.OpenrouterApiKey, s),
+    // Secret: store in the OS keychain (plaintext fallback only without a backend).
+    setter: (s) => storeSecret(Config.OpenrouterApiKey, s),
   },
   "openrouter-model": {
     configKey: Config.OpenrouterModel,

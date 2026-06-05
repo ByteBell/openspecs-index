@@ -2,8 +2,15 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import express from "express";
-import { Config, DbProviderType, GraphProviderType, QueueProviderType, type Config as ConfigEnum } from "@bb/types";
-import { getBytebellHome, getConfigValue, HINTS } from "@bb/config";
+import {
+  Config,
+  DbProviderType,
+  GraphProviderType,
+  QueueProviderType,
+  SecretSource,
+  type Config as ConfigEnum,
+} from "@bb/types";
+import { getBytebellHome, getConfigValue, getSecretSource, HINTS, SECRET_KEYS } from "@bb/config";
 import { connectDb } from "@bb/db";
 import { connectGraph, indexesGraph } from "@bb/graph-db";
 import { connectQueue, resumeOrphans } from "@bb/queue";
@@ -87,8 +94,24 @@ function checkRequiredConfig(): void {
   }
 }
 
+/**
+ * Warn (do not fail) when a secret is still sitting in plaintext in config.json.
+ * No silent migration — re-running `bytebell set <key> <value>` re-stores it in
+ * the OS keychain (when a backend is available).
+ */
+function warnPlaintextSecrets(): void {
+  for (const key of SECRET_KEYS) {
+    if (getSecretSource(key) === SecretSource.Plaintext) {
+      process.stderr.write(
+        `⚠ ${key} is stored in plaintext in config.json. Re-run "bytebell set ${key} <value>" to move it to the OS keychain.\n`,
+      );
+    }
+  }
+}
+
 async function main(): Promise<void> {
   checkRequiredConfig();
+  warnPlaintextSecrets();
   const dbProvider = getConfigValue(Config.DbProvider);
   await connectDb(dbProvider);
   // Self-heal the legacy on-disk layout: migrate what has a DB record, drop

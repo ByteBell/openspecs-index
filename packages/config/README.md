@@ -17,8 +17,35 @@ Single source of truth for runtime settings stored in
 - Memoized in-process load
 - Atomic, validating writes via `setConfigValue`
 - Required-field completeness check with CLI-hint strings
+- OS-keychain storage for secrets (`SECRET_KEYS`), with a transparent
+  read-overlay and a warned plaintext fallback
 
 This package does **not** read from `process.env` and never will.
+
+### Secrets (OS keychain)
+
+`SECRET_KEYS` = { `openrouter_api_key`, `neo4j_password` } — the only persisted
+secrets. Their live value is stored in the OS keychain (macOS Keychain, Linux
+Secret Service, Windows Credential Manager) under service `"bytebell"`, account
+= the `Config` enum value. `config.json` holds an **empty string** for a
+keychain-backed secret.
+
+Read path: `loadConfig()` overlays each empty secret field with its keychain
+value, so `getConfigValue`, `isConfigComplete`, and every downstream reader
+resolve the secret transparently — no caller changes. Resolution order per
+secret: **non-empty plaintext in `config.json` wins** (legacy / warned
+fallback) → else keychain → else empty (`missing`).
+
+Public surface: `getSecret` / `setSecret` / `deleteSecret` /
+`isKeychainAvailable` / `isSecretKey` / `KeychainUnavailableError` (keychain
+primitives), `storeSecret` (composes keychain with the config writer),
+and `getSecretSource(key) → SecretSource` (`Plaintext` | `Keychain` | `Missing`,
+the `@bb/types` enum — for boot/CLI warnings). `storeSecret` writes to the keychain and clears any
+plaintext copy; if no keychain backend exists it writes plaintext and returns
+`"plaintext"` so the caller can warn. The `@bb/cli` `set` command's secret-key
+setters call `storeSecret`, so `bytebell set openrouter-api-key …`
+stores to the keychain with no separate command. Seeded/test configs never touch
+the keychain (`seedConfig` bypasses the overlay).
 
 `setBytebellHomeResolver` registers an override function invoked on every
 `getBytebellHome()` call (no caching). The resolver returns the home directory
@@ -64,11 +91,11 @@ Anything not in this list is internal — do not import from subpaths.
 - `~/.bytebell/` directory creation (mode `0700`)
 - `~/.bytebell/config.json` content + atomic writes (mode `0600`)
 - Default values for every config key
+- OS-keychain entries for `SECRET_KEYS` (service `"bytebell"`)
 
 This package does **not** own:
 
 - `~/.bytebell/install_id` — assigned to a later package
-- `~/.bytebell/keys.json` — out of scope for v0
 - `~/.bytebell/logs/` — `@bb/logger`
 - `~/.bytebell/cost-ledger.sqlite` — `@bb/llm`
 
@@ -86,14 +113,17 @@ This package does **not** own:
    `isConfigComplete()` rather than thrown by the loader.
 5. **Atomic writes.** Every write is `tmp → fsync → rename`. A crash mid-write
    leaves the previous `config.json` intact.
-6. **File mode `0600`.** `config.json` contains the OpenRouter API key in
-   plaintext (v0 decision); the file is owner-read/write only.
+6. **File mode `0600`.** `config.json` is owner-read/write only. Secrets in
+   `SECRET_KEYS` are stored in the OS keychain, not `config.json`; a plaintext
+   secret only remains as a legacy/keychain-less fallback and triggers a boot
+   warning recommending a re-run of `bytebell set <key> <value>`.
 7. **No public file paths besides home + config.** Other files under
    `~/.bytebell/` are not addressed by this package.
 
 ## External dependencies
 
 - `zod` — runtime schema + parsing
+- `@napi-rs/keyring` — synchronous OS-keychain access for `SECRET_KEYS`
 - Node built-ins — `node:fs`, `node:os`, `node:path`
 
 No HTTP, no DB, no logger. This package boots before everything else.
@@ -101,7 +131,8 @@ No HTTP, no DB, no logger. This package boots before everything else.
 ## What is intentionally out of scope
 
 - `install_id` generation/reading (deferred ownership)
-- OS keychain / `keys.json` / encrypted secrets
+- Encrypting non-secret connection URIs that may embed credentials
+  (`mongo_uri`, `neo4j_uri`, `redis_url`) — not in `SECRET_KEYS`
 - Logger initialization
 - A `bytebell set` CLI command (lives in `@bb/cli`; uses `setConfigValue`
   primitive)
