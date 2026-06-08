@@ -1,8 +1,8 @@
-# Bytebell — Architecture
+# Open-IR — Architecture
 
 > **Status: review draft.** This document was reconstructed from [CLAUDE.md](../CLAUDE.md) (the authoritative source for _intent_) and the current package layout. Several package `README.md` files link here with line numbers from an earlier version of this file; those anchors should be re-pointed to the section headings below. Treat CLAUDE.md as authoritative wherever the two disagree, and update both in the same PR.
 
-Bytebell-public is an open-source, **single-tenant, local-first** knowledge engine. It ingests source repositories into a durable knowledge graph and serves them through an MCP retrieval surface — all from a single Bun process on the user's own machine. There is exactly one tenant (`orgId="local"`), no auth, and no outbound calls except to the user-selected LLM backend.
+Open-IR is an open-source, **single-tenant, local-first** knowledge engine. It ingests source repositories into a durable knowledge graph and serves them through an MCP retrieval surface — all from a single Bun process on the user's own machine. There is exactly one tenant (`orgId="local"`), no auth, and no outbound calls except to the user-selected LLM backend.
 
 This document describes **what** the system is and **why** it is shaped this way. The enforceable rules (file size, tier boundaries, env-var policy, license) live in [CLAUDE.md](../CLAUDE.md); the command surface lives in [commands.md](commands.md); settings live in [configuration.md](configuration.md).
 
@@ -118,6 +118,6 @@ Knowledge entities are immutable once `PROCESSED`: new versions are written, nev
 
 ## Distribution
 
-Bytebell defaults to **embedded** infrastructure — SQLite + LadybugDB + Honker in local files under `~/.bytebell`, so a fresh install runs with **no Docker and no external services**. Users who prefer the server databases choose **Docker mode** (Mongo + Neo4j + Redis), provisioned locally by `bytebell boot` or pointed at their own instances. The engine makes no telemetry or phone-home calls; distribution is a single Bun process plus whichever data stores the user selects — there is no hosted control plane in the OSS edition.
+Open-IR defaults to **embedded** infrastructure — SQLite + LadybugDB + Honker in local files under `~/.bytebell`, so a fresh install runs with **no Docker and no external services**. Users who prefer the server databases choose **Docker mode** (Mongo + Neo4j + Redis), provisioned locally by `bytebell boot` or pointed at their own instances. The engine makes no telemetry or phone-home calls; distribution is a single Bun process plus whichever data stores the user selects — there is no hosted control plane in the OSS edition.
 
 For the enforceable contribution rules and invariants, see [CLAUDE.md](../CLAUDE.md).

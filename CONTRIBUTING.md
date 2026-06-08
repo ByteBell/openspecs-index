@@ -1,4 +1,4 @@
-# Contributing to Bytebell-public
+# Contributing to Open-IR
 
 Thanks for contributing. This document describes the automated checks that run on every commit and push, what each check enforces, and how to recover when one fails.
 

@@ -1,6 +1,6 @@
-# Bytebell CLI — Commands
+# Open-IR CLI — Commands
 
-`bytebell` is the interactive CLI. Commands start the local Bytebell instance in the background automatically when needed — you never manage it by hand.
+`bytebell` is the interactive CLI. Commands start the local Open-IR instance in the background automatically when needed — you never manage it by hand.
 
 ```
 bytebell [command] [...args]
@@ -14,8 +14,8 @@ Run `bytebell --help` or `bytebell <command> --help` for the live list. Global f
 | --------------------- | ---------------------------------------------------------------------------- |
 | `setup`               | First-run wizard: LLM provider, infra (embedded/Docker), optional index, editor wiring. **Start here.** |
 | `set [key] [value]`   | Write a setting (no args → interactive form). Keys: [configuration.md](configuration.md). |
-| `boot`                | Start Bytebell (embedded → no Docker; Docker mode → brings up containers first). |
-| `shutdown`            | Stop Bytebell.                                                                |
+| `boot`                | Start Open-IR (embedded → no Docker; Docker mode → brings up containers first). |
+| `shutdown`            | Stop Open-IR.                                                                |
 | `index <git-url>`     | Index a remote git repository.                                               |
 | `ingest [path]`       | Index a local directory (defaults to the current directory).                 |
 | `pull [knowledge-id]` | Re-index a previously added GitHub repo at branch HEAD (diff-aware).          |
@@ -36,7 +36,7 @@ Interactive first-run wizard (requires a terminal — it won't run piped). It wa
 2. **Infrastructure** — **Embedded** (SQLite + LadybugDB + Honker, no Docker; the default) or **Docker** (Mongo + Neo4j + Redis).
 3. **Repo** — optionally paste a GitHub URL to index right away.
 
-It then boots Bytebell, indexes your repo, and wires the MCP endpoint into your detected editors.
+It then boots Open-IR, indexes your repo, and wires the MCP endpoint into your detected editors.
 
 ```
 bytebell setup
@@ -62,7 +62,7 @@ This is the only sanctioned way to write config — there is no `.env` file. The
 
 ## `bytebell boot`
 
-Starts Bytebell. Runs a preflight first (and prints the exact `bytebell set …` to fix anything missing).
+Starts Open-IR. Runs a preflight first (and prints the exact `bytebell set …` to fix anything missing).
 
 - **Embedded mode** (default): no Docker — the stores are local files under `~/.bytebell`.
 - **Docker mode**: brings up the containers your providers need (mongo / neo4j / redis), waits for health, then starts the server.
@@ -77,7 +77,7 @@ Output ends with the MCP endpoint URL (`http://127.0.0.1:<port>/mcp`) and a hint
 
 ## `bytebell shutdown`
 
-Stops Bytebell. In Docker mode the containers are left running (it prints the `docker compose … down` command to stop them).
+Stops Open-IR. In Docker mode the containers are left running (it prints the `docker compose … down` command to stop them).
 
 ```
 bytebell shutdown
@@ -180,7 +180,7 @@ bytebell stats
 
 ### `bytebell mcp install`
 
-Detects installed editors — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and writes the Bytebell MCP endpoint into each one's config, backing up the file first. `bytebell setup` runs this for you on first boot.
+Detects installed editors — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and writes the Open-IR MCP endpoint into each one's config, backing up the file first. `bytebell setup` runs this for you on first boot.
 
 ```
 bytebell mcp install
@@ -219,14 +219,14 @@ bytebell index https://github.com/owner/repo
 bytebell ls
 bytebell pull                         # re-index against branch HEAD
 bytebell stats
-bytebell shutdown                     # stop Bytebell
+bytebell shutdown                     # stop Open-IR
 ```
 
 ---
 
 ## The `--verbose` flag
 
-Available on `bytebell index` and `bytebell pull`. When set, the CLI tails the Bytebell log file (`~/.bytebell/logs/server-YYYY-MM-DD.log`) to the terminal alongside the progress bar for the duration of the job.
+Available on `bytebell index` and `bytebell pull`. When set, the CLI tails the Open-IR log file (`~/.bytebell/logs/server-YYYY-MM-DD.log`) to the terminal alongside the progress bar for the duration of the job.
 
 The flag controls **what you see**, not what's logged — the log level is separate. For more detail, run `bytebell set log-level debug` first, then re-run with `--verbose`.
 

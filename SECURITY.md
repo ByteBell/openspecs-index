@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you believe you have found a security issue in Bytebell, please report it privately. **Do not open a public GitHub issue for security problems.**
+If you believe you have found a security issue in Open-IR, please report it privately. **Do not open a public GitHub issue for security problems.**
 
 - **Email**: `team@bytebell.ai`
 - **Subject line**: `[security] <short description>`
@@ -40,9 +40,9 @@ The OSS edition binds the server to `127.0.0.1` and has no remote attack surface
 
 - Third-party services the user runs (MongoDB, Neo4j, Redis, Docker, OpenRouter). Report those upstream.
 - The user's own environment (their OS, their LLM provider account, their network).
-- Theoretical issues without a reproducible impact on Bytebell.
+- Theoretical issues without a reproducible impact on Open-IR.
 - DDoS or volumetric reports against `bytebell.ai` web properties (this policy covers the OSS code only).
 
 ## Recognition
 
-Bytebell is licensed under **AGPL-3.0-only with an additional non-commercial clause**. We do not run a paid bug bounty programme. With your permission, we will credit you in [CHANGELOG.md](CHANGELOG.md) and the release notes when a reported issue is fixed.
+Open-IR is licensed under **AGPL-3.0-only with an additional non-commercial clause**. We do not run a paid bug bounty programme. With your permission, we will credit you in [CHANGELOG.md](CHANGELOG.md) and the release notes when a reported issue is fixed.

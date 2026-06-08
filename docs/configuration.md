@@ -1,6 +1,6 @@
-# Bytebell Configuration Reference
+# Open-IR Configuration Reference
 
-Every Bytebell setting lives in `~/.bytebell/config.json` (mode `0600`) — the single source of truth. There is **no `.env` file** anywhere (see [CLAUDE.md](../CLAUDE.md) "Rule of Env Vars"); the server reads `config.json` directly and never reads `process.env`.
+Every Open-IR setting lives in `~/.bytebell/config.json` (mode `0600`) — the single source of truth. There is **no `.env` file** anywhere (see [CLAUDE.md](../CLAUDE.md) "Rule of Env Vars"); the server reads `config.json` directly and never reads `process.env`.
 
 The only sanctioned write path is:
 
@@ -9,7 +9,7 @@ bytebell set <key> <value>
 bytebell set                 # no args → opens the interactive setup form
 ```
 
-Values are validated before they are persisted. Keys are defined in [keyMap.ts](../packages/cli/src/keyMap.ts); defaults come from [schema.ts](../packages/config/src/schema.ts). If a required setting is missing, Bytebell either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot.
+Values are validated before they are persisted. Keys are defined in [keyMap.ts](../packages/cli/src/keyMap.ts); defaults come from [schema.ts](../packages/config/src/schema.ts). If a required setting is missing, Open-IR either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot.
 
 > **Boot auto-fill (Docker mode):** when the Mongo/Neo4j/Redis keys are blank, `bytebell boot` fills them with local defaults (and generates a Neo4j password) before starting the containers. You only set them yourself when bringing your own infrastructure.
 
@@ -17,7 +17,7 @@ Values are validated before they are persisted. Keys are defined in [keyMap.ts](
 
 ## Infrastructure presets
 
-Bytebell runs in one of two presets, **derived from the `db-provider` / `graph-provider` / `queue-provider` keys** — there is no separate "mode" setting:
+Open-IR runs in one of two presets, **derived from the `db-provider` / `graph-provider` / `queue-provider` keys** — there is no separate "mode" setting:
 
 | Preset                   | db / graph / queue            | Docker? | Stores                          |
 | ------------------------ | ----------------------------- | ------- | ------------------------------- |

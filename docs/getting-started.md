@@ -1,10 +1,10 @@
 # Get started
 
-**Ask questions about any codebase — straight from Claude Code, Cursor, and other AI assistants.** Point Bytebell at a repo and your AI tools can answer _"where is auth handled?"_ or _"how does caching work here?"_ with real, grounded answers from the actual code.
+**Ask questions about any codebase — straight from Claude Code, Cursor, and other AI assistants.** Point Open-IR at a repo and your AI tools can answer _"where is auth handled?"_ or _"how does caching work here?"_ with real, grounded answers from the actual code.
 
 Everything runs on your machine. Nothing leaves it except the calls to the model you choose — no telemetry, no phone-home.
 
-By default Bytebell runs in **embedded mode**: SQLite + LadybugDB + Honker, all in local files under `~/.bytebell` — **no database to install, no Docker to run.** (Prefer Mongo + Neo4j + Redis in Docker? See [Docker mode](#docker-mode) below.)
+By default Open-IR runs in **embedded mode**: SQLite + LadybugDB + Honker, all in local files under `~/.bytebell` — **no database to install, no Docker to run.** (Prefer Mongo + Neo4j + Redis in Docker? See [Docker mode](#docker-mode) below.)
 
 ---
 
@@ -51,9 +51,9 @@ The wizard asks a few quick things, then takes over:
 2. **Infrastructure** — **Embedded (no Docker)** is the default: SQLite + LadybugDB + Honker, all local files. Or choose **Docker** (Mongo + Neo4j + Redis).
 3. **Repo** — paste a GitHub URL to index now, or skip and add one later. Private repo? It'll ask for a token. Want a specific branch? It'll let you pick.
 
-From there it runs on its own — **boots Bytebell, indexes your repo, and shows live progress.** The part that feels like magic:
+From there it runs on its own — **boots Open-IR, indexes your repo, and shows live progress.** The part that feels like magic:
 
-> **It detects your coding tools** — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and wires Bytebell into each one for you (backing up each config first). No copy-pasting connection strings.
+> **It detects your coding tools** — Claude Code, Cursor, Claude Desktop, Windsurf, VS Code — and wires Open-IR into each one for you (backing up each config first). No copy-pasting connection strings.
 
 ---
 
@@ -62,7 +62,7 @@ From there it runs on its own — **boots Bytebell, indexes your repo, and shows
 When setup finishes you'll see something like:
 
 ```
-✓ Bytebell running (embedded — no Docker)
+✓ Open-IR running (embedded — no Docker)
 ✓ Repo indexed
 ✓ Connected to Cursor & Claude Code
 ```
@@ -75,7 +75,7 @@ When setup finishes you'll see something like:
 - _"What happens when a request hits the `/index` route?"_
 - _"Which files would I touch to add a new CLI command?"_
 
-The assistant calls Bytebell's retrieval tools behind the scenes and answers from your actual code.
+The assistant calls Open-IR's retrieval tools behind the scenes and answers from your actual code.
 
 > If your editor wasn't auto-detected, connect it once by hand:
 > `claude mcp add --transport http bytebell http://127.0.0.1:8080/mcp`
@@ -122,7 +122,7 @@ Then `bytebell boot` brings up the local Docker stack (`bytebell-mongo`, `bytebe
 Already run your own Mongo / Neo4j / Redis? Set their connection details first (`bytebell set mongo …`, `neo4j …`, `redis …`) and `bytebell boot` skips the containers for any service you've configured. See [configuration.md](configuration.md).
 
 <details>
-<summary><strong>Under the hood</strong> (optional — you don't need this to use Bytebell)</summary>
+<summary><strong>Under the hood</strong> (optional — you don't need this to use Open-IR)</summary>
 
 ### Local-first & private
 

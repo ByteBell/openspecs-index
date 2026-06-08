@@ -1,10 +1,10 @@
 <div align="center">
 
 <!-- Hero banner — drop your image at docs/assets/bytebell-banner.png, then uncomment:
-<img src="docs/assets/bytebell-banner.png" alt="Bytebell" width="680" />        to be made
+<img src="docs/assets/bytebell-banner.png" alt="Open-IR" width="680" />        to be made
 -->
 
-# Bytebell
+# Open-IR
 
 ### A code knowledge graph for your AI coding agent
 
@@ -21,11 +21,11 @@
 
 ---
 
-> Your AI agent can't read your whole codebase, so it guesses. **Bytebell builds it a queryable map.** Point `bytebell` at a repo and it builds an LLM-enriched knowledge graph — every file's purpose, summary, business context, classes, and imports — then serves it over **MCP** to Claude Code, Cursor, and any MCP client. Everything runs on your machine; nothing leaves it except the calls to the model you choose.
+> Your AI agent can't read your whole codebase, so it guesses. **Open-IR builds it a queryable map.** Point `bytebell` at a repo and it builds an LLM-enriched knowledge graph — every file's purpose, summary, business context, classes, and imports — then serves it over **MCP** to Claude Code, Cursor, and any MCP client. Everything runs on your machine; nothing leaves it except the calls to the model you choose.
 
 ## Run it in 5 minutes
 
-> Bytebell's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
+> Open-IR's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
 
 **You need:** [Bun](https://bun.sh) ≥ 1.1, git, and an [OpenRouter](https://openrouter.ai) API key _or_ a local [Ollama](https://ollama.com) model.
 
@@ -41,13 +41,13 @@ bytebell setup
 #     "Where is auth handled?"  ·  "Summarize the architecture."
 ```
 
-`bytebell setup` auto-detects and wires Bytebell into Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code for you.
+`bytebell setup` auto-detects and wires Open-IR into Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code for you.
 
 Every command and flag: **[docs/commands.md](docs/commands.md)** · every setting: **[docs/configuration.md](docs/configuration.md)**.
 
 There is no `.env` file anywhere — `~/.bytebell/config.json` (mode `0600`) is the single source of truth, written only by `bytebell set`.
 
-## What Bytebell does
+## What Open-IR does
 
 You point `bytebell` at a repo. It clones the source, walks every file, and for each file calls an LLM (via OpenRouter) to extract a structured `FileAnalysis`: a one-paragraph **purpose**, a longer **summary** of what the file does and how it fits the architecture, a **business context** line tying it to the product domain, plus the file's classes, functions, keywords, and imports.
 
@@ -147,7 +147,7 @@ Most well-formed code questions resolve in 2–4 tool calls. No re-clone, no ful
 
 ## Storage backends
 
-Bytebell runs **embedded** by default (SQLite + LadybugDB + Honker, no Docker). Switch to **Docker mode** (Mongo + Neo4j + Redis), or point Bytebell at your own database instances — at setup or any time via `bytebell set`. The steps are in **[docs/getting-started.md](docs/getting-started.md#docker-mode)**; every key is in **[docs/configuration.md](docs/configuration.md)**.
+Open-IR runs **embedded** by default (SQLite + LadybugDB + Honker, no Docker). Switch to **Docker mode** (Mongo + Neo4j + Redis), or point Open-IR at your own database instances — at setup or any time via `bytebell set`. The steps are in **[docs/getting-started.md](docs/getting-started.md#docker-mode)**; every key is in **[docs/configuration.md](docs/configuration.md)**.
 
 ## Architecture at a glance
 
@@ -166,13 +166,13 @@ Settings live in `~/.bytebell/config.json` and are written exclusively by `byteb
 
 The **full list of keys** — infrastructure, LLM provider (OpenRouter / Ollama), logging, and storage backends, with validation and defaults — lives in **[docs/configuration.md](docs/configuration.md)**.
 
-If a required setting is missing, Bytebell either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
+If a required setting is missing, Open-IR either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
 
 ## Why this design — research grounding
 
-> Comparing Bytebell to PageIndex, GitNexus, GraphRAG, Sourcegraph, or Augment Code? See **[comparison.md](comparison.md)** for a side-by-side feature table and pros / cons of each.
+> Comparing Open-IR to PageIndex, GitNexus, GraphRAG, Sourcegraph, or Augment Code? See **[comparison.md](comparison.md)** for a side-by-side feature table and pros / cons of each.
 
-Bytebell's shape — _build a code graph at ingest time, enrich every node with LLM-derived structured semantics, then serve retrieval against the joined surface_ — tracks a converging body of recent work showing that purely structural retrieval (AST / call-graph) and purely semantic retrieval (embeddings) each leave large performance on the table, and that combining them at indexing time unlocks the gains.
+Open-IR's shape — _build a code graph at ingest time, enrich every node with LLM-derived structured semantics, then serve retrieval against the joined surface_ — tracks a converging body of recent work showing that purely structural retrieval (AST / call-graph) and purely semantic retrieval (embeddings) each leave large performance on the table, and that combining them at indexing time unlocks the gains.
 
 **Graphs beat flat retrieval for code.** Repository-level graphs from AST + imports + call structure consistently outperform flat embedding retrieval on real engineering tasks.
 
@@ -188,7 +188,7 @@ Bytebell's shape — _build a code graph at ingest time, enrich every node with 
 - Knowledge-Graph-Based Repo-Level Code Generation ([2505.14394](https://arxiv.org/abs/2505.14394)) — graph captures structure; LLM context fills semantic gaps.
 - Sense and Sensitivity ([2505.13353](https://arxiv.org/abs/2505.13353)) — lexical and semantic recall are different capabilities; supports the `summary` (semantic) vs Mongo raw (lexical) split.
 
-**Structured summaries and hierarchy beat blob summarization.** Explicit fields — purpose, inputs, outputs, business context — aggregated bottom-up let retrieval match at the right level of abstraction. This maps directly onto Bytebell's `purpose` / `summary` / `businessContext` schema.
+**Structured summaries and hierarchy beat blob summarization.** Explicit fields — purpose, inputs, outputs, business context — aggregated bottom-up let retrieval match at the right level of abstraction. This maps directly onto Open-IR's `purpose` / `summary` / `businessContext` schema.
 
 - Hierarchical Repo-Level Code Summarization for Business Applications ([2501.07857](https://arxiv.org/abs/2501.07857), ICSE LLM4Code 2025) — closest motivational match: structured per-unit summaries aggregated to file/package level, grounded in business context.
 - Beyond Function Level ([2502.16704](https://arxiv.org/abs/2502.16704)) — class/repo context in summaries beats function-only.
@@ -203,7 +203,7 @@ The design choices follow directly: each `:File` node carries LLM-generated sema
 
 ## Enterprise
 
-Bytebell-public is the OSS edition. ByteBell also offers a separately-licensed **Enterprise** edition for organizations that need a commercial-use grant, hardening, and direct support. Enterprise typically includes:
+Open-IR is the OSS edition. ByteBell also offers a separately-licensed **Enterprise** edition for organizations that need a commercial-use grant, hardening, and direct support. Enterprise typically includes:
 
 - A commercial-use grant covering use by or on behalf of for-profit entities, including SaaS deployments and revenue-generating applications.
 - Hardened multi-tenant deployment patterns, SSO / SCIM, audit logging, and data-isolation guarantees.
@@ -219,4 +219,4 @@ Hooks, commit conventions, and pre-push gates are documented in [CONTRIBUTING.md
 
 ## License
 
-Bytebell is released under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) for the authoritative text. Personal, academic, research, and non-profit use are unrestricted under AGPL-3.0 (network-copyleft applies). **Commercial use** is governed by license terms and is covered by the [Enterprise edition](#enterprise) (`team@bytebell.ai`). The running server itself does **not** verify a license; governance is by license terms, not by code. The server is meant for local single-tenant use — no remote network surface; everything binds to `127.0.0.1`.
+Open-IR is released under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) for the authoritative text. Personal, academic, research, and non-profit use are unrestricted under AGPL-3.0 (network-copyleft applies). **Commercial use** is governed by license terms and is covered by the [Enterprise edition](#enterprise) (`team@bytebell.ai`). The running server itself does **not** verify a license; governance is by license terms, not by code. The server is meant for local single-tenant use — no remote network surface; everything binds to `127.0.0.1`.
