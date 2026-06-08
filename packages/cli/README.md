@@ -131,9 +131,12 @@ any plaintext copy in `config.json`:
 - `bytebell set` (no args) / `bytebell setup` — the interactive forms use the
   same setters (masked input), so secrets entered there also land in the keychain.
 
-Reads are transparent: `@bb/config` overlays the keychain value on load, so the
-server and all consumers resolve secrets via the normal config path. The server
-warns at boot if a secret is still sitting in plaintext.
+Reads are transparent: on first load `@bb/config` performs a **clean migration**
+— any plaintext secret found in `config.json` is moved into the keychain and the
+plaintext field is cleared on disk. The keychain is the source of truth from
+then on; `getConfigValue` resolves it without callers knowing. The only case a
+plaintext secret persists is on a system with no keychain backend (headless
+Linux without Secret Service, CI, etc.), and the server warns about it at boot.
 
 ## Public exports
 

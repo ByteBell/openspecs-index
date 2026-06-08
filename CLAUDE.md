@@ -45,7 +45,7 @@ TUI / HTTP client → Express (bytebell-server) → BullMQ (in-process) → Inge
 - **Local persistence**: `~/.bytebell/` (config, logs)
 - **LLM Provider**: OpenRouter (default) or local Ollama, selected via `Config.LlmProvider`
 - **Logging**: Winston (file + stdout)
-- **Secret storage**: secrets (`openrouter_api_key`, `neo4j_password`) live in the OS keychain via `@napi-rs/keyring` (`@bb/config`). `bytebell set <key> <value>` stores them there (its secret-key setters call `storeSecret`); `config.json` (mode `0600`) holds an empty string for keychain-backed secrets. A plaintext value remains only as a legacy / keychain-less fallback and is flagged at boot.
+- **Secret storage**: secrets (`openrouter_api_key`, `neo4j_password`) live in the OS keychain via `@napi-rs/keyring` (`@bb/config`). `bytebell set <key> <value>` stores them there (its secret-key setters call `storeSecret`); `config.json` (mode `0600`) holds an empty string for keychain-backed secrets. On load, `loadConfig` cleanly migrates any plaintext secret it finds into the keychain and clears the field. A plaintext secret only persists when the OS has no keychain backend (e.g. headless Linux without Secret Service), and the server warns about it at boot.
 - **Package manager**: Bun (workspaces)
 
 ---
@@ -166,7 +166,7 @@ The `~/.bytebell/` directory is the **single source of truth** for runtime confi
   pid                   running server PID
 ```
 
-Secrets (`openrouter_api_key`, `neo4j_password`) are stored in the OS keychain (macOS Keychain / Linux Secret Service / Windows Credential Manager) via `@napi-rs/keyring`; `config.json` (mode `0600`) keeps an empty string for them. A non-empty plaintext secret is a legacy / keychain-less fallback only and triggers a boot warning.
+Secrets (`openrouter_api_key`, `neo4j_password`) are stored in the OS keychain (macOS Keychain / Linux Secret Service / Windows Credential Manager) via `@napi-rs/keyring`; `config.json` (mode `0600`) keeps an empty string for them. On load, `@bb/config` migrates any plaintext secret it finds into the keychain and clears the field — keychain is authoritative thereafter. A plaintext secret only persists on systems with no keychain backend and triggers a boot warning.
 
 - `bytebell set <key> <value>` is the sanctioned write path for `config.json`. For secret keys (`openrouter-api-key`, `neo4j-password`) it routes the value to the OS keychain instead of writing plaintext. Manual edits work but are not advertised.
 
