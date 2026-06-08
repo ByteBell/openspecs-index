@@ -114,8 +114,12 @@ const CONFIG_HINT_KEYS: Partial<Record<Config, string>> = {
 };
 
 export function checkPreflight(): PreflightResult {
-  const provider = getConfigValue(Config.LlmProvider);
-  const required = requiredKeysFor(provider);
+  const required = requiredKeysFor(
+    getConfigValue(Config.LlmProvider),
+    getConfigValue(Config.DbProvider),
+    getConfigValue(Config.GraphProvider),
+    getConfigValue(Config.QueueProvider),
+  );
   const missing: PreflightResult["missing"] = [];
   for (const configKey of required) {
     const value = getConfigValue(configKey);

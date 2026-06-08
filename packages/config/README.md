@@ -30,11 +30,19 @@ Secret Service, Windows Credential Manager) under service `"bytebell"`, account
 = the `Config` enum value. `config.json` holds an **empty string** for a
 keychain-backed secret.
 
-Read path: `loadConfig()` overlays each empty secret field with its keychain
-value, so `getConfigValue`, `isConfigComplete`, and every downstream reader
-resolve the secret transparently — no caller changes. Resolution order per
-secret: **non-empty plaintext in `config.json` wins** (legacy / warned
-fallback) → else keychain → else empty (`missing`).
+Read path: `loadConfig()` performs a **clean migration**. Per secret:
+
+1. If `config.json` has a non-empty plaintext value AND the OS keychain is
+   available → move the value into the keychain, clear the plaintext field on
+   disk (atomic write), and use the keychain value going forward. Migration is
+   one-shot — once cleared, subsequent loads find the field empty.
+2. Else if the field is empty → overlay the keychain value (if any).
+3. Else (plaintext present **and** keychain unavailable, e.g. headless Linux
+   without Secret Service) → leave plaintext as-is; the server boot warning
+   flags it. This is the only case where a plaintext secret persists.
+
+The keychain is the source of truth. `getConfigValue`, `isConfigComplete`, and
+every downstream reader resolve the secret transparently — no caller changes.
 
 Public surface: `getSecret` / `setSecret` / `deleteSecret` /
 `isKeychainAvailable` / `isSecretKey` / `KeychainUnavailableError` (keychain
@@ -114,9 +122,10 @@ This package does **not** own:
 5. **Atomic writes.** Every write is `tmp → fsync → rename`. A crash mid-write
    leaves the previous `config.json` intact.
 6. **File mode `0600`.** `config.json` is owner-read/write only. Secrets in
-   `SECRET_KEYS` are stored in the OS keychain, not `config.json`; a plaintext
-   secret only remains as a legacy/keychain-less fallback and triggers a boot
-   warning recommending a re-run of `bytebell set <key> <value>`.
+   `SECRET_KEYS` live in the OS keychain, not `config.json`; `loadConfig()`
+   migrates any plaintext secret it finds into the keychain. A plaintext
+   secret only persists on systems with no keychain backend, and triggers a
+   boot warning.
 7. **No public file paths besides home + config.** Other files under
    `~/.bytebell/` are not addressed by this package.
 
@@ -144,9 +153,9 @@ To add a new config key:
 1. Add a new `Config` enum entry in `src/schema.ts`.
 2. Add the field to `configSchema` with a `.default(...)`.
 3. Add a `ConfigValueMap` entry mapping the enum to its TS type.
-4. If required, add the enum to `REQUIRED_KEYS` (infra-always) or to
-   `PROVIDER_REQUIRED_KEYS[<provider>]` (provider-specific — driven by
-   `Config.LlmProvider` at completeness-check time).
+4. If the key is required, add it to the relevant branch of `requiredKeysFor`
+   (provider-conditional — both the CLI `bytebell boot` preflight and the server's
+   startup check call this with all four providers).
 5. Add a hint string to `HINTS`.
 6. Add cases to `readField` and `writeField`.
 7. Update this `README.md` if the new key changes invariants or ownership.
