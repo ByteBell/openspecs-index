@@ -46,7 +46,8 @@ repoName)` projection used to label retrieval results.
   consumes `lucene.ts`).
 - Up into the parent package: `#src/client.ts` only (for `_runCypher`),
   never relative parent traversal.
-- Cross-package: `@bb/graph-core` (types).
+- Cross-package: `@bb/graph-core` (types), `@bb/config`
+  (`getKnowledgeScope` — read-scope seam).
 - Forbidden: importing from `../knowledge.ts`, `../files.ts`, or any
   other write-side neo4j module — search is read-only.
 
@@ -60,3 +61,9 @@ repoName)` projection used to label retrieval results.
 - Return shapes match `IGraphSearchRepository` (defined in
   `@bb/graph-core`) so the provider's `search` namespace satisfies the
   interface without adapter layers.
+- **Knowledge-scope honoured.** `smartSearch`, `keywordLookup`,
+  `listKnowledge`, and `fileMetadata` read `getKnowledgeScope()` from
+  `@bb/config` and add `AND ($scope IS NULL OR knowledgeId IN $scope)` to
+  their MATCH filters. `$scope` is `null` by default (unrestricted); a host
+  may register a resolver to restrict reads to an allowlist. An empty
+  allowlist matches nothing.

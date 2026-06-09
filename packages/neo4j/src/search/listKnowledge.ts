@@ -1,4 +1,5 @@
 import type { KnowledgeListRow } from "@bb/graph-core";
+import { getKnowledgeScope } from "@bb/config";
 import { _runCypher } from "#src/client.ts";
 
 interface RawRow {
@@ -15,6 +16,7 @@ interface RawRow {
 
 const LIST_KNOWLEDGE_CYPHER = `
   MATCH (k:Knowledge)
+  WHERE ($scope IS NULL OR k.knowledgeId IN $scope)
   OPTIONAL MATCH (k)-[:HAS_FILE]->(f:File)
   WITH k, count(f) AS fileCount
   RETURN k.knowledgeId AS knowledgeId,
@@ -40,7 +42,7 @@ function toNumber(value: RawRow["fileCount"]): number {
 }
 
 export async function listKnowledgeBases(): Promise<KnowledgeListRow[]> {
-  const raw = await _runCypher<RawRow>(LIST_KNOWLEDGE_CYPHER, {});
+  const raw = await _runCypher<RawRow>(LIST_KNOWLEDGE_CYPHER, { scope: getKnowledgeScope() });
   return raw.map((row) => ({
     knowledgeId: row.knowledgeId ?? "",
     repoName: row.repoName ?? "",

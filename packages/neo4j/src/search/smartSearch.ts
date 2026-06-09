@@ -1,4 +1,5 @@
 import type { ScoredHit, SmartSearchChannel, SmartSearchChannelInput } from "@bb/graph-core";
+import { getKnowledgeScope } from "@bb/config";
 import { _runCypher, toNeo4jInt } from "#src/client.ts";
 import { buildFulltextQuery } from "#src/search/lucene.ts";
 
@@ -17,6 +18,8 @@ interface CypherParams extends Record<string, unknown> {
    * its own in-flight knowledge plus any cross-repo neighbours.
    */
   knowledgeIds: string[] | null;
+  /** Host-injected hard scope (library mode). Null when unrestricted. */
+  scope: string[] | null;
   pathPrefix: string | null;
   queryTerms: string[];
   fulltextQuery: string;
@@ -33,6 +36,7 @@ const EXCLUSION_WHERE = `
 const SHARED_FILE_FILTERS = `
   ($knowledgeId IS NULL OR f.knowledgeId = $knowledgeId)
   AND ($knowledgeIds IS NULL OR f.knowledgeId IN $knowledgeIds)
+  AND ($scope IS NULL OR f.knowledgeId IN $scope)
   AND ($pathPrefix IS NULL OR f.relativePath STARTS WITH $pathPrefix)
 ${EXCLUSION_WHERE}`;
 
@@ -44,6 +48,7 @@ function toCypherParams(input: SmartSearchChannelInput): CypherParams {
   return {
     knowledgeId: input.knowledgeId,
     knowledgeIds: input.knowledgeIds === null ? null : [...input.knowledgeIds],
+    scope: getKnowledgeScope(),
     pathPrefix: input.pathPrefix,
     queryTerms: [...input.queryTerms],
     fulltextQuery: buildFulltextQuery(input.queryTerms),

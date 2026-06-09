@@ -1,4 +1,5 @@
 import type { KeywordLookupInput, KeywordLookupMatch, KeywordLookupRow } from "@bb/graph-core";
+import { getKnowledgeScope } from "@bb/config";
 import { _runCypher, toNeo4jInt } from "#src/client.ts";
 import { buildFulltextQuery, escapeLucene } from "#src/search/lucene.ts";
 
@@ -17,6 +18,7 @@ const KEYWORD_CYPHER = `
   MATCH (f:File)-[:HAS_KEYWORD]->(kw)
   WHERE ($knowledgeId IS NULL OR f.knowledgeId = $knowledgeId)
     AND ($knowledgeIds IS NULL OR f.knowledgeId IN $knowledgeIds)
+    AND ($scope IS NULL OR f.knowledgeId IN $scope)
   MATCH (k:Knowledge {knowledgeId: f.knowledgeId})
   WITH kw, f, k LIMIT $keywordLimit * $filesPerKeyword
   RETURN kw.name AS name,
@@ -33,6 +35,7 @@ const MODULE_CYPHER = `
   MATCH (f:File)-[:HAS_IMPORT_INTERNAL|HAS_IMPORT_EXTERNAL]->(m)
   WHERE ($knowledgeId IS NULL OR f.knowledgeId = $knowledgeId)
     AND ($knowledgeIds IS NULL OR f.knowledgeId IN $knowledgeIds)
+    AND ($scope IS NULL OR f.knowledgeId IN $scope)
   MATCH (k:Knowledge {knowledgeId: f.knowledgeId})
   WITH m, f, k LIMIT $keywordLimit * $filesPerKeyword
   RETURN m.name AS name,
@@ -51,6 +54,7 @@ function symbolCypher(label: "Class" | "Function", rel: "HAS_CLASS" | "HAS_FUNCT
     MATCH (f:File)-[:${rel}]->(sym)
     WHERE ($knowledgeId IS NULL OR f.knowledgeId = $knowledgeId)
       AND ($knowledgeIds IS NULL OR f.knowledgeId IN $knowledgeIds)
+      AND ($scope IS NULL OR f.knowledgeId IN $scope)
     MATCH (k:Knowledge {knowledgeId: f.knowledgeId})
     WITH sym, f, k LIMIT $keywordLimit * $filesPerKeyword
     RETURN sym.signature AS name,
@@ -80,6 +84,7 @@ export async function keywordLookup(input: KeywordLookupInput): Promise<KeywordL
   const params: Record<string, unknown> = {
     knowledgeId: input.knowledgeId,
     knowledgeIds: input.knowledgeIds === null ? null : [...input.knowledgeIds],
+    scope: getKnowledgeScope(),
     keywordLimit: toNeo4jInt(input.keywordLimit),
     filesPerKeyword: toNeo4jInt(input.filesPerKeyword),
   };

@@ -13,3 +13,5 @@ export {
   setBytebellHomeResolver,
   __setBytebellHomeForTests,
 } from "./paths.ts";
+
+export { getKnowledgeScope, setKnowledgeScopeResolver } from "./scope.ts";

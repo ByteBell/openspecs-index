@@ -1,4 +1,5 @@
 import type { FileMetadataRow } from "@bb/graph-core";
+import { getKnowledgeScope } from "@bb/config";
 import { _runCypher } from "#src/client.ts";
 
 interface RawRow {
@@ -18,6 +19,7 @@ interface RawRow {
 const FILE_METADATA_CYPHER = `
   MATCH (f:File)
   WHERE f.knowledgeId = $knowledgeId AND f.relativePath IN $paths
+    AND ($scope IS NULL OR f.knowledgeId IN $scope)
   OPTIONAL MATCH (f)-[:HAS_KEYWORD]->(kw:Keyword)
   OPTIONAL MATCH (f)-[:HAS_CLASS]->(c:Class)
   OPTIONAL MATCH (f)-[:HAS_FUNCTION]->(fn:Function)
@@ -53,6 +55,7 @@ export async function fetchFileMetadata(knowledgeId: string, paths: readonly str
   const rows = await _runCypher<RawRow>(FILE_METADATA_CYPHER, {
     knowledgeId,
     paths: [...paths],
+    scope: getKnowledgeScope(),
   });
   return rows.map((row) => ({
     path: row.path,

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { getBytebellHome, getConfigValue } from "@bb/config";
+import { getBytebellHome, getConfigValue, getKnowledgeScope } from "@bb/config";
 import { knowledgeDb } from "@bb/db";
 import { Config, parseGithubOwnerRepo, repositoryDirFor, type RepoLocation } from "@bb/types";
 import { IngestError, KnowledgeNotFoundError } from "@bb/errors";
@@ -39,6 +39,12 @@ export class FileReadError extends Error {
  * returns `source.sourcePath` unchanged.
  */
 export async function resolveCloneDir(knowledgeId: string): Promise<string> {
+  // Host-injected scope (library mode): deny file reads for any knowledge not in
+  // the caller's allowlist. Null scope (default/local) → no restriction.
+  const scope = getKnowledgeScope();
+  if (scope !== null && !scope.includes(knowledgeId)) {
+    throw new KnowledgeNotFoundError(knowledgeId);
+  }
   const kDoc = await knowledgeDb.getKnowledge(knowledgeId);
   if (kDoc === null) {
     throw new KnowledgeNotFoundError(knowledgeId);

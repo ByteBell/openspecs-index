@@ -25,6 +25,17 @@ This package does **not** read from `process.env` and never will.
 to use for the current invocation, or `null` to fall through to the
 `~/.bytebell` default. Pass `null` to clear.
 
+`setKnowledgeScopeResolver` / `getKnowledgeScope` (`src/scope.ts`) are a generic,
+tenant-agnostic read-scope seam. A composition root may register a resolver that
+returns the allowlist of `knowledgeId`s the current call may read, or `null` for
+"no restriction". Read paths — the Neo4j search/metadata queries (`@bb/neo4j`)
+and the MCP file resolver (`@bb/mcp`'s `resolveCloneDir`) — consult
+`getKnowledgeScope()` and, when it returns non-null, restrict results to that set
+(an empty array means "read nothing"). When no resolver is registered the value
+is `null`, so single-tenant local behaviour is unchanged — the hook is dormant
+unless a host opts in. The resolver is a plain function; `@bb/config` has no
+concept of users, orgs, or auth.
+
 `seedConfig` injects a pre-parsed config object into the in-memory cache,
 validated through `configSchema.parse`. When seeded, `loadConfig()` returns
 the seeded values and **does not** call `ensureBytebellHome()` or read
