@@ -9,6 +9,13 @@ export function buildSharedFilters(input: SmartSearchChannelInput, fileAlias = "
   if (input.knowledgeId) {
     conditions.push(`${fileAlias}.knowledgeId = $knowledgeId`);
   }
+  // Allowlist scope (e.g. ConceptGraphStrategy enrichment, which defaults to
+  // knowledgeIds=[currentKnowledge] with knowledgeId null). Mirrors the neo4j
+  // provider's `f.knowledgeId IN $knowledgeIds` filter — without this, a search
+  // scoped only via knowledgeIds would run unscoped across every repo.
+  if (input.knowledgeIds && input.knowledgeIds.length > 0) {
+    conditions.push(`${fileAlias}.knowledgeId IN $knowledgeIds`);
+  }
   if (input.pathPrefix) {
     conditions.push(`${fileAlias}.relativePath STARTS WITH $pathPrefix`);
   }

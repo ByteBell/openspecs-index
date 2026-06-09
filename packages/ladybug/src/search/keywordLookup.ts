@@ -18,14 +18,25 @@ export async function keywordLookup(input: KeywordLookupInput): Promise<KeywordL
   const filesPerKeyword = Number(input.filesPerKeyword);
   const totalLimit = keywordLimit * filesPerKeyword;
 
-  const params: Record<string, string | number | null> = {
+  const params: Record<string, string | number | string[] | null> = {
     knowledgeId: input.knowledgeId,
     keywordLimit,
     totalLimit,
     term: lower,
   };
 
-  const knowledgeFilter = input.knowledgeId ? "AND f.knowledgeId = $knowledgeId" : "";
+  // Scope by single knowledgeId and/or the knowledgeIds allowlist, mirroring the
+  // neo4j provider. The allowlist is the default scope for ConceptGraphStrategy
+  // enrichment; omitting it would make those lookups run unscoped across repos.
+  const scopeClauses: string[] = [];
+  if (input.knowledgeId) {
+    scopeClauses.push("AND f.knowledgeId = $knowledgeId");
+  }
+  if (input.knowledgeIds && input.knowledgeIds.length > 0) {
+    scopeClauses.push("AND f.knowledgeId IN $knowledgeIds");
+    params["knowledgeIds"] = [...input.knowledgeIds];
+  }
+  const knowledgeFilter = scopeClauses.join(" ");
   let cypher: string;
 
   if (input.match === "keyword") {
