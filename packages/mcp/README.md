@@ -43,7 +43,9 @@ The package does **not** own:
 
 - Auth gating. MCP is unauthenticated in the OSS engine —
   single-tenant, localhost-only. See [docs/mcp.md](../../docs/mcp.md)
-  "Transport and mounting".
+  "Transport and mounting". (A host may still restrict which knowledges
+  the tools may read via the generic `@bb/config` knowledge-scope seam —
+  see invariant 5 — but that is read-scoping, not request authentication.)
 - Mongo or LLM access. The retrieval tools are pure
   graph-and-disk reads.
 - HTTP body parsing — relies on `@bb/server`'s top-level `express.json`.
@@ -173,9 +175,12 @@ and from a built output. `skills/bytebell/SKILL.md` and
 4. **Transports are owned, not leaked.** Every transport created here
    either lives in the per-flavour `Map` or has been closed.
    `closeAllMcpSessions` drains both maps.
-5. **Disk I/O is path-traversal safe.** `repoFs.ts` rejects absolute
-   paths, `..` components, and any resolved target outside
-   `<bytebellHome>/repos/{knowledgeId}/`.
+5. **Disk I/O is path-traversal safe and scope-aware.** `repoFs.ts`
+   rejects absolute paths, `..` components, and any resolved target
+   outside `<bytebellHome>/repos/{knowledgeId}/`. `resolveCloneDir` also
+   consults `getKnowledgeScope()` (`@bb/config`) and denies reads for any
+   `knowledgeId` outside the host-registered allowlist; the default scope
+   is `null` (unrestricted), so single-tenant local reads are unchanged.
 6. **No non-null assertions, no `any`, no dynamic `import()`.** Repo-wide
    strict-types rules apply — see CLAUDE.md.
 7. **Tool input types use `field?: T | undefined`.** The Zod-inferred
