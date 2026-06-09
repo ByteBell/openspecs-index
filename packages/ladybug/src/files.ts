@@ -1,4 +1,4 @@
-import { _runCypher } from "./client.ts";
+import { _runCypher, _runCypherOnce } from "./client.ts";
 import { ParquetSchema, ParquetWriter } from "parquetjs";
 import { join } from "node:path";
 import { unlinkSync } from "node:fs";
@@ -248,30 +248,32 @@ export async function bulkUpsertFiles(
       );
     }
 
-    // Execute COPY FROM commands exactly once
+    // Execute COPY FROM commands exactly once. These embed a unique temp-file
+    // path per call, so run them uncached (see `_runCypherOnce`) to avoid
+    // leaking a prepared statement per ingestion.
     if (fileCount > 0) {
-      await _runCypher(`COPY File FROM '${fileWriterInfo.path}'`);
+      await _runCypherOnce(`COPY File FROM '${fileWriterInfo.path}'`);
     }
     if (hasFileCount > 0) {
-      await _runCypher(`COPY HAS_FILE FROM '${hasFileRelWriterInfo.path}'`);
+      await _runCypherOnce(`COPY HAS_FILE FROM '${hasFileRelWriterInfo.path}'`);
     }
     if (containsCount > 0) {
-      await _runCypher(`COPY CONTAINS FROM '${containsRelWriterInfo.path}' (FROM='Folder', TO='File')`);
+      await _runCypherOnce(`COPY CONTAINS FROM '${containsRelWriterInfo.path}' (FROM='Folder', TO='File')`);
     }
     if (keywordCount > 0) {
-      await _runCypher(`COPY HAS_KEYWORD FROM '${hasKeywordRelWriterInfo.path}' (FROM='File', TO='Keyword')`);
+      await _runCypherOnce(`COPY HAS_KEYWORD FROM '${hasKeywordRelWriterInfo.path}' (FROM='File', TO='Keyword')`);
     }
     if (classCount > 0) {
-      await _runCypher(`COPY HAS_CLASS FROM '${hasClassRelWriterInfo.path}'`);
+      await _runCypherOnce(`COPY HAS_CLASS FROM '${hasClassRelWriterInfo.path}'`);
     }
     if (functionCount > 0) {
-      await _runCypher(`COPY HAS_FUNCTION FROM '${hasFunctionRelWriterInfo.path}'`);
+      await _runCypherOnce(`COPY HAS_FUNCTION FROM '${hasFunctionRelWriterInfo.path}'`);
     }
     if (importIntCount > 0) {
-      await _runCypher(`COPY HAS_IMPORT_INTERNAL FROM '${hasImportInternalRelWriterInfo.path}'`);
+      await _runCypherOnce(`COPY HAS_IMPORT_INTERNAL FROM '${hasImportInternalRelWriterInfo.path}'`);
     }
     if (importExtCount > 0) {
-      await _runCypher(`COPY HAS_IMPORT_EXTERNAL FROM '${hasImportExternalRelWriterInfo.path}'`);
+      await _runCypherOnce(`COPY HAS_IMPORT_EXTERNAL FROM '${hasImportExternalRelWriterInfo.path}'`);
     }
   } finally {
     for (const p of tempPaths) {
