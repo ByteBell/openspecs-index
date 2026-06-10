@@ -1,51 +1,92 @@
-<div align="center">
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/open-ir-logo.svg" />
+    <img src="docs/assets/open-ir-logo.svg" alt="Open-IR" width="150" />
+  </picture>
+</p>
 
-<!-- Hero banner — drop your image at docs/assets/bytebell-banner.png, then uncomment:
-<img src="docs/assets/bytebell-banner.png" alt="Open-IR" width="680" />        to be made
+<h1 align="center">Open-IR</h1>
+
+<p align="center"><em>A code knowledge graph for your AI coding agent</em></p>
+
+<p align="center">
+  <strong>Local-first</strong> &nbsp;·&nbsp; <strong>Embedded by Default</strong> &nbsp;·&nbsp; <strong>No Telemetry</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20NC-1f6feb?style=flat-square" alt="license" /></a>
+  &nbsp;<a href="https://bun.sh"><img src="https://img.shields.io/badge/runtime-Bun%20%E2%89%A5%201.1-14151a?style=flat-square&logo=bun&logoColor=white" alt="Bun" /></a>
+  &nbsp;<a href="tsconfig.base.json"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  &nbsp;<a href="docs/getting-started.md"><img src="https://img.shields.io/badge/MCP-ready-8a2be2?style=flat-square" alt="MCP" /></a>
+</p>
+
+<!-- quick-links card deck -->
+<table align="center">
+  <tr>
+    <td align="center" width="160">🚀<br /><a href="docs/getting-started.md"><b>Get Started</b></a><br /><sub>quick setup</sub></td>
+    <td align="center" width="160">⌨️<br /><a href="docs/commands.md"><b>Commands</b></a><br /><sub>every CLI flag</sub></td>
+    <td align="center" width="160">⚙️<br /><a href="docs/configuration.md"><b>Configuration</b></a><br /><sub>all the keys</sub></td>
+    <td align="center" width="160">🏛️<br /><a href="docs/arch.md"><b>Architecture</b></a><br /><sub>the full PRD</sub></td>
+  </tr>
+</table>
+
+<p align="center"><sub><a href="comparison.md">Comparison</a> &nbsp;·&nbsp; <a href="https://bytebell.ai">bytebell.ai</a></sub></p>
+
+---
+
+## 🎬 Demo
+
+<!-- Demo placeholder — drop your recording at docs/assets/demo.gif (or .mp4 / asciinema),
+     then uncomment the block below:
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Open-IR — install, index, and ask your editor" width="820" />
+</p>
 -->
 
-# Open-IR
-
-### A code knowledge graph for your AI coding agent
-
-**Local-first** &nbsp;·&nbsp; **Embedded by Default** &nbsp;·&nbsp; **No Telemetry**
-
-[**Get Started**](docs/getting-started.md) &nbsp;·&nbsp; [Commands](docs/commands.md) &nbsp;·&nbsp; [Configuration](docs/configuration.md) &nbsp;·&nbsp; [Architecture](docs/arch.md) &nbsp;·&nbsp; [Comparison](comparison.md) &nbsp;·&nbsp; [bytebell.ai](https://bytebell.ai)
-
-[![license](https://img.shields.io/badge/license-AGPL--3.0%20%2B%20NC-1f6feb?style=flat-square)](LICENSE)
-&nbsp;[![Bun](https://img.shields.io/badge/runtime-Bun%20%E2%89%A5%201.1-14151a?style=flat-square&logo=bun&logoColor=white)](https://bun.sh)
-&nbsp;[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=white)](tsconfig.base.json)
-&nbsp;[![MCP](https://img.shields.io/badge/MCP-ready-8a2be2?style=flat-square)](docs/getting-started.md)
-
-</div>
+> _Demo coming soon._
 
 ---
 
 > Your AI agent can't read your whole codebase, so it guesses. **Open-IR builds it a queryable map.** Point `bytebell` at a repo and it builds an LLM-enriched knowledge graph — every file's purpose, summary, business context, classes, and imports — then serves it over **MCP** to Claude Code, Cursor, and any MCP client. Everything runs on your machine; nothing leaves it except the calls to the model you choose.
 
-## Run it in 5 minutes
+## ✨ Why Open-IR
 
-> Open-IR's default **embedded** mode keeps everything in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). The full walkthrough — Docker mode, bring-your-own-infra, troubleshooting — is in **[docs/getting-started.md](docs/getting-started.md)**.
+<table>
+  <tr>
+    <td width="33%" valign="top">🔒&nbsp; <b>Local-first</b><br /><sub>Source never leaves your machine — the only outbound call is to the model you choose.</sub></td>
+    <td width="33%" valign="top">📦&nbsp; <b>Embedded by default</b><br /><sub>SQLite + LadybugDB + Honker in local files. No Docker, no database to install.</sub></td>
+    <td width="33%" valign="top">🧠&nbsp; <b>LLM-enriched graph</b><br /><sub>Every file carries a purpose, summary, and business context — not just raw symbols.</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">🔁&nbsp; <b>Diff-aware re-indexing</b><br /><sub>Re-analyses only files whose SHA changed — cost tracks code churn, not repo size.</sub></td>
+    <td width="33%" valign="top">🔌&nbsp; <b>MCP-native</b><br /><sub>Four retrieval tools for Claude Code, Cursor, and any MCP client.</sub></td>
+    <td width="33%" valign="top">🚫&nbsp; <b>No telemetry</b><br /><sub>Single-tenant, binds to <code>127.0.0.1</code> — the server never phones home.</sub></td>
+  </tr>
+</table>
 
-**You need:** [Bun](https://bun.sh) ≥ 1.1, git, and an [OpenRouter](https://openrouter.ai) API key _or_ a local [Ollama](https://ollama.com) model.
+## ⚡ Quickstart
+
+**Prerequisites** &nbsp;·&nbsp; [Bun](https://bun.sh) ≥ 1.1 &nbsp;·&nbsp; git &nbsp;·&nbsp; an [OpenRouter](https://openrouter.ai) API key _or_ a local [Ollama](https://ollama.com) model
+
+> **Embedded by default** — everything lives in local files under `~/.bytebell` (SQLite + LadybugDB + Honker). No Docker, no database to install. Prefer Docker mode or your own infra? The full walkthrough is in **[docs/getting-started.md](docs/getting-started.md)**.
+
+**1 · Install** &nbsp;—&nbsp; clones the repo, installs deps, links the `bytebell` command
 
 ```bash
-# 1 · install — clones the repo, installs deps, links the `bytebell` command
 curl -fsSL https://raw.githubusercontent.com/ByteBell/open-ir/main/install.sh | bash
-
-# 2 · one interactive wizard: LLM provider → infra (Embedded, no Docker) → optional repo.
-#     Then it boots, indexes, and auto-wires the MCP endpoint into your editor.
-bytebell setup
-
-# 3 · restart your editor, then ask it:
-#     "Where is auth handled?"  ·  "Summarize the architecture."
 ```
 
-`bytebell setup` auto-detects and wires Open-IR into Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code for you.
+**2 · Set up** &nbsp;—&nbsp; one wizard (LLM provider → infra → optional first repo); then it boots, indexes, and wires the MCP endpoint into your editor
 
-Every command and flag: **[docs/commands.md](docs/commands.md)** · every setting: **[docs/configuration.md](docs/configuration.md)**.
+```bash
+bytebell setup
+```
 
-There is no `.env` file anywhere — `~/.bytebell/config.json` (mode `0600`) is the single source of truth, written only by `bytebell set`.
+**3 · Ask your editor** &nbsp;—&nbsp; restart it, then try:
+
+> _“Where is auth handled?”_ &nbsp;·&nbsp; _“Summarize the architecture.”_
+
+<sub>`bytebell setup` auto-wires Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code for you. &nbsp;·&nbsp; Every command → **[docs/commands.md](docs/commands.md)** &nbsp;·&nbsp; every setting → **[docs/configuration.md](docs/configuration.md)** &nbsp;·&nbsp; no `.env` anywhere — `~/.bytebell/config.json` (mode `0600`) is the single source of truth, written only by `bytebell set`.</sub>
 
 ## What Open-IR does
 

@@ -2,7 +2,7 @@
 
 Code knowledge graphs are not a new idea. Most of the tools below build one in some form. What actually matters is what each graph stores on its nodes, and how those nodes are connected to each other. That is where the token cost gap comes from when you start running real queries against your codebase.
 
-**Repo:** https://github.com/ByteBell/bytebell-oss
+**Repo:** https://github.com/ByteBell/open-ir
 
 ---
 
@@ -80,7 +80,7 @@ Everything runs on 127.0.0.1. There are no vectors involved, no embedding provid
 
 We did not invent code knowledge graphs. What we built is one that carries business context, structural edges, cross-repo semantic links, and per-commit history on every node. That combination is what brings your AI coding token bill down by 80 percent or more.
 
-**Repo:** https://github.com/ByteBell/bytebell-oss
+**Repo:** https://github.com/ByteBell/open-ir
 **Website:** https://bytebell.ai
 Free up to 1M tokens. $13 per user per month for 5M tokens.
 
