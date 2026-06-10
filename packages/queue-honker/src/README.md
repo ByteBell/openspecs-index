@@ -9,20 +9,22 @@ Implementation of the Honker-over-SQLite provider that registers itself with `@b
 - **[priority.ts](priority.ts)** — `mapHonkerPriority(JobPriority)` returns Honker's higher-number-wins numeric priority (Low=1, Normal=100, High=1000).
 - **[paths.ts](paths.ts)** — `resolveQueueDbPath()` returns `Config.QueueDbPath` (with `~/...` expanded to the home dir) if set, else `path.join(getBytebellHome(), "queue.db")`.
 - **[failed.ts](failed.ts)** — `normalizeFailed(row)` converts a raw `_honker_dead` row into the cross-provider `FailedJob` shape from `@bb/queue-core` (parses the TEXT JSON payload, extracts `knowledgeId`, converts `died_at` Unix seconds → ISO).
+- **[repo-log-settle.ts](repo-log-settle.ts)** — `knowledgeIdOf(job)` and `settleDeadRepoLogs(db)`: the terminal per-repo-log hooks (`@bb/logger`'s `settleRepoLog`) used by the provider on `ack`, on dead-letter sweep, and on cancel. Split out so `provider.ts` stays under the 300-line cap.
 
 ## Module dependency graph
 
 ```
-priority.ts → @bb/types
-paths.ts    → @bb/config, @bb/types, node:path, node:os
-failed.ts   → @bb/types, @bb/queue-core
-provider.ts → @russellthehippo/honker-node, @bb/types, @bb/config, @bb/errors,
-              @bb/logger, @bb/queue (registerQueueProvider, defaultConcurrencyFor),
-              @bb/queue-core, priority.ts, paths.ts, failed.ts
-index.ts    → provider.ts (side effect only)
+priority.ts        → @bb/types
+paths.ts           → @bb/config, @bb/types, node:path, node:os
+failed.ts          → @bb/types, @bb/queue-core
+repo-log-settle.ts → @russellthehippo/honker-node (types), @bb/logger
+provider.ts        → @russellthehippo/honker-node, @bb/types, @bb/config, @bb/errors,
+                     @bb/logger, @bb/queue (registerQueueProvider, defaultConcurrencyFor),
+                     @bb/queue-core, priority.ts, paths.ts, failed.ts, repo-log-settle.ts
+index.ts           → provider.ts (side effect only)
 ```
 
-No cycles. `priority.ts`, `paths.ts`, `failed.ts` are leaves within the package.
+No cycles. `priority.ts`, `paths.ts`, `failed.ts`, `repo-log-settle.ts` are leaves within the package.
 
 ## Internal table access
 

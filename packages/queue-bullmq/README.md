@@ -12,6 +12,7 @@ Strategy. Registers itself with `@bb/queue` via side-effect import as the `"bull
 - Owns the Redis lifecycle: `connect()` calls `connectRedis()`, `close()` calls `closeRedis()`, `ping()` calls `pingRedis()`.
 - Maps `JobPriority` (Low/Normal/High) to BullMQ's smaller-number-wins ordering (1000/100/10).
 - Computes the stable dedupe `jobId = ${type}-${knowledgeId}` so re-publishing is a no-op.
+- Settles per-repo logs (`@bb/logger`'s `settleRepoLog`) at terminal states: the worker's `completed` event (success), its `failed` event once `attemptsMade >= attempts` (retries exhausted), and on cancellation. Mid-retry failures are left so the in-flight `repos/<label>.log` stays until the job is truly done.
 
 ## Public Exports
 

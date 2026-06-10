@@ -1,6 +1,8 @@
 import type { GithubIndexPayload, JobMessage, LocalIngestPayload, UsageGuard } from "@bb/types";
 import { IngestError } from "@bb/errors";
+import { withRepoLog } from "@bb/logger";
 import { isEnvelopeCoherent, narrowGithubIngest, narrowLocalIngest } from "#src/payload/narrow.ts";
+import { githubRepoLogLabel, localRepoLogLabel } from "#src/handlers/repo-log-label.ts";
 import type { IngestRunnerDeps, IngestRunnerInput } from "#src/types/ingest-runner.ts";
 import type { PipelineSummary } from "#src/types/pipeline.ts";
 
@@ -31,7 +33,9 @@ export function createGithubIngestHandler(
     if (usageGuard !== undefined) {
       input.usageGuard = usageGuard;
     }
-    return await deps.runner.run(input);
+    return await withRepoLog({ knowledgeId: payload.knowledgeId, label: githubRepoLogLabel(payload) }, () =>
+      deps.runner.run(input),
+    );
   };
 }
 
@@ -51,6 +55,8 @@ export function createLocalIngestHandler(
     if (usageGuard !== undefined) {
       input.usageGuard = usageGuard;
     }
-    return await deps.runner.run(input);
+    return await withRepoLog({ knowledgeId: payload.knowledgeId, label: localRepoLogLabel(payload) }, () =>
+      deps.runner.run(input),
+    );
   };
 }

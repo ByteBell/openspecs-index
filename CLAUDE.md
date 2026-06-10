@@ -162,6 +162,8 @@ The `~/.bytebell/` directory is the **single source of truth** for runtime confi
   logs/
     server-YYYY-MM-DD.log
     cli-YYYY-MM-DD.log
+    repos/<label>.log     log of a repo still indexing (stays across retries)
+    archive/<label>.log   consolidated log of a fully-settled repo (all attempts)
   pid                   running server PID
 ```
 
