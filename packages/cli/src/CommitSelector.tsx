@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+import { ACCENT } from "./theme.ts";
 
 /**
  * Interactive commit picker. Type any character to filter the list (matches
@@ -105,7 +106,7 @@ export function CommitSelector({ items, title, onDone }: CommitSelectorProps): R
         <Text dimColor>{`  (${filtered.length}/${items.length})`}</Text>
       </Box>
       <Box marginBottom={1}>
-        <Text color="cyan">filter: </Text>
+        <Text color={ACCENT}>filter: </Text>
         <Text>{filter.length > 0 ? filter : <Text dimColor>(type to filter)</Text>}</Text>
       </Box>
       {filtered.length === 0 ? (
@@ -118,8 +119,8 @@ export function CommitSelector({ items, title, onDone }: CommitSelectorProps): R
           const cursor = absoluteIndex === boundedIndex;
           return (
             <Box key={item.hash}>
-              <Text color={cursor ? "cyan" : "gray"}>{cursor ? "▶ " : "  "}</Text>
-              <Text color={cursor ? "cyan" : "gray"}>{item.shortHash}</Text>
+              <Text color={cursor ? ACCENT : "gray"}>{cursor ? "▶ " : "  "}</Text>
+              <Text color={cursor ? ACCENT : "gray"}>{item.shortHash}</Text>
               <Text dimColor>{` ${item.subject.slice(0, 80)} `}</Text>
               <Text dimColor>{`(${item.author}, ${formatDate(item.date)})`}</Text>
             </Box>

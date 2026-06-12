@@ -6,11 +6,65 @@ package-level contract; this file documents how the source tree is split.
 ## Files
 
 - **[index.ts](index.ts)** — binary entry. Shebang `#!/usr/bin/env bun`.
-  Constructs the commander `Command("bytebell")`, wires version, and
-  registers every shipped subcommand: `set`, `boot`, `shutdown`,
-  `server`, `index`, `ingest`, `ls`. Calls `parseAsync`. Top-level
-  `try/catch` prints any uncaught error and exits `2` (the typed-error
-  path through commander handlers exits `1`).
+  A bare `bytebell-tinker` (no argv beyond node + script) calls `runMenu()` to
+  open the interactive TUI menu; anything else (a subcommand, `--help`,
+  `--version`) is built via `buildProgram()` and handed to `parseAsync`.
+  Top-level `try/catch` prints any uncaught error and exits `2` (the
+  typed-error path through commander handlers exits `1`).
+- **[program.ts](program.ts)** — `buildProgram()` constructs the
+  commander `Command("bytebell-tinker")`, wires `VERSION`, and registers every
+  shipped subcommand: `set`, `boot`, `shutdown`, `server`, `index`,
+  `ingest`, `pull`, `ls`, `delete`, `stats`, `mcp`, `migrate`, `menu`.
+  Extracted from `index.ts` so `MenuCommand` can build a fresh program
+  to dispatch a chosen command. Single source of truth for the command
+  list. Also re-exports `VERSION` (from `version.ts`).
+- **[version.ts](version.ts)** — leaf module exporting the `VERSION`
+  string, shared by `program.ts` and the menu footer. Separate file to
+  avoid an `index ↔ program ↔ MenuCommand` import cycle.
+- **[MenuCommand.ts](MenuCommand.ts)** — the `menu` subcommand and the
+  `runMenu()` orchestrator (also the default when `bytebell-tinker` is run
+  with no args). Owns the `GROUPS` layout (SETUP / KNOWLEDGE / SERVER /
+  INSIGHTS), the `ARG_SPECS` table (which commands need positional args
+  prompted), and `DISPATCH` (menu id → argv, e.g. `mcp` → `mcp stats`).
+  **Loops**: every command / form returns to the menu so the user moves
+  back and forth between options; the loop ends only on quit. Flow per
+  iteration: render `<MenuSelector />` → on `configure-llm` render
+  `<LlmConfigForm />`; on an arg-taking command render `<ArgPrompt />`
+  then dispatch; otherwise dispatch immediately. `dispatch()` builds a
+  fresh `buildProgram()` and `parseAsync`es `[node, script, cmd, ...args]`.
+  **Keys:** `q` backs out of a sub-screen to the menu; `Esc` leaves the
+  TUI entirely (on the text-entry screens — arg prompt, LLM fields — Esc
+  backs out instead, since `q` is typed there).
+- **[MenuSelector.tsx](MenuSelector.tsx)** — the top-level command picker.
+  Takes grouped `MenuGroup[]`; renders labelled sections with a per-item
+  glyph, but the cursor walks a single flat order skipping headers.
+  ↑/↓ or j/k move (wrapping), Enter selects, Esc/q quit (root level).
+  Header is the cyan `Bytebell Tinker` wordmark + dim
+  `local knowledge engine · open-ir` subtitle; footer is a
+  `<ControlsBar />` with the version right-aligned.
+- **[ControlsBar.tsx](ControlsBar.tsx)** — the universal footer key legend.
+  Renders each `{ keys, label }` as a bold inverse "cap" (`ACCENT` cyan bg
+  / white) plus a bold white label, so the control hints look identical on
+  every screen. Adds no outer padding (callers place it); an optional
+  `version` is pushed dim-right via `space-between`. Used by `MenuSelector`,
+  `ArgPrompt`, and both phases of `LlmConfigForm`.
+- **[theme.ts](theme.ts)** — single-source brand accent for the **whole**
+  CLI. Exports `ACCENT` (`cyan`, Bytebell accent — an Ink colour for
+  cursors / active rows / form highlights / control caps) **and** `ANSI`
+  (raw truecolor escapes) so the non-Ink output path (`output.ts`
+  spinners, tables, progress bars) draws from the same palette. Every
+  command — Ink or plain stdout — is themed from here.
+- **[LlmConfigForm.tsx](LlmConfigForm.tsx)** — dedicated two-phase form
+  for the LLM provider config. Phase 1 (`ProviderPicker`): choose
+  openrouter or ollama. Phase 2 (`FieldsForm`): edit just that provider's
+  fields — OpenRouter API key (masked) + model, or Ollama URL + model —
+  via Ink's focus manager (Tab/Shift-Tab), Enter saves all rows through
+  `KEY_MAP` setters (`llm-provider` plus the field keys), Esc steps back
+  to the provider choice. Pre-filled from `getConfigValue`.
+- **[ArgPrompt.tsx](ArgPrompt.tsx)** — one-field-at-a-time positional-arg
+  collector for menu-launched commands (`index` → git-url, `ingest` →
+  optional path). Enter advances / submits, Esc returns to the menu,
+  required fields refuse to advance while empty.
 - **[SetCommand.ts](SetCommand.ts)** — the `set` subcommand. Two
   optional positional args. Both provided → headless flow: looks up
   `KEY_MAP[key]`, runs `entry.setter(value)`, prints success (or the
@@ -36,10 +90,22 @@ package-level contract; this file documents how the source tree is split.
   and polls `/health`). Prints a final ready banner with the MCP URL.
   Idempotent — re-running on an already-up stack is a fast no-op.
 - **[ShutdownCommand.ts](ShutdownCommand.ts)** — the `shutdown`
-  subcommand. Reads `~/.bytebell/pid`, sends `SIGTERM`, polls until
-  the PID file vanishes (≤ 30 s), and prints the explicit
-  `docker compose down` hint. Docker is left running by design.
-  Stale PID file is treated as "already stopped" and exits 0.
+  subcommand. Delegates the actual stop to `serverLifecycle.stopServer()`
+  (see below), then handles the Docker side: prints the explicit
+  `docker compose down` hint, or tears infra down when `--with-docker`
+  (or the interactive prompt) says so. Skips all Docker handling in
+  embedded mode (`isEmbedded()`). On a timed-out stop it exits 1 without
+  escalating to `SIGKILL`; on no running server it reports "server is not
+  running" and exits 0.
+- **[serverLifecycle.ts](serverLifecycle.ts)** — `stopServer()` /
+  `startServer()` shared by `shutdown`/`server`. `stopServer` resolves the
+  target pids from **two sources** — the live process(es) holding the
+  configured server port (`lsof -nP -iTCP:<port> -sTCP:LISTEN -t`) plus a
+  still-alive pid from `~/.bytebell/pid` — so a stale pid file (a
+  double-start where the loser died on the port-bind conflict without
+  unlinking) no longer hides the real server. SIGTERMs each, polls until
+  **no process holds the port** (≤ 30 s), and unlinks any leftover pid
+  file. Returns `{ wasRunning, timedOut, pid }`.
 - **[bootConfig.ts](bootConfig.ts)** — `applyInfraDefaults` writes
   local-docker defaults (mongo / neo4j / neo4j-user / redis) and a
   random base64url 24-byte Neo4j password into `~/.bytebell/config.json`
@@ -128,8 +194,11 @@ dockerInfra.ts     → node:child_process, node:fs/promises, node:path, node:url
 BootCommand.ts     → commander, react, ink (render), @bb/types (Config),
                      @bb/config (HINTS, getConfigValue), bootConfig.ts, dockerInfra.ts,
                      serverSpawn.ts, SetupForm.tsx (SetupForm), output.ts
-ShutdownCommand.ts → commander, node:fs/promises, node:path, @bb/config (getBytebellHome),
-                     dockerInfra.ts (composeFilePath), output.ts
+ShutdownCommand.ts → commander, dockerInfra.ts (composeFilePath, down), output.ts,
+                     shutdownPrompts.ts, serverLifecycle.ts (stopServer), infraMode.ts (isEmbedded)
+serverLifecycle.ts → node:fs/promises, node:child_process (execFile), node:path,
+                     @bb/config (getBytebellHome, getConfigValue), @bb/types (Config),
+                     @bb/errors, serverSpawn.ts, output.ts
 
 httpClient.ts      → node:url
 serverSpawn.ts     → node:child_process, node:fs/promises, node:path, node:url,
@@ -147,9 +216,23 @@ IngestCommand.ts   → commander, node:fs/promises, node:path, serverSpawn.ts,
                      httpClient.ts, output.ts
 LsCommand.ts       → commander, serverSpawn.ts, httpClient.ts, output.ts
 
-index.ts           → commander, SetCommand, BootCommand, ShutdownCommand, ServerCommand,
-                     IndexCommand, IngestCommand, LsCommand, output.ts
+version.ts         → (leaf — no imports)
+ControlsBar.tsx    → ink, react (type-only)
+MenuSelector.tsx   → ink, react (type-only), version.ts (VERSION), ControlsBar.tsx
+ArgPrompt.tsx      → ink, react (type-only), Field.tsx (Field), ControlsBar.tsx
+LlmConfigForm.tsx  → ink, react, @bb/types (Config), @bb/config (getConfigValue),
+                     keyMap.ts (KEY_MAP), Field.tsx (Field), ControlsBar.tsx
+MenuCommand.ts     → commander, react, ink (render), MenuSelector.tsx, LlmConfigForm.tsx,
+                     ArgPrompt.tsx, program.ts (buildProgram), output.ts (info, success)
+program.ts         → commander, every buildXCommand (incl. MenuCommand), version.ts
+index.ts           → program.ts (buildProgram), MenuCommand.ts (runMenu), output.ts (error)
 ```
+
+`program.ts` imports `MenuCommand.ts` (for `buildMenuCommand`) and
+`MenuCommand.ts` imports `program.ts` (for `buildProgram`) — this cycle is
+safe because both bindings are only invoked at runtime, never at module
+load. `version.ts` is the leaf that keeps the version string out of the
+cycle.
 
 No cycles. `output.ts` is a leaf; `keyMap.ts` and `httpClient.ts` are
 near-leaves. `serverSpawn.ts` and `dockerInfra.ts` both manage foreign

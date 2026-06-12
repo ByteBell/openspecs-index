@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
+import { ACCENT } from "./theme.ts";
 
 export type PortConflictAction = "reuse" | "kill" | "change" | "cancel";
 
@@ -128,7 +129,7 @@ export function PortConflictSelector(props: PortConflictSelectorProps): ReactEle
       </Box>
       {choices.map((choice, i) => {
         const selected = i === index;
-        const colorProp = choice.disabled === true ? { color: "gray" } : selected ? { color: "cyan" } : {};
+        const colorProp = choice.disabled === true ? { color: "gray" } : selected ? { color: ACCENT } : {};
         return (
           <Box key={choice.action} flexDirection="column">
             <Text {...colorProp}>

@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { Box, Text, useFocus } from "ink";
 import TextInput from "ink-text-input";
+import { ACCENT } from "./theme.ts";
 
 export interface FieldProps {
   id: string;
@@ -15,7 +16,7 @@ export interface FieldProps {
 export function Field({ id, label, value, onChange, mask, error, autoFocus }: FieldProps): ReactElement {
   const { isFocused } = useFocus({ id, autoFocus: autoFocus === true });
   const indicator = isFocused ? "▶" : " ";
-  const labelProps = isFocused ? { color: "cyan" } : {};
+  const labelProps = isFocused ? { color: ACCENT } : {};
   const masked = mask === true;
   const displayValue = masked && value.length > 0 ? "•".repeat(value.length) : value;
   const inputProps = masked ? { value, onChange, mask: "•" } : { value, onChange };

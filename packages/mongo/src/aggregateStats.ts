@@ -132,8 +132,11 @@ function deriveRepoName(doc: KnowledgeDoc): string {
     const segments = doc.source.sourcePath.split("/").filter((s) => s.length > 0);
     return segments.at(-1) ?? doc.source.sourcePath;
   }
+  // `info` is typed required, but legacy / partially-written docs can lack it
+  // entirely — guard against `doc.info` being undefined so stats never crash.
+  const repoUrl = doc.info?.repoUrl ?? "";
   try {
-    const segments = new URL(doc.info.repoUrl ?? "").pathname
+    const segments = new URL(repoUrl).pathname
       .split("/")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
@@ -145,5 +148,6 @@ function deriveRepoName(doc: KnowledgeDoc): string {
   } catch {
     // fall through
   }
-  return doc.info.repoUrl ?? "";
+  // No usable URL — render a stable, non-empty label rather than a blank cell.
+  return repoUrl.length > 0 ? repoUrl : `unknown (${doc.knowledgeId.slice(0, 8)})`;
 }

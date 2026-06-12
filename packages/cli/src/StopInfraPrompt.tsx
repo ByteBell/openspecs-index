@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+import { ACCENT } from "./theme.ts";
 
 export interface StopInfraPromptProps {
   onDone: (stop: boolean) => void;
@@ -49,7 +50,7 @@ export function StopInfraPrompt(props: StopInfraPromptProps): ReactElement {
       {CHOICES.map((choice, i) => {
         const selected = i === index;
         return (
-          <Text key={choice.label} {...(selected ? { color: "cyan" } : {})}>
+          <Text key={choice.label} {...(selected ? { color: ACCENT } : {})}>
             {selected ? "❯ " : "  "}
             {choice.label}
           </Text>

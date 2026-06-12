@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+import { ACCENT } from "./theme.ts";
 
 export interface InitialBranchResult {
   choice?: "default" | "other";
@@ -54,8 +55,8 @@ export function InitialBranchSelector({ defaultBranch, onDone }: InitialBranchPr
         const cursor = i === index;
         return (
           <Box key={item.value}>
-            <Text color={cursor ? "cyan" : "gray"}>{cursor ? "▶ " : "  "}</Text>
-            <Text color={cursor ? "cyan" : "white"}>{item.label}</Text>
+            <Text color={cursor ? ACCENT : "gray"}>{cursor ? "▶ " : "  "}</Text>
+            <Text color={cursor ? ACCENT : "white"}>{item.label}</Text>
           </Box>
         );
       })}

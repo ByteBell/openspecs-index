@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH non-commercial-clause
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, unlink } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import path from "node:path";
-import { getBytebellHome } from "@bb/config";
+import { getBytebellHome, getConfigValue } from "@bb/config";
+import { Config } from "@bb/types";
 import {
   ServerStartTimeoutError,
   ServerInfraDownError,
@@ -31,15 +33,68 @@ async function readPid(pidFile: string): Promise<number | null> {
   }
 }
 
-async function waitForPidFileGone(pidFile: string): Promise<boolean> {
+function errorCode(cause: unknown): string | undefined {
+  if (cause !== null && typeof cause === "object" && "code" in cause) {
+    const code = (cause as Record<string, unknown>)["code"];
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+  return undefined;
+}
+
+/** `kill(pid, 0)` probes liveness: ESRCH → dead, EPERM → alive but not ours
+ * to signal (still counts as running). */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (cause: unknown) {
+    return errorCode(cause) === "EPERM";
+  }
+}
+
+/** Pids holding a LISTEN socket on the given TCP port, via `lsof`. Returns
+ * `[]` when lsof is absent or finds nothing — callers degrade gracefully. */
+function findListenerPids(port: number): Promise<number[]> {
+  return new Promise((resolve) => {
+    execFile("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], (cause, stdout) => {
+      if (cause !== null || stdout.length === 0) {
+        resolve([]);
+        return;
+      }
+      const pids = stdout
+        .split(/\s+/u)
+        .map((s) => Number.parseInt(s, 10))
+        .filter((n) => Number.isInteger(n) && n > 0);
+      resolve([...new Set(pids)]);
+    });
+  });
+}
+
+/** Stops when no process still holds the server port. When lsof is unavailable
+ *  (findListenerPids returns `[]`), falls back to `isAlive`-polling on
+ *  `knownPids`. */
+async function waitForServerStopped(port: number, knownPids?: Set<number>): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < POLL_TIMEOUT_MS) {
-    if (!(await pidFileExists(pidFile))) {
+    const listenerPids = await findListenerPids(port);
+    if (listenerPids.length > 0) {
+      await sleep(POLL_INTERVAL_MS);
+    } else if (knownPids && knownPids.size > 0 && [...knownPids].some(isAlive)) {
+      await sleep(POLL_INTERVAL_MS);
+    } else {
       return true;
     }
-    await sleep(POLL_INTERVAL_MS);
   }
-  return !(await pidFileExists(pidFile));
+  const listenerPids = await findListenerPids(port);
+  if (listenerPids.length > 0) {
+    return false;
+  }
+  if (knownPids && knownPids.size > 0 && [...knownPids].some(isAlive)) {
+    return false;
+  }
+  return true;
 }
 
 async function pidFileExists(pidFile: string): Promise<boolean> {
@@ -48,6 +103,12 @@ async function pidFileExists(pidFile: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function removeStalePidFile(pidFile: string): Promise<void> {
+  if (await pidFileExists(pidFile)) {
+    await unlink(pidFile).catch(() => undefined);
   }
 }
 
@@ -61,29 +122,56 @@ export interface StopServerResult {
   pid: number | null;
 }
 
+/**
+ * Stops the running server. Resolves targets from two sources — the live
+ * process(es) holding the configured server port (via `lsof`) plus a still-
+ * alive pid from `~/.bytebell/pid` — so a stale pid file (a double-start where
+ * the loser died on the port-bind conflict without unlinking it) no longer
+ * hides the real server. SIGTERMs each, waits until the port is free, and
+ * cleans up any leftover pid file.
+ */
 export async function stopServer(): Promise<StopServerResult> {
   const pidFile = path.join(getBytebellHome(), "pid");
-  const pid = await readPid(pidFile);
-  if (pid === null) {
-    return { wasRunning: false, timedOut: false, pid: null };
+  const port = getConfigValue(Config.ServerPort);
+
+  const filePid = await readPid(pidFile);
+  const targets = new Set<number>();
+  if (filePid !== null && isAlive(filePid)) {
+    targets.add(filePid);
   }
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch (cause: unknown) {
-    const code =
-      cause !== null &&
-      typeof cause === "object" &&
-      "code" in cause &&
-      typeof (cause as Record<string, unknown>)["code"] === "string"
-        ? ((cause as Record<string, unknown>)["code"] as string)
-        : undefined;
-    if (code === "ESRCH") {
-      return { wasRunning: false, timedOut: false, pid };
+  for (const pid of await findListenerPids(port)) {
+    if (pid !== process.pid) {
+      targets.add(pid);
     }
-    throw cause;
   }
-  const drained = await waitForPidFileGone(pidFile);
-  return { wasRunning: true, timedOut: !drained, pid };
+
+  if (targets.size === 0) {
+    await removeStalePidFile(pidFile);
+    return { wasRunning: false, timedOut: false, pid: filePid };
+  }
+
+  let signalled = false;
+  for (const pid of targets) {
+    try {
+      process.kill(pid, "SIGTERM");
+      signalled = true;
+    } catch (cause: unknown) {
+      if (errorCode(cause) !== "ESRCH") {
+        throw cause;
+      }
+    }
+  }
+  if (!signalled) {
+    await removeStalePidFile(pidFile);
+    return { wasRunning: false, timedOut: false, pid: filePid };
+  }
+
+  const drained = await waitForServerStopped(port, targets);
+  if (drained) {
+    await removeStalePidFile(pidFile);
+  }
+  const firstTarget = [...targets][0] ?? filePid;
+  return { wasRunning: true, timedOut: !drained, pid: firstTarget };
 }
 
 export async function startServer(): Promise<boolean> {

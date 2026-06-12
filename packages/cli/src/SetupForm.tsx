@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
+import path from "node:path";
 import { Box, Text, useApp, useInput } from "ink";
 import { Config } from "@bb/types";
-import { getConfigValue } from "@bb/config";
+import { getConfigValue, getBytebellHome } from "@bb/config";
 import { KEY_MAP } from "./keyMap.ts";
 import { applyInfraMode, infraModeOption, isEmbedded, type InfraMode } from "./infraMode.ts";
 import { Field } from "./Field.tsx";
@@ -15,8 +16,10 @@ interface Row {
   label: string;
   cliKey: string;
   mask?: boolean;
-  /** Infra connection rows — only required/shown in Docker (non-embedded) mode. */
+  /** Infra connection rows — only shown in Docker (non-embedded) mode. */
   infra?: boolean;
+  /** Local-store rows — only shown in Embedded mode. */
+  embedded?: boolean;
   validate: (raw: string) => string | null;
 }
 
@@ -62,6 +65,27 @@ const ROWS: Row[] = [
     validate: (s) => (REDIS_RX.test(s) ? null : "expected redis:// or rediss://"),
   },
   {
+    id: "sqlite-path",
+    label: "SQLite path",
+    cliKey: "sqlite-path",
+    embedded: true,
+    validate: (s) => (s.length > 0 ? null : "required"),
+  },
+  {
+    id: "ladybug-path",
+    label: "Ladybug path",
+    cliKey: "ladybug-path",
+    embedded: true,
+    validate: (s) => (s.length > 0 ? null : "required"),
+  },
+  {
+    id: "queue-db-path",
+    label: "Queue DB path",
+    cliKey: "queue-db-path",
+    embedded: true,
+    validate: (s) => (s.length > 0 ? null : "required"),
+  },
+  {
     id: "port",
     label: "Server port",
     cliKey: "port",
@@ -88,6 +112,13 @@ const ROWS: Row[] = [
   },
 ];
 
+/** Embedded store paths fall back to the home-derived default so the field
+ * is never blank (matches what `applyInfraMode` would auto-fill). */
+function embeddedDefault(key: Config, filename: string): string {
+  const current = getConfigValue(key);
+  return typeof current === "string" && current.length > 0 ? current : path.join(getBytebellHome(), filename);
+}
+
 function loadInitial(): Record<string, string> {
   return {
     mongo: getConfigValue(Config.MongoUri),
@@ -95,6 +126,9 @@ function loadInitial(): Record<string, string> {
     "neo4j-user": getConfigValue(Config.Neo4jUser),
     "neo4j-password": getConfigValue(Config.Neo4jPassword),
     redis: getConfigValue(Config.RedisUrl),
+    "sqlite-path": embeddedDefault(Config.SqlitePath, "data.sqlite"),
+    "ladybug-path": embeddedDefault(Config.LadybugPath, "ladybug.lbug"),
+    "queue-db-path": embeddedDefault(Config.QueueDbPath, "queue.db"),
     port: String(getConfigValue(Config.ServerPort)),
     "concurrency-github": String(getConfigValue(Config.ConcurrencyGithub)),
     "openrouter-api-key": getConfigValue(Config.OpenrouterApiKey),
@@ -113,7 +147,17 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isDocker = (values["infra-mode"] ?? "docker") === "docker";
-  const visibleRows = ROWS.filter((r) => isDocker || r.infra !== true);
+  // Docker mode shows the connection rows; Embedded mode shows the local-store
+  // path rows; common rows (port / concurrency / OpenRouter) show in both.
+  const visibleRows = ROWS.filter((r) => {
+    if (r.infra === true) {
+      return isDocker;
+    }
+    if (r.embedded === true) {
+      return !isDocker;
+    }
+    return true;
+  });
 
   const errors: Record<string, string | null> = {};
   for (const row of visibleRows) {
@@ -172,7 +216,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
         />
       ))}
       <Box marginTop={1}>
-        <Text dimColor>[Tab] next [Shift-Tab] back [←/→] switch [Enter] save [Esc] quit</Text>
+        <Text dimColor>[Tab] next [Shift-Tab] back [←/→] switch [Enter] save [Esc] back to menu</Text>
       </Box>
       {submitError !== null && (
         <Box marginTop={1}>

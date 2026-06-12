@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+import { ACCENT } from "./theme.ts";
 
 export type PullMode = "latest" | "specific";
 
@@ -59,15 +60,15 @@ export function PullModeSelector({ repoLabel, onDone }: PullModeSelectorProps): 
     <Box flexDirection="column" borderStyle="round" paddingX={1} paddingY={0}>
       <Box marginBottom={1}>
         <Text bold>How should we pull </Text>
-        <Text bold color="cyan">
+        <Text bold color={ACCENT}>
           {repoLabel}
         </Text>
         <Text bold>?</Text>
       </Box>
       {CHOICES.map((choice, i) => (
         <Box key={choice.mode}>
-          <Text color={i === index ? "cyan" : "gray"}>{i === index ? "▶ " : "  "}</Text>
-          <Text color={i === index ? "cyan" : "gray"}>{choice.label}</Text>
+          <Text color={i === index ? ACCENT : "gray"}>{i === index ? "▶ " : "  "}</Text>
+          <Text color={i === index ? ACCENT : "gray"}>{choice.label}</Text>
           <Text dimColor>{` — ${choice.hint}`}</Text>
         </Box>
       ))}

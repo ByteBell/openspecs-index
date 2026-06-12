@@ -1,6 +1,10 @@
-const GREEN = "[32m";
-const RED = "[31m";
-const RESET = "[0m";
+import { ANSI } from "./theme.ts";
+
+const GREEN = ANSI.success;
+const RED = ANSI.error;
+const ACCENT = ANSI.accent;
+const BOLD = ANSI.bold;
+const RESET = ANSI.reset;
 
 function paint(color: string, line: string, stream: { isTTY?: boolean }): string {
   return stream.isTTY === true ? `${color}${line}${RESET}` : line;
@@ -37,7 +41,7 @@ export function createSpinner(initialText: string): Spinner {
 
   const render = () => {
     if (process.stderr.isTTY) {
-      process.stderr.write(`\r${frames[frameIndex]} ${text}\x1b[K`);
+      process.stderr.write(`\r${ACCENT}${frames[frameIndex]}${RESET} ${text}\x1b[K`);
     }
   };
 
@@ -95,7 +99,7 @@ export function createProgressBar(initialText: string): ProgressBar {
       const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;
       const filled = Math.floor((percent / 100) * width);
       const empty = width - filled;
-      const bar = "█".repeat(filled) + "░".repeat(empty);
+      const bar = `${ACCENT}${"█".repeat(filled)}${RESET}${"░".repeat(empty)}`;
       process.stderr.write(`\r${text} [${bar}] ${percent.toFixed(1)}%\x1b[K`);
     }
   };
@@ -143,7 +147,12 @@ export function table(headers: string[], rows: string[][]): void {
   const writeRow = (cols: string[]): void => {
     process.stdout.write(cols.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ") + "\n");
   };
-  writeRow(headers);
+  if (process.stdout.isTTY === true) {
+    const headerLine = headers.map((h, i) => h.padEnd(widths[i] ?? 0)).join("  ");
+    process.stdout.write(`${ACCENT}${BOLD}${headerLine}${RESET}\n`);
+  } else {
+    writeRow(headers);
+  }
   for (const row of rows) {
     writeRow(row);
   }

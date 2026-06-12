@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+import { ACCENT } from "./theme.ts";
 
 /**
  * Generic interactive selector for indexed repos.
@@ -143,9 +144,9 @@ export function RepoSelector({ items, title, multi = true, confirm, onDone }: Re
       </Box>
       {items.map((item, i) => (
         <Box key={item.knowledgeId}>
-          <Text color={i === index ? "cyan" : "gray"}>{i === index ? "▶ " : "  "}</Text>
+          <Text color={i === index ? ACCENT : "gray"}>{i === index ? "▶ " : "  "}</Text>
           {multi ? <Text>{selected.has(i) ? "[x] " : "[ ] "}</Text> : null}
-          <Text color={i === index ? "cyan" : "gray"}>{item.label}</Text>
+          <Text color={i === index ? ACCENT : "gray"}>{item.label}</Text>
           <Text dimColor> {item.detail}</Text>
         </Box>
       ))}

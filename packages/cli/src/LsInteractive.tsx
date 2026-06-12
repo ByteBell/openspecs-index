@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import type { CommitHashRecord } from "@bb/types";
+import { ACCENT } from "./theme.ts";
 
 export interface RepoEntry {
   knowledgeId: string;
@@ -121,13 +122,13 @@ export function LsInteractive({ repos, onDone }: LsInteractiveProps): ReactEleme
   const renderRepos = () => (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">
+        <Text bold color={ACCENT}>
           Indexed Repositories ({groupedRepos.length})
         </Text>
       </Box>
       {groupedRepos.map((group, i) => (
         <Box key={group.url}>
-          <Text color={i === repoIndex ? "cyan" : "gray"}>{i === repoIndex ? "▶ " : "  "}</Text>
+          <Text color={i === repoIndex ? ACCENT : "gray"}>{i === repoIndex ? "▶ " : "  "}</Text>
           <Text color={i === repoIndex ? "white" : "gray"} bold={i === repoIndex}>
             {group.kind === "github" ? parseGithubSlug(group.url) : group.url}
           </Text>
@@ -146,7 +147,7 @@ export function LsInteractive({ repos, onDone }: LsInteractiveProps): ReactEleme
         <Text color="gray" dimColor>
           Repos /{" "}
         </Text>
-        <Text bold color="cyan">
+        <Text bold color={ACCENT}>
           {selectedRepoUrl
             ? currentBranches[0]?.source.kind === "github"
               ? parseGithubSlug(selectedRepoUrl)
@@ -156,7 +157,7 @@ export function LsInteractive({ repos, onDone }: LsInteractiveProps): ReactEleme
       </Box>
       {currentBranches.map((entry, i) => (
         <Box key={entry.knowledgeId}>
-          <Text color={i === branchIndex ? "cyan" : "gray"}>{i === branchIndex ? "▶ " : "  "}</Text>
+          <Text color={i === branchIndex ? ACCENT : "gray"}>{i === branchIndex ? "▶ " : "  "}</Text>
           <Text color={i === branchIndex ? "white" : "gray"} bold={i === branchIndex}>
             {entry.source.kind === "github" ? (entry.source.branch ?? "default") : "local"}
           </Text>
@@ -183,7 +184,7 @@ export function LsInteractive({ repos, onDone }: LsInteractiveProps): ReactEleme
           <Text color="gray" dimColor>
             Repos / {s.kind === "github" ? parseGithubSlug(s.repoUrl) : s.sourcePath} /{" "}
           </Text>
-          <Text bold color="cyan">
+          <Text bold color={ACCENT}>
             {s.kind === "github" ? (s.branch ?? "default") : "local"}
           </Text>
         </Box>

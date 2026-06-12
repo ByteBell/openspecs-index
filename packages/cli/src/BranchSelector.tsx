@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
+import { ACCENT } from "./theme.ts";
 
 export interface BranchSelectorResult {
   branch?: string;
@@ -93,7 +94,7 @@ export function BranchSelector({ branches: rawBranches, title, onDone }: BranchS
         <Text dimColor>{`  (${filtered.length}/${branches.length})`}</Text>
       </Box>
       <Box marginBottom={1}>
-        <Text color="cyan">filter: </Text>
+        <Text color={ACCENT}>filter: </Text>
         <Text>{filter.length > 0 ? filter : <Text dimColor>(type to filter)</Text>}</Text>
       </Box>
       {filtered.length === 0 ? (
@@ -107,8 +108,8 @@ export function BranchSelector({ branches: rawBranches, title, onDone }: BranchS
           const isManual = item.kind === "manual";
           return (
             <Box key={`${item.kind}-${item.label}`}>
-              <Text color={cursor ? "cyan" : "gray"}>{cursor ? "▶ " : "  "}</Text>
-              <Text color={cursor ? "cyan" : isManual ? "yellow" : "white"}>{item.label}</Text>
+              <Text color={cursor ? ACCENT : "gray"}>{cursor ? "▶ " : "  "}</Text>
+              <Text color={cursor ? ACCENT : isManual ? "yellow" : "white"}>{item.label}</Text>
             </Box>
           );
         })
