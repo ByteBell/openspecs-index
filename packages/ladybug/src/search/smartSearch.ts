@@ -19,11 +19,18 @@ export async function runSmartSearchChannel(
     return [];
   }
 
-  const params: Record<string, string | number | null> = {
+  const params: Record<string, string | number | string[] | null> = {
     knowledgeId: input.knowledgeId,
     pathPrefix: input.pathPrefix,
     resultCap: Number(input.resultCap),
   };
+
+  // Bind $knowledgeIds only when buildSharedFilters emits the matching
+  // condition, so the prepared query's placeholders and the param map stay in
+  // lockstep (an unreferenced param would be rejected by the engine).
+  if (input.knowledgeIds && input.knowledgeIds.length > 0) {
+    params["knowledgeIds"] = [...input.knowledgeIds];
+  }
 
   input.queryTerms.forEach((t, i) => {
     params[`queryTerm_${i}`] = t.toLowerCase();

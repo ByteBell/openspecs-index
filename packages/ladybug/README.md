@@ -20,7 +20,7 @@ The package owns:
 - Optimized File-node Bulk Upsert (`bulkUpsertFiles`) — maps files to Parquet rows, writes them to temporary files on disk, and executes single-transaction `DELETE` and SQL `COPY FROM` commands.
 - File-node Snapshotting (`snapshotFilesToVersion`) — copies live files to snapshots before updates.
 - Concept-graph writes (`upsertConcept`, `attachFileToConcept`, `upsertTestsEdge`, `upsertContract`, `attachFileToContract`, `upsertGuidepost`, `attachGuidepost`) — `:Concept` / `:Contract` / `:Guidepost` nodes plus their file edges, matching the neo4j provider's merge policy so the ConceptGraphStrategy persists identically on either backend.
-- Stubbed read-side search (`src/search.ts`) — `IGraphSearchRepository` methods are declared but throw `"Ladybug search not implemented yet"`. The interface keeps types honest under a Ladybug-only deployment; real implementations (LadybugDB-native column lookups) land in a follow-up PR. Until then, MCP smart_search / keyword_lookup / list_knowledge / retrieve_file(metadata) will fail loudly rather than return wrong results when the active graph provider is Ladybug.
+- Read-side search (`src/search/`) — LadybugDB-native implementations of the `IGraphSearchRepository` surface: `runSmartSearchChannel` (fused per-channel scoring over `File` text, paths, keywords, classes/functions, and internal/external imports), `keywordLookup`, `listKnowledgeBases`, `fetchFileMetadata`, and `fetchRepoNames`. These back MCP smart_search / keyword_lookup / list_knowledge / retrieve_file(metadata) when the active graph provider is Ladybug. They are not named package exports — they are wired into the registered provider's `search` namespace in `src/provider.ts`.
 
 ## Public exports
 
@@ -31,7 +31,9 @@ function pingLadybug(): Promise<PingResult>;
 
 function upsertKnowledgeNode(doc: KnowledgeDoc): Promise<void>;
 function setKnowledgeStateInGraph(knowledgeId: string, state: KnowledgeState): Promise<void>;
+function setKnowledgeBranchInGraph(knowledgeId: string, branch: string): Promise<void>;
 function deleteKnowledgeGraph(knowledgeId: string): Promise<void>;
+function vacuumOrphanEntities(): Promise<void>;
 function upsertFileNode(input: UpsertFileNodeInput): Promise<void>;
 function bulkUpsertFiles(knowledgeId: string, fileStream: AsyncIterable<UpsertFileNodeInput>): Promise<void>;
 function deleteFileNodes(knowledgeId: string, paths: string[]): Promise<void>;
