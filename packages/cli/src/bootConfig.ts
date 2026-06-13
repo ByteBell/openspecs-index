@@ -86,6 +86,8 @@ export function applyInfraDefaults(): ApplyDefaultsResult {
       continue;
     }
     const value = entry.computeDefault();
+    // Secret keys (e.g. an auto-generated Neo4j password) route to the OS keychain
+    // via their KEY_MAP setter, so a routine boot leaves no plaintext secret.
     const setter = KEY_MAP[entry.cliKey];
     if (setter === undefined) {
       throw new Error(`internal: KEY_MAP entry "${entry.cliKey}" missing`);
@@ -112,8 +114,12 @@ const CONFIG_HINT_KEYS: Partial<Record<Config, string>> = {
 };
 
 export function checkPreflight(): PreflightResult {
-  const provider = getConfigValue(Config.LlmProvider);
-  const required = requiredKeysFor(provider);
+  const required = requiredKeysFor(
+    getConfigValue(Config.LlmProvider),
+    getConfigValue(Config.DbProvider),
+    getConfigValue(Config.GraphProvider),
+    getConfigValue(Config.QueueProvider),
+  );
   const missing: PreflightResult["missing"] = [];
   for (const configKey of required) {
     const value = getConfigValue(configKey);

@@ -107,15 +107,36 @@ infra/docker/docker-compose.yml up -d` for **only the services the
 
 The package does **not** own:
 
-- Any other subcommand (index, ls, clean, models, keys, cost, server,
+- Any other subcommand (index, ls, clean, models, cost, server,
   mcp, update) — all deferred per the catalog below.
 - Live infra connection probes — the CLI cannot import `@bb/mongo` /
   `@bb/redis` per the tier rule. Format-only validation in v0; future
   `bytebell config doctor` will probe via a running server.
 - The Ink dashboard (`bytebell` no-args) — needs the server's HTTP API
   - activity feed.
-- OpenRouter API key handling — own subcommand (`bytebell keys set`)
-  with `keytar` keychain backing.
+
+### Secrets — handled by `bytebell set`, stored in the OS keychain
+
+There is no separate secrets command. The secret-bearing keys
+(`openrouter-api-key`, `neo4j-password`) are written by the **same `bytebell
+set`** path as everything else; their `KEY_MAP` setters call
+`@bb/config.storeSecret`, which stores the value in the OS keychain
+(macOS Keychain / Linux Secret Service / Windows Credential Manager) and clears
+any plaintext copy in `config.json`:
+
+- `bytebell set openrouter-api-key <key>` / `bytebell set neo4j-password <pwd>` —
+  store in the keychain. If no keychain backend is available (e.g. headless
+  Linux without Secret Service, CI), it falls back to a plaintext write in
+  `config.json` and prints a warning.
+- `bytebell set` (no args) / `bytebell setup` — the interactive forms use the
+  same setters (masked input), so secrets entered there also land in the keychain.
+
+Reads are transparent: on first load `@bb/config` performs a **clean migration**
+— any plaintext secret found in `config.json` is moved into the keychain and the
+plaintext field is cleared on disk. The keychain is the source of truth from
+then on; `getConfigValue` resolves it without callers knowing. The only case a
+plaintext secret persists is on a system with no keychain backend (headless
+Linux without Secret Service, CI, etc.), and the server warns about it at boot.
 
 ## Public exports
 
@@ -201,7 +222,6 @@ will touch when implemented. Only the **bolded** entries ship in v0.
 | `bytebell` (first-run auto-launch of setup form) | If `isConfigComplete()` returns false, redirect to `bytebell set` form ([docs/arch.md:170](../../docs/arch.md#L170))                                                                                  | After dashboard lands                       |
 | `bytebell models set <model-id>`                 | Validate model via OpenRouter API + write `openrouter_model`                                                                                                                                          | After OpenRouter helper                     |
 | `bytebell models ls`                             | Curated 5-10 models, on-the-fly OpenRouter pricing                                                                                                                                                    | Same                                        |
-| `bytebell keys set`                              | Interactive masked prompt → `keytar` keychain → write key                                                                                                                                             | After `keytar` integration                  |
 | `bytebell cost`                                  | Read `~/.bytebell/cost-ledger.sqlite` via `bun:sqlite`, render breakdowns                                                                                                                             | After cost ledger lands in `@bb/llm`        |
 | `bytebell server stop \| status \| logs`         | Kill / inspect `bytebell-server`, tail server logs (start is shipped — see above)                                                                                                                     | After `@bb/server` health surface           |
 | `bytebell mcp`                                   | Print MCP endpoint URL + sample MCP-client config                                                                                                                                                     | After dashboard pane                        |
@@ -223,7 +243,6 @@ will touch when implemented. Only the **bolded** entries ship in v0.
 | `bytebell` (first-run auto-launch of setup form) | If `isConfigComplete()` returns false, redirect to `bytebell set` form ([docs/arch.md:170](../../docs/arch.md#L170))                                                                                  | After dashboard lands                       |
 | `bytebell models set <model-id>`                 | Validate model via OpenRouter API + write `openrouter_model`                                                                                                                                          | After OpenRouter helper                     |
 | `bytebell models ls`                             | Curated 5-10 models, on-the-fly OpenRouter pricing                                                                                                                                                    | Same                                        |
-| `bytebell keys set`                              | Interactive masked prompt → `keytar` keychain → write key                                                                                                                                             | After `keytar` integration                  |
 | `bytebell cost`                                  | Read `~/.bytebell/cost-ledger.sqlite` via `bun:sqlite`, render breakdowns                                                                                                                             | After cost ledger lands in `@bb/llm`        |
 | `bytebell server stop \| status \| logs`         | Kill / inspect `bytebell-server`, tail server logs (start is shipped — see above)                                                                                                                     | After `@bb/server` health surface           |
 | **`bytebell mcp install`**                       | **Detect installed coding tools (Claude Code, Cursor, Claude Desktop, Windsurf, VS Code) and merge a `bytebell` MCP server entry into each one's config, pointing at `http://127.0.0.1:<port>/mcp`.** | **Shipped**                                 |
@@ -256,7 +275,6 @@ will touch when implemented. Only the **bolded** entries ship in v0.
   defaults
 - Live connection probes inside the setup form
 - First-run auto-launch of setup form (needs the dashboard pane first)
-- OpenRouter API key in the setup form (separate `bytebell keys set`)
 - Tests — workspace has no test infra yet
 - Color theming via `kleur` / `picocolors` — manual ANSI for now
 - Distinct exit codes per failure mode (today: `1` = typed/handled error,
@@ -288,9 +306,10 @@ Adding a new subcommand:
 3. Wire into `src/index.ts`: `program.addCommand(build<Name>Command())`.
 4. If the command speaks to `bytebell-server`: HTTP only (e.g. `fetch`
    to `http://localhost:<server_port>`). Never import `@bb/server`.
-5. If the command needs OS primitives (`keytar`, `bun:sqlite`,
-   `child_process`): add the dep to `package.json`, but never import a
-   domain / strategy / infra-non-config workspace package.
+5. If the command needs OS primitives (`bun:sqlite`, `child_process`) or a
+   secret store, prefer reusing `@bb/config` (which owns OS-keychain access via
+   `@napi-rs/keyring`); otherwise add the dep to `package.json`, but never
+   import a domain / strategy / infra-non-config workspace package.
 6. Update _Public exports_ / _Out of scope_ in this file and the table
    above — move the row from "deferred" to "shipped".
 

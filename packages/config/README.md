@@ -17,8 +17,43 @@ Single source of truth for runtime settings stored in
 - Memoized in-process load
 - Atomic, validating writes via `setConfigValue`
 - Required-field completeness check with CLI-hint strings
+- OS-keychain storage for secrets (`SECRET_KEYS`), with a transparent
+  read-overlay and a warned plaintext fallback
 
 This package does **not** read from `process.env` and never will.
+
+### Secrets (OS keychain)
+
+`SECRET_KEYS` = { `openrouter_api_key`, `neo4j_password` } — the only persisted
+secrets. Their live value is stored in the OS keychain (macOS Keychain, Linux
+Secret Service, Windows Credential Manager) under service `"bytebell"`, account
+= the `Config` enum value. `config.json` holds an **empty string** for a
+keychain-backed secret.
+
+Read path: `loadConfig()` performs a **clean migration**. Per secret:
+
+1. If `config.json` has a non-empty plaintext value AND the OS keychain is
+   available → move the value into the keychain, clear the plaintext field on
+   disk (atomic write), and use the keychain value going forward. Migration is
+   one-shot — once cleared, subsequent loads find the field empty.
+2. Else if the field is empty → overlay the keychain value (if any).
+3. Else (plaintext present **and** keychain unavailable, e.g. headless Linux
+   without Secret Service) → leave plaintext as-is; the server boot warning
+   flags it. This is the only case where a plaintext secret persists.
+
+The keychain is the source of truth. `getConfigValue`, `isConfigComplete`, and
+every downstream reader resolve the secret transparently — no caller changes.
+
+Public surface: `getSecret` / `setSecret` / `deleteSecret` /
+`isKeychainAvailable` / `isSecretKey` / `KeychainUnavailableError` (keychain
+primitives), `storeSecret` (composes keychain with the config writer),
+and `getSecretSource(key) → SecretSource` (`Plaintext` | `Keychain` | `Missing`,
+the `@bb/types` enum — for boot/CLI warnings). `storeSecret` writes to the keychain and clears any
+plaintext copy; if no keychain backend exists it writes plaintext and returns
+`"plaintext"` so the caller can warn. The `@bb/cli` `set` command's secret-key
+setters call `storeSecret`, so `bytebell set openrouter-api-key …`
+stores to the keychain with no separate command. Seeded/test configs never touch
+the keychain (`seedConfig` bypasses the overlay).
 
 `setBytebellHomeResolver` registers an override function invoked on every
 `getBytebellHome()` call (no caching). The resolver returns the home directory
@@ -64,11 +99,11 @@ Anything not in this list is internal — do not import from subpaths.
 - `~/.bytebell/` directory creation (mode `0700`)
 - `~/.bytebell/config.json` content + atomic writes (mode `0600`)
 - Default values for every config key
+- OS-keychain entries for `SECRET_KEYS` (service `"bytebell"`)
 
 This package does **not** own:
 
 - `~/.bytebell/install_id` — assigned to a later package
-- `~/.bytebell/keys.json` — out of scope for v0
 - `~/.bytebell/logs/` — `@bb/logger`
 - `~/.bytebell/cost-ledger.sqlite` — `@bb/llm`
 
@@ -86,14 +121,18 @@ This package does **not** own:
    `isConfigComplete()` rather than thrown by the loader.
 5. **Atomic writes.** Every write is `tmp → fsync → rename`. A crash mid-write
    leaves the previous `config.json` intact.
-6. **File mode `0600`.** `config.json` contains the OpenRouter API key in
-   plaintext (v0 decision); the file is owner-read/write only.
+6. **File mode `0600`.** `config.json` is owner-read/write only. Secrets in
+   `SECRET_KEYS` live in the OS keychain, not `config.json`; `loadConfig()`
+   migrates any plaintext secret it finds into the keychain. A plaintext
+   secret only persists on systems with no keychain backend, and triggers a
+   boot warning.
 7. **No public file paths besides home + config.** Other files under
    `~/.bytebell/` are not addressed by this package.
 
 ## External dependencies
 
 - `zod` — runtime schema + parsing
+- `@napi-rs/keyring` — synchronous OS-keychain access for `SECRET_KEYS`
 - Node built-ins — `node:fs`, `node:os`, `node:path`
 
 No HTTP, no DB, no logger. This package boots before everything else.
@@ -101,7 +140,8 @@ No HTTP, no DB, no logger. This package boots before everything else.
 ## What is intentionally out of scope
 
 - `install_id` generation/reading (deferred ownership)
-- OS keychain / `keys.json` / encrypted secrets
+- Encrypting non-secret connection URIs that may embed credentials
+  (`mongo_uri`, `neo4j_uri`, `redis_url`) — not in `SECRET_KEYS`
 - Logger initialization
 - A `bytebell set` CLI command (lives in `@bb/cli`; uses `setConfigValue`
   primitive)
@@ -113,9 +153,9 @@ To add a new config key:
 1. Add a new `Config` enum entry in `src/schema.ts`.
 2. Add the field to `configSchema` with a `.default(...)`.
 3. Add a `ConfigValueMap` entry mapping the enum to its TS type.
-4. If required, add the enum to `REQUIRED_KEYS` (infra-always) or to
-   `PROVIDER_REQUIRED_KEYS[<provider>]` (provider-specific — driven by
-   `Config.LlmProvider` at completeness-check time).
+4. If the key is required, add it to the relevant branch of `requiredKeysFor`
+   (provider-conditional — both the CLI `bytebell boot` preflight and the server's
+   startup check call this with all four providers).
 5. Add a hint string to `HINTS`.
 6. Add cases to `readField` and `writeField`.
 7. Update this `README.md` if the new key changes invariants or ownership.

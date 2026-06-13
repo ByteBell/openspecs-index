@@ -1,4 +1,4 @@
-export { Config, DbProviderType, GraphProviderType, QueueProviderType } from "./config.ts";
+export { Config, DbProviderType, GraphProviderType, QueueProviderType, SecretSource } from "./config.ts";
 export { JobType, JobPriority } from "./job.ts";
 export type {
   GithubIndexPayload,

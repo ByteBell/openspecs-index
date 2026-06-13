@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Config } from "@bb/types";
+import { Config, DbProviderType, GraphProviderType, QueueProviderType } from "@bb/types";
 
 export { Config };
 
@@ -130,21 +130,45 @@ export type ConfigValueMap = {
 
 export type ConfigValue<K extends Config> = ConfigValueMap[K];
 
-export const REQUIRED_KEYS: readonly Config[] = [
-  Config.MongoUri,
-  Config.Neo4jUri,
-  Config.Neo4jUser,
-  Config.Neo4jPassword,
-  Config.RedisUrl,
-];
-
-const PROVIDER_REQUIRED_KEYS: Readonly<Record<LlmProvider, readonly Config[]>> = {
+const LLM_PROVIDER_REQUIRED_KEYS: Readonly<Record<LlmProvider, readonly Config[]>> = {
   openrouter: [Config.OpenrouterApiKey],
   ollama: [Config.OllamaUrl, Config.OllamaModel],
 };
 
-export function requiredKeysFor(provider: LlmProvider): readonly Config[] {
-  return [...REQUIRED_KEYS, ...PROVIDER_REQUIRED_KEYS[provider]];
+/**
+ * The set of config keys that must be non-empty for the current provider
+ * selection. Embedded providers (sqlite / ladybug / honker) need their on-disk
+ * paths instead of Docker connection URIs, so the list is provider-conditional
+ * — there are no unconditionally required infra keys. The server's required
+ * check and the CLI's `bytebell boot` preflight both call this so the rule
+ * lives in exactly one place.
+ */
+export function requiredKeysFor(
+  llmProvider: LlmProvider,
+  dbProvider: string,
+  graphProvider: string,
+  queueProvider: string,
+): readonly Config[] {
+  const keys: Config[] = [];
+  if (dbProvider === DbProviderType.Mongo) {
+    keys.push(Config.MongoUri);
+  } else if (dbProvider === DbProviderType.Sqlite) {
+    keys.push(Config.SqlitePath);
+  }
+  if (graphProvider === GraphProviderType.Neo4j) {
+    keys.push(Config.Neo4jUri, Config.Neo4jUser, Config.Neo4jPassword);
+  } else if (graphProvider === GraphProviderType.Ladybug) {
+    keys.push(Config.LadybugPath);
+  }
+  if (queueProvider === QueueProviderType.Bullmq) {
+    keys.push(Config.RedisUrl);
+  } else if (queueProvider === QueueProviderType.Honker) {
+    keys.push(Config.QueueDbPath);
+  }
+  for (const k of LLM_PROVIDER_REQUIRED_KEYS[llmProvider]) {
+    keys.push(k);
+  }
+  return keys;
 }
 
 export const HINTS: Readonly<Record<Config, string>> = {
@@ -154,7 +178,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.Neo4jUser]: "bytebell set neo4j-user <user>",
   [Config.Neo4jPassword]: "bytebell set neo4j-password <pwd>",
   [Config.RedisUrl]: "bytebell set redis <url>",
-  [Config.OpenrouterApiKey]: "bytebell keys set",
+  [Config.OpenrouterApiKey]: "bytebell set openrouter-api-key <key>",
   [Config.OpenrouterModel]: "bytebell models set <model-id>",
   [Config.OpenrouterFallbackModel1]: "bytebell set openrouter-fallback-model-1 <model-id>",
   [Config.OpenrouterFallbackModel2]: "bytebell set openrouter-fallback-model-2 <model-id>",

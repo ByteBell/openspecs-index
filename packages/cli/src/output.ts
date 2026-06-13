@@ -17,6 +17,11 @@ export function error(line: string, hint?: string): void {
   }
 }
 
+export function warn(line: string): void {
+  const YELLOW = "[33m";
+  process.stderr.write(`${paint(YELLOW, `⚠ ${line}`, process.stderr)}\n`);
+}
+
 export function list(label: string, items: readonly string[]): void {
   process.stderr.write(`${label}\n`);
   for (const item of items) {

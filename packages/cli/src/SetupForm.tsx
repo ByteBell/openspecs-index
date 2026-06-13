@@ -135,6 +135,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
           if (entry === undefined) {
             throw new Error(`No KEY_MAP entry for "${row.cliKey}"`);
           }
+          // Secret keys route to the OS keychain via their KEY_MAP setter.
           entry.setter(values[row.id] ?? "");
         }
         exit();

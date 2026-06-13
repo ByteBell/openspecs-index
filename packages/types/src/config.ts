@@ -64,6 +64,17 @@ export enum QueueProviderType {
   Bullmq = "bullmq",
   Honker = "honker",
 }
+
+/**
+ * Where a persisted secret's live value comes from. `Plaintext` means it is
+ * sitting in `config.json` (a security smell — boot warns); `Keychain` means it
+ * lives in the OS credential store; `Missing` means it is not set anywhere.
+ */
+export enum SecretSource {
+  Plaintext = "plaintext",
+  Keychain = "keychain",
+  Missing = "missing",
+}
 /**
  * Active ingestion strategy. `flat-folder` is the historic default that
  * produces `:Repo` + `:Folder` summaries via per-folder LLM passes.

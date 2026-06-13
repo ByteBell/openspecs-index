@@ -1,10 +1,11 @@
 import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
-import { HINTS, getConfigValue } from "@bb/config";
+import { SecretSource } from "@bb/types";
+import { HINTS, getConfigValue, getSecretSource, isSecretKey } from "@bb/config";
 import { KEY_MAP, validKeysList } from "./keyMap.ts";
 import { SetupForm } from "./SetupForm.tsx";
-import { error, list, success } from "./output.ts";
+import { error, list, success, warn } from "./output.ts";
 
 export function buildSetCommand(): Command {
   const cmd = new Command("set");
@@ -58,7 +59,17 @@ async function runSet(key?: string, value?: string): Promise<void> {
 
   try {
     mappedKey.setter(value);
-    success(`Set ${key} to ${mappedKey.redact ? "<redacted>" : value}`);
+    // Secrets route to the OS keychain via their setter; report where it landed.
+    if (isSecretKey(mappedKey.configKey)) {
+      if (getSecretSource(mappedKey.configKey) === SecretSource.Keychain) {
+        success(`Set ${key} (stored in OS keychain).`);
+      } else {
+        success(`Set ${key} (plaintext).`);
+        warn(`No OS keychain backend available — ${key} was written to config.json in plaintext.`);
+      }
+    } else {
+      success(`Set ${key} to ${mappedKey.redact ? "<redacted>" : value}`);
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     error(`Failed to set ${key}: ${message}`);
