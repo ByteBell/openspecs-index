@@ -91,6 +91,8 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg.ladybug_path as ConfigValue<K>;
     case Config.IngestionStrategy:
       return cfg["ingestion.strategy"] as ConfigValue<K>;
+    case Config.UnitsModel:
+      return cfg["units.model"] as ConfigValue<K>;
     case Config.EnrichmentModel:
       return cfg["enrichment.model"] as ConfigValue<K>;
     case Config.EnrichmentMaxToolCallsPerFile:
@@ -196,6 +198,8 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, ladybug_path: value as string };
     case Config.IngestionStrategy:
       return { ...cfg, "ingestion.strategy": value as IngestionStrategy };
+    case Config.UnitsModel:
+      return { ...cfg, "units.model": value as string };
     case Config.EnrichmentModel:
       return { ...cfg, "enrichment.model": value as string };
     case Config.EnrichmentMaxToolCallsPerFile:

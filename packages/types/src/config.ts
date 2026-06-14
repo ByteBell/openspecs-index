@@ -42,6 +42,12 @@ export enum Config {
   SqlitePath = "sqlite_path",
   LadybugPath = "ladybug_path",
   IngestionStrategy = "ingestion.strategy",
+  /**
+   * Optional model for fine-grained per-unit analysis (the IR strategy's phase 7). When set, the
+   * runner routes per-unit calls to this model instead of `openrouter_model`, letting a deployment
+   * point the high-volume per-unit pass at a cheaper model. Empty → per-unit uses the main model.
+   */
+  UnitsModel = "units.model",
   EnrichmentModel = "enrichment.model",
   EnrichmentMaxToolCallsPerFile = "enrichment.max.tool.calls.per.file",
   EnrichmentMaxIterationsPerFile = "enrichment.max.iterations.per.file",
@@ -74,4 +80,5 @@ export enum QueueProviderType {
 export enum IngestionStrategyType {
   FlatFolder = "flat-folder",
   ConceptGraph = "concept-graph",
+  IntermediateRepresentation = "intermediate-representation",
 }

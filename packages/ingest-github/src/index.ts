@@ -205,3 +205,25 @@ export {
   throwIfCancelled,
   CancellationError,
 } from "./pipeline/cancellation.ts";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IR-strategy support surface. These are internal pipeline primitives surfaced
+// so an out-of-tree strategy (the private `@bytebell/ingest-ir`) can reuse the
+// same scan / classify / file-analysis / skip-decision building blocks without
+// reaching into this package's internals. No new behaviour — re-exports only.
+// ─────────────────────────────────────────────────────────────────────────────
+export { withConcurrency, runInPool } from "./pipeline/concurrency.ts";
+export type { ConcurrencyLimiter } from "./pipeline/concurrency.ts";
+export { classifyFailure } from "./pipeline/failure-classifier.ts";
+export { makeSkipDecider } from "./pipeline/skip-decisions/index.ts";
+export { buildEffectiveIgnoreSets } from "./pipeline/skip-decisions/effective.ts";
+export type { EffectiveIgnoreSets } from "./pipeline/skip-decisions/effective.ts";
+export { encodeMetaPath, decodeMetaPath } from "./pipeline/paths.ts";
+export type { MetaPaths } from "./types/meta-paths.ts";
+export type { ChunkAnalysisResult, FileChunk } from "./types/big-file.ts";
+export type { SkipDecider } from "./types/pipeline.ts";
+export { FALLBACK_LANGUAGE, emptyFileAnalysis } from "./types/file-analysis.ts";
+export { languageFromPath, shapeAnalysis } from "./adapters/llm-file-analyzer.ts";
+export { classifyByTokens } from "./strategies/flat-folder/big-file/detector.ts";
+export { readScanManifest, writeScanManifest, emptyManifest } from "./strategies/flat-folder/scan-manifest.ts";
+export type { ScanManifest, ScanManifestEntry } from "./strategies/flat-folder/scan-manifest.ts";

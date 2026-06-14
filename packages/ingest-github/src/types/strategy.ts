@@ -22,6 +22,14 @@ export interface StrategyContext {
    */
   llmCallContext?: AskLlmOptions;
   /**
+   * Optional second LLM context for fine-grained (per-unit) analysis. When a strategy runs a
+   * high-volume per-unit pass (e.g. the IR strategy's phase 7), it routes those calls through this
+   * context instead of {@link llmCallContext} — letting a job point them at a cheaper model. Built
+   * from the payload's `unitsLlmModel`; absent when unset, and the strategy falls back to
+   * {@link llmCallContext}.
+   */
+  unitsLlmCallContext?: AskLlmOptions;
+  /**
    * Per-job effective ignore sets (seed defaults overlaid with the org's
    * overrides). Threaded into scan + skip-decider. Absent in OSS standalone
    * runs, where the built-in seed defaults apply.
@@ -48,6 +56,12 @@ export interface StrategyInput {
 
 export interface StrategyResult {
   filesAnalyzed: number;
+  /**
+   * Items (files, chunks, units) whose analysis errored and left no record on disk. A non-zero
+   * count means the run is partial: the on-disk cache is incomplete and a resume must retry the
+   * gaps. Strategies that don't track per-item failures omit the field.
+   */
+  filesFailed?: number;
   foldersSummarised: number;
   repoSummarised: boolean;
   graphNodesWritten: number;
