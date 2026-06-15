@@ -227,3 +227,4 @@ export { languageFromPath, shapeAnalysis } from "./adapters/llm-file-analyzer.ts
 export { classifyByTokens } from "./strategies/flat-folder/big-file/detector.ts";
 export { readScanManifest, writeScanManifest, emptyManifest } from "./strategies/flat-folder/scan-manifest.ts";
 export type { ScanManifest, ScanManifestEntry } from "./strategies/flat-folder/scan-manifest.ts";
+export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "./strategies/flat-folder/eligible-files.ts";
