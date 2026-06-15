@@ -21,3 +21,35 @@ export function emptyPullSummary(commitHash: string, baseCommit: string): Pipeli
     baseCommit,
   };
 }
+
+interface PullTokenTotals {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
+/**
+ * Advance a knowledge record to a new commit and mark it PROCESSED, recording the
+ * per-commit token + cost totals. Wraps `knowledgeDb.setKnowledgeCommit` + the
+ * `PROCESSED` transition so an out-of-tree pull driver (the private IR pull) can
+ * finalise a successful pull without taking a direct `@bb/db` / `@bb/graph-db`
+ * dependency. Mirrors the tail of OSS `runPull` (the non-no-op success path).
+ */
+export async function recordPullCommit(
+  knowledgeId: string,
+  commitHash: string,
+  tokenUsage: PullTokenTotals,
+  cachedTokenUsage: PullTokenTotals,
+): Promise<void> {
+  await knowledgeDb.setKnowledgeCommit(
+    knowledgeId,
+    commitHash,
+    String(tokenUsage.inputTokens),
+    String(tokenUsage.outputTokens),
+    String(tokenUsage.costUsd),
+    String(cachedTokenUsage.inputTokens),
+    String(cachedTokenUsage.outputTokens),
+    String(cachedTokenUsage.costUsd),
+  );
+  await transitionState(knowledgeId, KnowledgeState.Processed);
+}

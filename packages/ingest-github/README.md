@@ -255,6 +255,20 @@ Adding the `github_pull` worker:
    `registerWorker(JobType.GithubPull, handleGithubPull)`.
 3. Update _Public exports_ / _Out of scope_ here.
 
+Driving a pull with an out-of-tree strategy:
+
+The `github_pull` worker (`runPull`) is hardcoded to the flat-folder
+analysis phases. An out-of-tree strategy that needs its own incremental
+pull (e.g. the private `@bytebell/ingest-ir`) does **not** fork `runPull`;
+instead it reuses the strategy-agnostic pull prelude re-exported from
+`index.ts`'s IR-support surface — `preflightPull`, `resolvePullSource`,
+`transitionState`, `emptyPullSummary`, `recordPullCommit`,
+`throwPullFailure`, and the `context.ts` builders (`resolveOrgId`,
+`ignoreSetsFromPayload`, `llmCallContextFromPayload`,
+`unitsLlmCallContextFromPayload`, `withUsageMeter`) — and swaps only the
+analysis step for its own `IngestStrategy.execute()`. All lifecycle DB
+writes stay in this package via `recordPullCommit` / `transitionState`.
+
 Adding concurrency:
 
 1. Pull `Config.ConcurrencyGithub` from `@bb/config` inside the
