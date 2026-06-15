@@ -28,7 +28,7 @@ TUI / HTTP client → Express (bytebell-server) → BullMQ (in-process) → Inge
 
 - The CLI never touches Mongo / Neo4j / Redis directly — it only talks HTTP to `bytebell-server`.
 - Ingestion is asynchronous via BullMQ. Workers run **inside** the server process; there is no separate worker fleet.
-- A worker (e.g. `handleGithubIndex`) clones the repo, runs the active `IngestionStrategy` (today: `BasicFileAnalysisStrategy` — file-walk + per-file LLM analysis), upserts file rows to Mongo + file nodes to Neo4j, and transitions `KnowledgeState`.
+- A worker (e.g. `handleGithubIndex`) clones the repo, runs the active `IngestionStrategy` (today: `flat-folder` by default, or `concept-graph` — file-walk + per-file LLM analysis), upserts file rows to Mongo + file nodes to Neo4j, and transitions `KnowledgeState`.
 - MCP requests dispatch to the same Mongo + Neo4j the ingestion side wrote.
 
 ---
@@ -100,7 +100,7 @@ No layer skips another. The TUI is a special case: it is a thin HTTP client over
 
 ### 5. Strategy-Based Ingestion
 
-Ingestion is dispatched through `IngestionStrategy` (`@bb/ingest-github/Strategy.ts`). The active strategy today is `BasicFileAnalysisStrategy` — file-walk + per-file LLM analysis, returning `IngestionResult` (files analysed + per-model token breakdown). New ingestion shapes (AST extraction, dependency-graph extraction, etc.) land as new strategies behind the same interface, never as ad-hoc forks of the worker.
+Ingestion is dispatched through `IngestionStrategy` (`@bb/ingest-github/Strategy.ts`). The active strategies today are `flat-folder` (default) and `concept-graph` — file-walk + per-file LLM analysis, returning `IngestionResult` (files analysed + per-model token breakdown). New ingestion shapes (AST extraction, dependency-graph extraction, etc.) land as new strategies behind the same interface, never as ad-hoc forks of the worker.
 
 ### 6. Reliability Over Speed
 
@@ -395,7 +395,7 @@ Every package and every major subfolder MUST contain a `README.md`.
 
 ## Naming Conventions
 
-- Strategies: `BasicFileAnalysisStrategy.ts` (one class per file, `*Strategy.ts`)
+- Strategies: one folder per strategy under `strategies/` — e.g. `flat-folder/`, `concept-graph/`
 - HTTP route builders (server): `githubIndexRoute.ts`, `deleteRoute.ts` (camelCase + `Route.ts`, each exports a `buildXRoute()` factory)
 - Commander subcommand entry points (CLI): `IndexCommand.ts`, `IngestCommand.ts` — plain `.ts`, no JSX
 - Ink components (CLI forms / pickers): `SetupForm.tsx`, `DeleteSelector.tsx` — `.tsx` because Ink renders JSX to the terminal
