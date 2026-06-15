@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/open-ir-logo.svg" />
-    <img src="docs/assets/open-ir-logo.svg" alt="Open-IR" width="150" />
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/bytebell-logo.svg" />
+    <img src="docs/assets/bytebell-logo.svg" alt="OpenSpecs" width="150" />
   </picture>
 </p>
 
-<h1 align="center">Open-IR</h1>
+<h1 align="center">OpenSpecs</h1>
 
 <p align="center"><em>A code knowledge graph for your AI coding agent</em></p>
 
@@ -39,7 +39,7 @@
 <!-- Demo placeholder — drop your recording at docs/assets/demo.gif (or .mp4 / asciinema),
      then uncomment the block below:
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="Open-IR — install, index, and ask your editor" width="820" />
+  <img src="docs/assets/demo.gif" alt="OpenSpecs — install, index, and ask your editor" width="820" />
 </p>
 -->
 
@@ -47,9 +47,9 @@
 
 ---
 
-> Your AI agent can't read your whole codebase, so it guesses. **Open-IR builds it a queryable map.** Point `bytebell` at a repo and it builds an LLM-enriched knowledge graph — every file's purpose, summary, business context, classes, and imports — then serves it over **MCP** to Claude Code, Cursor, and any MCP client. Everything runs on your machine; nothing leaves it except the calls to the model you choose.
+> Your AI agent can't read your whole codebase, so it guesses. **OpenSpecs builds it a queryable map.** Point `bytebell` at a repo and it builds an LLM-enriched knowledge graph — every file's purpose, summary, business context, classes, and imports — then serves it over **MCP** to Claude Code, Cursor, and any MCP client. Everything runs on your machine; nothing leaves it except the calls to the model you choose.
 
-## ✨ Why Open-IR
+## ✨ Why OpenSpecs
 
 <table>
   <tr>
@@ -73,7 +73,7 @@
 **1 · Install** &nbsp;—&nbsp; clones the repo, installs deps, links the `bytebell` command
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ByteBell/open-ir/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ByteBell/openspecs/main/install.sh | bash
 ```
 
 **2 · Set up** &nbsp;—&nbsp; one wizard (LLM provider → infra → optional first repo); then it boots, indexes, and wires the MCP endpoint into your editor
@@ -88,7 +88,7 @@ bytebell setup
 
 <sub>`bytebell setup` auto-wires Claude Code, Cursor, Claude Desktop, Windsurf, and VS Code for you. &nbsp;·&nbsp; Every command → **[docs/commands.md](docs/commands.md)** &nbsp;·&nbsp; every setting → **[docs/configuration.md](docs/configuration.md)** &nbsp;·&nbsp; no `.env` anywhere — `~/.bytebell/config.json` (mode `0600`) is the single source of truth, written only by `bytebell set`.</sub>
 
-## What Open-IR does
+## What OpenSpecs does
 
 You point `bytebell` at a repo. It clones the source, walks every file, and for each file calls an LLM (via OpenRouter) to extract a structured `FileAnalysis`: a one-paragraph **purpose**, a longer **summary** of what the file does and how it fits the architecture, a **business context** line tying it to the product domain, plus the file's classes, functions, keywords, and imports.
 
@@ -188,7 +188,7 @@ Most well-formed code questions resolve in 2–4 tool calls. No re-clone, no ful
 
 ## Storage backends
 
-Open-IR runs **embedded** by default (SQLite + LadybugDB + Honker, no Docker). Switch to **Docker mode** (Mongo + Neo4j + Redis), or point Open-IR at your own database instances — at setup or any time via `bytebell set`. The steps are in **[docs/getting-started.md](docs/getting-started.md#docker-mode)**; every key is in **[docs/configuration.md](docs/configuration.md)**.
+OpenSpecs runs **embedded** by default (SQLite + LadybugDB + Honker, no Docker). Switch to **Docker mode** (Mongo + Neo4j + Redis), or point OpenSpecs at your own database instances — at setup or any time via `bytebell set`. The steps are in **[docs/getting-started.md](docs/getting-started.md#docker-mode)**; every key is in **[docs/configuration.md](docs/configuration.md)**.
 
 ## Architecture at a glance
 
@@ -207,13 +207,13 @@ Settings live in `~/.bytebell/config.json` and are written exclusively by `byteb
 
 The **full list of keys** — infrastructure, LLM provider (OpenRouter / Ollama), logging, and storage backends, with validation and defaults — lives in **[docs/configuration.md](docs/configuration.md)**.
 
-If a required setting is missing, Open-IR either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
+If a required setting is missing, OpenSpecs either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
 
 ## Why this design — research grounding
 
-> Comparing Open-IR to PageIndex, GitNexus, GraphRAG, Sourcegraph, or Augment Code? See **[comparison.md](comparison.md)** for a side-by-side feature table and pros / cons of each.
+> Comparing OpenSpecs to PageIndex, GitNexus, GraphRAG, Sourcegraph, or Augment Code? See **[comparison.md](comparison.md)** for a side-by-side feature table and pros / cons of each.
 
-Open-IR's shape — _build a code graph at ingest time, enrich every node with LLM-derived structured semantics, then serve retrieval against the joined surface_ — tracks a converging body of recent work showing that purely structural retrieval (AST / call-graph) and purely semantic retrieval (embeddings) each leave large performance on the table, and that combining them at indexing time unlocks the gains.
+OpenSpecs's shape — _build a code graph at ingest time, enrich every node with LLM-derived structured semantics, then serve retrieval against the joined surface_ — tracks a converging body of recent work showing that purely structural retrieval (AST / call-graph) and purely semantic retrieval (embeddings) each leave large performance on the table, and that combining them at indexing time unlocks the gains.
 
 **Graphs beat flat retrieval for code.** Repository-level graphs from AST + imports + call structure consistently outperform flat embedding retrieval on real engineering tasks.
 
@@ -229,7 +229,7 @@ Open-IR's shape — _build a code graph at ingest time, enrich every node with L
 - Knowledge-Graph-Based Repo-Level Code Generation ([2505.14394](https://arxiv.org/abs/2505.14394)) — graph captures structure; LLM context fills semantic gaps.
 - Sense and Sensitivity ([2505.13353](https://arxiv.org/abs/2505.13353)) — lexical and semantic recall are different capabilities; supports the `summary` (semantic) vs Mongo raw (lexical) split.
 
-**Structured summaries and hierarchy beat blob summarization.** Explicit fields — purpose, inputs, outputs, business context — aggregated bottom-up let retrieval match at the right level of abstraction. This maps directly onto Open-IR's `purpose` / `summary` / `businessContext` schema.
+**Structured summaries and hierarchy beat blob summarization.** Explicit fields — purpose, inputs, outputs, business context — aggregated bottom-up let retrieval match at the right level of abstraction. This maps directly onto OpenSpecs's `purpose` / `summary` / `businessContext` schema.
 
 - Hierarchical Repo-Level Code Summarization for Business Applications ([2501.07857](https://arxiv.org/abs/2501.07857), ICSE LLM4Code 2025) — closest motivational match: structured per-unit summaries aggregated to file/package level, grounded in business context.
 - Beyond Function Level ([2502.16704](https://arxiv.org/abs/2502.16704)) — class/repo context in summaries beats function-only.
@@ -244,7 +244,7 @@ The design choices follow directly: each `:File` node carries LLM-generated sema
 
 ## Enterprise
 
-Open-IR is the OSS edition. ByteBell also offers a separately-licensed **Enterprise** edition for organizations that need a commercial-use grant, hardening, and direct support. Enterprise typically includes:
+OpenSpecs is the OSS edition. ByteBell also offers a separately-licensed **Enterprise** edition for organizations that need a commercial-use grant, hardening, and direct support. Enterprise typically includes:
 
 - A commercial-use grant covering use by or on behalf of for-profit entities, including SaaS deployments and revenue-generating applications.
 - Hardened multi-tenant deployment patterns, SSO / SCIM, audit logging, and data-isolation guarantees.
@@ -260,4 +260,4 @@ Hooks, commit conventions, and pre-push gates are documented in [CONTRIBUTING.md
 
 ## License
 
-Open-IR is released under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) for the authoritative text. Personal, academic, research, and non-profit use are unrestricted under AGPL-3.0 (network-copyleft applies). **Commercial use** is governed by license terms and is covered by the [Enterprise edition](#enterprise) (`team@bytebell.ai`). The running server itself does **not** verify a license; governance is by license terms, not by code. The server is meant for local single-tenant use — no remote network surface; everything binds to `127.0.0.1`.
+OpenSpecs is released under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) for the authoritative text. Personal, academic, research, and non-profit use are unrestricted under AGPL-3.0 (network-copyleft applies). **Commercial use** is governed by license terms and is covered by the [Enterprise edition](#enterprise) (`team@bytebell.ai`). The running server itself does **not** verify a license; governance is by license terms, not by code. The server is meant for local single-tenant use — no remote network surface; everything binds to `127.0.0.1`.

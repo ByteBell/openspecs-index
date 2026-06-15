@@ -1,7 +1,7 @@
 ---
 name: bytebell
 description: >
-  Open-IR(Bytebell's OSS engine) local knowledge graph. Discover, search, lookup, and
+  OpenSpecs(Bytebell's OSS engine) local knowledge graph. Discover, search, lookup, and
   retrieve from code repositories indexed locally by bytebell-server.
   TRIGGER when using: list_knowledge, smart_search, keyword_lookup,
   retrieve_file.
@@ -9,7 +9,7 @@ user-invocable: true
 argument-hint: "[search query or task description]"
 ---
 
-# Open-IR knowledge graph
+# OpenSpecs knowledge graph
 
 Single-tenant local engine. The graph is `Knowledge → File → (Keyword | Class | Function | Module)` — flat, no commit versioning, no multi-tenant scoping. Every `Knowledge` node carries a `repoName` (e.g. `anthropics/claude-code`) and a `knowledgeId` (UUID).
 

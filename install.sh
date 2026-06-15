@@ -7,10 +7,10 @@ export PATH="$HOME/.bun/bin:$PATH"
 
 # ─────────────────────────────────────────────
 #  Bytebell — one-command setup (V1 / git-clone path)
-#  Usage: curl -fsSL https://raw.githubusercontent.com/ByteBell/open-ir/main/install.sh | bash
+#  Usage: curl -fsSL https://raw.githubusercontent.com/ByteBell/openspecs/main/install.sh | bash
 # ─────────────────────────────────────────────
 
-REPO_URL="https://github.com/ByteBell/open-ir"
+REPO_URL="https://github.com/ByteBell/openspecs"
 # Clone the same branch this installer was published from, so the installed code
 # matches the config schema it writes. Override with BYTEBELL_BRANCH=... if needed.
 REPO_BRANCH="${BYTEBELL_BRANCH:-merge/embedded_prerelease}"
@@ -26,7 +26,7 @@ print_info() { echo "  •  $1"; }
 
 echo ""
 echo "This installer will:"
-echo "  • clone Bytebell into ./open-ir (the current directory)"
+echo "  • clone Bytebell into ./openspecs (the current directory)"
 echo "  • add a global 'bytebell' command"
 echo "  • install project dependencies"
 echo ""
@@ -80,12 +80,12 @@ print_ok "git $(git --version | awk '{print $3}')"
 
 print_step "Cloning Bytebell"
 
-if [ -d "open-ir/.git" ]; then
-  print_info "existing install detected at open-ir/ — leaving it untouched (no git pull)"
+if [ -d "openspecs/.git" ]; then
+  print_info "existing install detected at openspecs/ — leaving it untouched (no git pull)"
 else
-  git clone --branch "$REPO_BRANCH" "$REPO_URL" open-ir
+  git clone --branch "$REPO_BRANCH" "$REPO_URL" openspecs
 fi
-cd open-ir
+cd openspecs
 REPO_DIR="$(pwd)"
 print_ok "Repository ready"
 
@@ -129,6 +129,6 @@ echo ""
 echo "    bytebell setup"
 echo ""
 echo "  Commands reference:"
-echo "    https://github.com/ByteBell/open-ir/blob/main/docs/commands.md"
+echo "    https://github.com/ByteBell/openspecs/blob/main/docs/commands.md"
 echo "════════════════════════════════════════"
 echo ""

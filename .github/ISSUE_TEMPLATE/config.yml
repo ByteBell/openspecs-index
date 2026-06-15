@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/ByteBell/open-ir/blob/main/SECURITY.md
+    url: https://github.com/ByteBell/openspecs/blob/main/SECURITY.md
     about: Please do NOT open a public issue. Email team@bytebell.ai — see SECURITY.md for details and PGP info.
   - name: Question, help, or discussion
-    url: https://github.com/ByteBell/open-ir/discussions
+    url: https://github.com/ByteBell/openspecs/discussions
     about: For "how do I…", design discussions, or sharing what you built — use Discussions, not issues.
   - name: Read the contributing guide
-    url: https://github.com/ByteBell/open-ir/blob/main/CONTRIBUTING.md
+    url: https://github.com/ByteBell/openspecs/blob/main/CONTRIBUTING.md
     about: New here? The contributing guide explains the architecture, package layout, and how to get a local dev loop running.

@@ -15,7 +15,7 @@ otherwise operates only on `~/.bytebell/` via `@bb/config`.
 
 ## Responsibility
 
-The user-facing terminal UI for Open-IR. Arch-spec'd at
+The user-facing terminal UI for OpenSpecs. Arch-spec'd at
 [docs/arch.md _TUI Spec_ §144-184](../../docs/arch.md#L144-L184) — single
 mode, every invocation is interactive in spirit, with subcommands for
 indexing, configuration, server lifecycle, and inspection.
