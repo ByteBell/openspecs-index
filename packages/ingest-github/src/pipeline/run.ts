@@ -3,28 +3,28 @@ import { knowledgeDb } from "@bb/db";
 import { knowledgeGraph } from "@bb/graph-db";
 import { IngestError, UsageLimitExceededError } from "@bb/errors";
 import { logger } from "@bb/logger";
-import { classifyFailure, isRetryable } from "./failure-classifier.ts";
-import { transitionState } from "./pull-helpers.ts";
-import { isGithubPayload, persistFailure, persistHalted, markNonRetryable } from "./run-helpers.ts";
+import { classifyFailure, isRetryable } from "@bb/ingest-core";
+import { transitionState } from "@bb/ingest-core";
+import { isGithubPayload, persistFailure, persistHalted, markNonRetryable } from "@bb/ingest-core";
 import { maybeInjectOneShotHalt } from "./fault-injection.ts";
 import { runLocal } from "./run-local.ts";
-import type { IngestRunnerDeps, IngestRunnerInput } from "#src/types/ingest-runner.ts";
-import type { IngestStrategy } from "#src/types/strategy.ts";
-import type { ArchiveSink, PipelineSummary, SourceFactory, SourceReader } from "#src/types/pipeline.ts";
-import type { ProgressContextFactory } from "#src/progress/types.ts";
-import { nullProgressContextFactory } from "#src/progress/NullProgressReporter.ts";
-import { ensureCommitDirs, pathsFor, type RepoLocation } from "./paths.ts";
+import type { IngestRunnerDeps, IngestRunnerInput } from "@bb/ingest-core";
+import type { IngestStrategy } from "@bb/ingest-core";
+import type { ArchiveSink, PipelineSummary, SourceFactory, SourceReader } from "@bb/ingest-core";
+import type { ProgressContextFactory } from "@bb/ingest-core";
+import { nullProgressContextFactory } from "@bb/ingest-core";
+import { ensureCommitDirs, pathsFor, type RepoLocation } from "@bb/ingest-core";
 import { readHeadCommitHash, syncRepository } from "./source.ts";
 import { resolveBranch } from "./branch.ts";
-import { CancellationError, clearCancellation, throwIfCancelled } from "./cancellation.ts";
-import { createDiskSourceReader } from "./disk-source-reader.ts";
+import { CancellationError, clearCancellation, throwIfCancelled } from "@bb/ingest-core";
+import { createDiskSourceReader } from "@bb/ingest-core";
 import {
   resolveOrgId,
   llmCallContextFromPayload,
   unitsLlmCallContextFromPayload,
   ignoreSetsFromPayload,
   withUsageMeter,
-} from "./context.ts";
+} from "@bb/ingest-core";
 import { fetchLatestCommitHash } from "#src/githubApi.ts";
 import { parseGithubRepo } from "#src/githubUrl.ts";
 

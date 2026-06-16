@@ -1,5 +1,5 @@
 {
-  "name": "@bb/ingest-github",
+  "name": "@bb/ingest-strategies",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,22 +15,16 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@bb/config": "workspace:*",
     "@bb/ingest-core": "workspace:*",
-    "@bb/ingest-strategies": "workspace:*",
+    "@bb/config": "workspace:*",
     "@bb/db": "workspace:*",
     "@bb/errors": "workspace:*",
+    "@bb/graph-core": "workspace:*",
     "@bb/graph-db": "workspace:*",
     "@bb/llm": "workspace:*",
     "@bb/logger": "workspace:*",
     "@bb/mcp": "workspace:*",
     "@bb/mongo": "workspace:*",
-    "@bb/sqlite": "workspace:*",
-    "@bb/neo4j": "workspace:*",
-    "@bb/ladybug": "workspace:*",
-    "@bb/queue": "workspace:*",
-    "@bb/db-core": "workspace:*",
-    "@bb/graph-core": "workspace:*",
     "@bb/types": "workspace:*"
   }
 }

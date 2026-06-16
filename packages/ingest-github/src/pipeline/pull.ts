@@ -7,41 +7,34 @@ import {
   type NodeScope,
 } from "@bb/types";
 import { getConfigValue } from "@bb/config";
-import { withConcurrency } from "./concurrency.ts";
+import { withConcurrency } from "@bb/ingest-core";
 import { knowledgeDb } from "@bb/db";
 import { filesGraph } from "@bb/graph-db";
-import type { PipelineSummary } from "#src/types/pipeline.ts";
-import { resolveOrgId, llmCallContextFromPayload, ignoreSetsFromPayload, withUsageMeter } from "./context.ts";
+import type { PipelineSummary } from "@bb/ingest-core";
+import { resolveOrgId, llmCallContextFromPayload, ignoreSetsFromPayload, withUsageMeter } from "@bb/ingest-core";
 import { IngestError } from "@bb/errors";
-import { transitionState, emptyPullSummary } from "./pull-helpers.ts";
-import { throwPullFailure } from "./pull-failure.ts";
-import { preflightPull } from "./pull-preflight.ts";
+import { transitionState, emptyPullSummary } from "@bb/ingest-core";
+import { throwPullFailure } from "@bb/ingest-core";
+import { preflightPull } from "@bb/ingest-core";
 import { logger } from "@bb/logger";
-import { pathsFor } from "./paths.ts";
+import { pathsFor } from "@bb/ingest-core";
 import { parseGithubRepo } from "#src/githubUrl.ts";
-import { clearCancellation, throwIfCancelled } from "./cancellation.ts";
-import { affectedFoldersFromDiff } from "./affected-folders.ts";
+import { clearCancellation, throwIfCancelled } from "@bb/ingest-core";
+import { affectedFoldersFromDiff } from "@bb/ingest-core";
 import { resolvePullSource } from "./pull-source-resolver.ts";
-import type { PullFactory } from "#src/types/pipeline.ts";
-import type { ProgressContextFactory } from "#src/progress/types.ts";
-import { nullProgressContextFactory } from "#src/progress/NullProgressReporter.ts";
-import { analyseChangedFiles } from "#src/strategies/flat-folder/analyse-changed.ts";
-import { processBigFilesQueue } from "#src/strategies/flat-folder/phases/process-big-files.ts";
-import { backfillMissingFields } from "#src/strategies/flat-folder/backfill/fields.ts";
-import { FileAnalysisCache } from "#src/strategies/flat-folder/file-analysis-cache.ts";
-import { runSelectiveFolderSummary } from "#src/strategies/flat-folder/folder-summary-selective.ts";
-import {
-  makeRepoSummaryEnvelope,
-  persistRepoSummary,
-  summariseRepo,
-} from "#src/strategies/flat-folder/repo-summary.ts";
-import { storePullAnalysis } from "#src/strategies/flat-folder/store-pull.ts";
-import { createTokenAccumulator } from "#src/types/token-usage.ts";
-import { createLlmFileAnalyzer } from "#src/adapters/llm-file-analyzer.ts";
-import {
-  COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
-  buildFileAnalysisUserPrompt,
-} from "#src/strategies/flat-folder/prompts/file-analysis.ts";
+import type { PullFactory } from "@bb/ingest-core";
+import type { ProgressContextFactory } from "@bb/ingest-core";
+import { nullProgressContextFactory } from "@bb/ingest-core";
+import { analyseChangedFiles } from "@bb/ingest-strategies";
+import { processBigFilesQueue } from "@bb/ingest-core";
+import { backfillMissingFields } from "@bb/ingest-core";
+import { FileAnalysisCache } from "@bb/ingest-core";
+import { runSelectiveFolderSummary } from "@bb/ingest-strategies";
+import { makeRepoSummaryEnvelope, persistRepoSummary, summariseRepo } from "@bb/ingest-strategies";
+import { storePullAnalysis } from "@bb/ingest-strategies";
+import { createTokenAccumulator } from "@bb/ingest-core";
+import { createLlmFileAnalyzer } from "@bb/ingest-core";
+import { COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT, buildFileAnalysisUserPrompt } from "@bb/ingest-core";
 
 export async function runPull(
   msg: JobMessage<GithubPullPayload>,

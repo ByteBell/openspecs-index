@@ -1,8 +1,8 @@
 import type { GithubIndexPayload, JobMessage, LocalIngestPayload, UsageGuard } from "@bb/types";
 import { IngestError } from "@bb/errors";
 import { isEnvelopeCoherent, narrowGithubIngest, narrowLocalIngest } from "#src/payload/narrow.ts";
-import type { IngestRunnerDeps, IngestRunnerInput } from "#src/types/ingest-runner.ts";
-import type { PipelineSummary } from "#src/types/pipeline.ts";
+import type { IngestRunnerDeps, IngestRunnerInput } from "@bb/ingest-core";
+import type { PipelineSummary } from "@bb/ingest-core";
 
 export interface IngestJobHandlerDeps {
   runner: IngestRunnerDeps;

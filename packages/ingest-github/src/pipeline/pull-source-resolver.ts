@@ -1,13 +1,13 @@
 import { type GithubPullPayload } from "@bb/types";
 import { IngestError } from "@bb/errors";
 import { logger } from "@bb/logger";
-import { ensureCommitDirs, pathsFor, type RepoLocation } from "./paths.ts";
+import { ensureCommitDirs, pathsFor, type RepoLocation } from "@bb/ingest-core";
 import { readHeadCommitHash, syncRepository } from "./source.ts";
-import { assertReachableFromBranch, checkoutCommit, type DiffResult } from "./git-diff.ts";
-import { computePullDiff, materialiseEndpoints } from "./pull-diff-resolver.ts";
-import { createDiskSourceReader } from "./disk-source-reader.ts";
+import { assertReachableFromBranch, checkoutCommit, type DiffResult } from "@bb/ingest-core";
+import { computePullDiff, materialiseEndpoints } from "@bb/ingest-core";
+import { createDiskSourceReader } from "@bb/ingest-core";
 import { fetchLatestCommitHash } from "#src/githubApi.ts";
-import type { ArchiveSink, PullFactory, SourceReader } from "#src/types/pipeline.ts";
+import type { ArchiveSink, PullFactory, SourceReader } from "@bb/ingest-core";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Resolves the "repository state" prelude for `runPull`:
