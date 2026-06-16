@@ -31,8 +31,8 @@ export interface PayloadLlmOverrides {
   llmModel?: string;
   llmKeyId?: string;
   /**
-   * Optional model override for high-volume, fine-grained analysis (e.g. the IR strategy's
-   * per-unit phase). Reuses the same `llmApiKey` / `llmProvider` as the main model but swaps the
+   * Optional model override for high-volume, fine-grained per-unit analysis.
+   * Reuses the same `llmApiKey` / `llmProvider` as the main model but swaps the
    * model id — letting a job route thousands of small per-unit calls to a cheaper / faster model.
    * Unset → fine-grained analysis falls back to `llmModel`.
    */

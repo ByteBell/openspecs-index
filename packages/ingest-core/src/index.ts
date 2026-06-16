@@ -52,6 +52,7 @@ export type {
   PullSourceResolver,
   PullRunner,
 } from "#src/types/pull-runner.ts";
+export type { ResolveIndexSourceInput, IndexSourceResolution, IndexSourceResolver } from "#src/types/index-source.ts";
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 export {
@@ -115,7 +116,13 @@ export { materialiseEndpoints, computePullDiff, unionDiff } from "#src/pipeline/
 // ── Pull lifecycle ─────────────────────────────────────────────────────────
 export { preflightPull } from "#src/pipeline/pull-preflight.ts";
 export type { PullPreflight } from "#src/pipeline/pull-preflight.ts";
-export { transitionState, emptyPullSummary, recordPullCommit } from "#src/pipeline/pull-helpers.ts";
+export {
+  transitionState,
+  emptyPullSummary,
+  recordPullCommit,
+  recordKnowledgeBranch,
+  recordKnowledgeCommitHead,
+} from "#src/pipeline/pull-helpers.ts";
 export { throwPullFailure } from "#src/pipeline/pull-failure.ts";
 export type { PullFailureDeps } from "#src/pipeline/pull-failure.ts";
 export { persistFailure, persistHalted, markNonRetryable, isGithubPayload } from "#src/pipeline/run-helpers.ts";

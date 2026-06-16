@@ -15,9 +15,9 @@ export interface PickStrategyDeps {
  * Defaults to flat-folder when the config value is unset or unrecognised
  * (with a warning so the operator knows their typo silently fell back).
  *
- * The private `intermediate-representation` strategy is NOT handled here — it
- * lives in `@bytebell/ingest-strategies` and is selected by the enterprise
- * composition root before falling back to this picker.
+ * Only the public strategies are resolved here. A downstream deployment that
+ * ships a private strategy selects it at its own composition root before
+ * falling back to this picker.
  */
 export function pickStrategy(deps: PickStrategyDeps): IngestStrategy {
   const selected = getConfigValue(Config.IngestionStrategy);

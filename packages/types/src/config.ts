@@ -43,7 +43,7 @@ export enum Config {
   LadybugPath = "ladybug_path",
   IngestionStrategy = "ingestion.strategy",
   /**
-   * Optional model for fine-grained per-unit analysis (the IR strategy's phase 7). When set, the
+   * Optional model for a fine-grained, high-volume per-unit analysis pass. When set, the
    * runner routes per-unit calls to this model instead of `openrouter_model`, letting a deployment
    * point the high-volume per-unit pass at a cheaper model. Empty → per-unit uses the main model.
    */
@@ -71,14 +71,17 @@ export enum QueueProviderType {
   Honker = "honker",
 }
 /**
- * Active ingestion strategy. `flat-folder` is the historic default that
+ * The PUBLIC ingestion strategies. `flat-folder` is the historic default that
  * produces `:Repo` + `:Folder` summaries via per-folder LLM passes.
  * `concept-graph` drops folder/repo summaries and runs a per-file
  * MCP-driven enrichment pass that emits `:Concept` / `:Contract` /
  * `:Guidepost` nodes instead.
+ *
+ * This enum lists only the strategies the open-source engine ships. The
+ * `ingestion.strategy` config value is a free string, so a downstream
+ * deployment may select a strategy this enum does not enumerate.
  */
 export enum IngestionStrategyType {
   FlatFolder = "flat-folder",
   ConceptGraph = "concept-graph",
-  IntermediateRepresentation = "intermediate-representation",
 }

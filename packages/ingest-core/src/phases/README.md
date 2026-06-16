@@ -1,7 +1,7 @@
 # `@bb/ingest-core/src/phases`
 
 The shared analysis phases reused by every strategy (`flat-folder`,
-`concept-graph`, `intermediate-representation`). Each phase has explicit
+`concept-graph`). Each phase has explicit
 inputs/outputs, persists its artifacts to disk before yielding, and is
 independently retryable — a crash resumes cleanly from the next phase boundary.
 Every LLM call checks out from the shared `ConcurrencyLimiter` threaded in by

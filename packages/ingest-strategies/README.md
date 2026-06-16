@@ -13,9 +13,8 @@ GitHub, GitLab, or anywhere else.
   per-file MCP enrichment pass emitting `:Concept` / `:Contract` / `:Guidepost`
   hypergraph nodes.
 - `pickStrategy(deps)` resolves the active public strategy from
-  `Config.IngestionStrategy` (defaults to flat-folder). The private
-  `intermediate-representation` strategy is selected by the enterprise
-  composition root from `@bytebell/ingest-strategies`, not here.
+  `Config.IngestionStrategy` (defaults to flat-folder). Any private strategy a
+  downstream deployment ships is selected at its own composition root, not here.
 
 ## Dependencies
 

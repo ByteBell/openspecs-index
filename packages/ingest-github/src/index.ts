@@ -96,3 +96,7 @@ export type { BootstrapRuntimeOptions } from "./bootstrap.ts";
 // (clone + diff). The composition root injects this into the flat-folder pull
 // driver (`@bb/ingest-strategies`' runPull).
 export { resolvePullSource } from "./pipeline/pull-source-resolver.ts";
+// GitHub implementation of the provider-agnostic `IndexSourceResolver` seam
+// (branch + clone/stream). The composition root injects this into the public
+// index runner and into any private out-of-tree index router.
+export { resolveGithubIndexSource } from "./pipeline/github-index-source.ts";

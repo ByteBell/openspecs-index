@@ -18,9 +18,8 @@ source came from GitHub, GitLab, or anywhere else — strategies depend only on
 - `pickStrategy.ts` — `pickStrategy(deps)` resolves the active public strategy
   from `Config.IngestionStrategy` (`flat-folder` default, `concept-graph`
   opt-in), warning and falling back to flat-folder on an unrecognised value.
-  The private `intermediate-representation` strategy is **not** handled here —
-  it lives in the enterprise `@bytebell/ingest-strategies` and is selected by
-  the enterprise composition root before this picker runs.
+  Private strategies are **not** handled here — a downstream deployment selects
+  its own at its composition root before this picker runs.
 - `flat-folder/` — `createFlatFolderStrategy`. Per-file LLM analysis → folder
   summaries → repo summary → graph store. The default strategy. See
   `flat-folder/README.md`.

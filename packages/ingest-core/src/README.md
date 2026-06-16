@@ -45,7 +45,7 @@ the package barrel only.
 
 Everything points **inward to core**: `core ← ingest-github`,
 `core ← ingest-strategies`, `core ← ingest-gitlab`,
-`core ← @bytebell/ingest-strategies`. This package imports **no** strategy and
+`core ← downstream private strategy packages`. This package imports **no** strategy and
 **no** provider — only `@bb/*` infrastructure (`@bb/types`, `@bb/config`,
 `@bb/llm`, `@bb/logger`, `@bb/errors`, …) and `node:*`.
 

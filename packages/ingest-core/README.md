@@ -22,11 +22,11 @@ Provider-agnostic ingestion SDK. The shared foundation that ingestion
 - **Shared phases** — scan-and-classify, analyse-small, analyse-big, backfill,
   file-analysis cache, scan-manifest, eligible-files, big-file handling, and the
   per-file analysis prompts. Reused by every strategy (`flat-folder`,
-  `concept-graph`, `intermediate-representation`).
+  `concept-graph`).
 
 ## Dependency direction
 
 Everything points **inward to core**: `core ← ingest-github`,
 `core ← ingest-strategies`, `core ← ingest-gitlab`,
-`core ← @bytebell/ingest-strategies`. No package imports a strategy except the
+`core ← downstream private strategy packages`. No package imports a strategy except the
 composition roots (OSS `server`, enterprise `knowledge-server`).

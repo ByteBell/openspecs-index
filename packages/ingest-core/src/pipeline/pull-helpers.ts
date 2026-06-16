@@ -8,6 +8,25 @@ export async function transitionState(knowledgeId: string, state: KnowledgeState
   await knowledgeGraph.setKnowledgeStateInGraph(knowledgeId, state).catch(() => undefined);
 }
 
+/**
+ * Record the resolved branch on the knowledge record + graph. Wraps the
+ * `@bb/db` / `@bb/graph-db` writes so a private out-of-tree index router in a
+ * downstream package can finalise without a direct infrastructure dependency.
+ * Mirrors the branch writes in OSS `runGithub`.
+ */
+export async function recordKnowledgeBranch(knowledgeId: string, branch: string): Promise<void> {
+  await knowledgeDb.setKnowledgeBranch(knowledgeId, branch);
+  await knowledgeGraph.setKnowledgeBranchInGraph(knowledgeId, branch).catch(() => undefined);
+}
+
+/**
+ * Persist the head commit BEFORE strategy execution so MCP tools invoked during
+ * enrichment can resolve the on-disk clone via the commit-scoped path layout.
+ */
+export async function recordKnowledgeCommitHead(knowledgeId: string, commitHash: string): Promise<void> {
+  await knowledgeDb.setKnowledgeCommitHead(knowledgeId, commitHash);
+}
+
 export function emptyPullSummary(commitHash: string, baseCommit: string): PipelineSummary {
   return {
     filesAnalyzed: 0,

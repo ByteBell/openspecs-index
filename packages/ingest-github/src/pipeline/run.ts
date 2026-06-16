@@ -3,30 +3,36 @@ import { knowledgeDb } from "@bb/db";
 import { knowledgeGraph } from "@bb/graph-db";
 import { IngestError, UsageLimitExceededError } from "@bb/errors";
 import { logger } from "@bb/logger";
-import { classifyFailure, isRetryable } from "@bb/ingest-core";
-import { transitionState } from "@bb/ingest-core";
-import { isGithubPayload, persistFailure, persistHalted, markNonRetryable } from "@bb/ingest-core";
-import { maybeInjectOneShotHalt } from "./fault-injection.ts";
-import { runLocal } from "./run-local.ts";
-import type { IngestRunnerDeps, IngestRunnerInput } from "@bb/ingest-core";
-import type { IngestStrategy } from "@bb/ingest-core";
-import type { ArchiveSink, PipelineSummary, SourceFactory, SourceReader } from "@bb/ingest-core";
-import type { ProgressContextFactory } from "@bb/ingest-core";
-import { nullProgressContextFactory } from "@bb/ingest-core";
-import { ensureCommitDirs, pathsFor, type RepoLocation } from "@bb/ingest-core";
-import { readHeadCommitHash, syncRepository } from "./source.ts";
-import { resolveBranch } from "./branch.ts";
-import { CancellationError, clearCancellation, throwIfCancelled } from "@bb/ingest-core";
-import { createDiskSourceReader } from "@bb/ingest-core";
 import {
+  classifyFailure,
+  isRetryable,
+  transitionState,
+  isGithubPayload,
+  persistFailure,
+  persistHalted,
+  markNonRetryable,
+  nullProgressContextFactory,
+  pathsFor,
+  CancellationError,
+  clearCancellation,
+  throwIfCancelled,
   resolveOrgId,
   llmCallContextFromPayload,
   unitsLlmCallContextFromPayload,
   ignoreSetsFromPayload,
   withUsageMeter,
 } from "@bb/ingest-core";
-import { fetchLatestCommitHash } from "#src/githubApi.ts";
-import { parseGithubRepo } from "#src/githubUrl.ts";
+import type {
+  IngestRunnerDeps,
+  IngestRunnerInput,
+  IngestStrategy,
+  PipelineSummary,
+  SourceFactory,
+  ProgressContextFactory,
+} from "@bb/ingest-core";
+import { maybeInjectOneShotHalt } from "./fault-injection.ts";
+import { runLocal } from "./run-local.ts";
+import { resolveGithubIndexSource } from "./github-index-source.ts";
 
 export interface CreatePipelineRunnerDeps {
   reposRootDir: string;
@@ -61,6 +67,10 @@ export function createPipelineRunner(deps: CreatePipelineRunnerDeps): IngestRunn
   };
 }
 
+// The OSS public index router. Provider-agnostic orchestration; the github
+// source prelude (branch + clone/stream) lives in `resolveGithubIndexSource`.
+// A private out-of-tree index router in a downstream package can share the same
+// source resolver via injection.
 async function runGithub(
   strategy: IngestStrategy,
   payload: GithubIndexPayload,
@@ -75,123 +85,38 @@ async function runGithub(
   const progressContext = progressContextFactory(knowledgeId);
   try {
     throwIfCancelled(knowledgeId);
-    const branch = await resolveBranch(knowledgeId, payload, payload.gitToken);
-    await knowledgeDb.setKnowledgeBranch(knowledgeId, branch);
-    await knowledgeGraph.setKnowledgeBranchInGraph(knowledgeId, branch).catch(() => undefined);
-
     const orgId = resolveOrgId(payload);
-    // Parse (owner, repo) up front — we need them to build the commit-scoped
-    // path *before* cloning. parseGithubRepo handles `.git`, `tree/branch`
-    // suffixes, and SSH-style URLs.
-    const parsed = parseGithubRepo(payload.repoUrl);
-    if (parsed === null) {
-      throw new IngestError(knowledgeId, `could not parse owner/repo from repoUrl=${payload.repoUrl}`);
-    }
-
-    let source: SourceReader;
-    let archiveSink: ArchiveSink | undefined;
-    let commitHash: string;
-    let location: RepoLocation;
 
     progressContext.phaseChanged("clone");
-    if (sourceFactory !== undefined) {
-      const factoryResult = await sourceFactory({ knowledgeId, payload, branch });
-      source = factoryResult.source;
-      commitHash = factoryResult.commitHash;
-      archiveSink = factoryResult.archiveSink;
-      location = {
-        provider: "github",
-        orgId,
-        knowledgeId,
-        owner: parsed.owner,
-        repo: parsed.repo,
-        commitHash,
-      };
-      // The factory has already produced the source tree; meta-output dirs
-      // still need to exist before the strategy writes scan-manifest.json.
-      // Idempotent — factories that pre-create the layout themselves see no
-      // effect.
-      await ensureCommitDirs(location);
-      logger.info(`pipeline/run: source factory wired (knowledgeId=${knowledgeId}, commit=${commitHash.slice(0, 12)})`);
-    } else {
-      // Resolve the HEAD commit SHA before cloning so we can clone *directly*
-      // into the commit-scoped `repository/` dir — no staging rename. Uses
-      // the GitHub REST `/branches/{branch}` endpoint via fetchLatestCommitHash.
-      const resolvedSha = await fetchLatestCommitHash(payload.repoUrl, branch, payload.gitToken);
-      if (resolvedSha === null) {
-        throw new IngestError(
-          knowledgeId,
-          `could not resolve HEAD commit hash for ${parsed.owner}/${parsed.repo}@${branch} before clone`,
-        );
-      }
-      location = {
-        provider: "github",
-        orgId,
-        knowledgeId,
-        owner: parsed.owner,
-        repo: parsed.repo,
-        commitHash: resolvedSha,
-      };
-      await ensureCommitDirs(location);
-      const repoDir = pathsFor(location).repositoryDir;
-      const cloneOpts: { repoUrl: string; branch: string; destinationDir: string; gitToken?: string } = {
-        repoUrl: payload.repoUrl,
-        branch,
-        destinationDir: repoDir,
-      };
-      if (payload.gitToken !== undefined) {
-        cloneOpts.gitToken = payload.gitToken;
-      }
-      await syncRepository(cloneOpts);
-      // Sanity check: the post-clone HEAD must match what we resolved against
-      // the REST API. A mismatch means the branch advanced between resolve
-      // and clone — rare but worth surfacing.
-      const postCloneSha = await readHeadCommitHash(repoDir);
-      if (postCloneSha === "unknown") {
-        throw new IngestError(knowledgeId, "could not resolve HEAD commit hash after clone");
-      }
-      commitHash = postCloneSha;
-      if (postCloneSha !== resolvedSha) {
-        logger.warn(
-          `pipeline/run: commit drift between REST and clone for ${knowledgeId} (rest=${resolvedSha.slice(0, 12)} clone=${postCloneSha.slice(0, 12)}); using clone SHA`,
-        );
-        // Rebuild the location with the post-clone SHA so meta-output lands
-        // at the same commit segment as the cloned tree.
-        location = { ...location, commitHash: postCloneSha };
-        // Repository tree is already at the new commit; meta dirs we ensured
-        // earlier are at the old SHA path. Re-ensure under the corrected
-        // path so the strategy writes to the right place.
-        await ensureCommitDirs(location);
-      }
-      source = createDiskSourceReader({ repoDir, commitHash });
-    }
+    const { source, archiveSink, commitHash, branch, location, owner, repo } = await resolveGithubIndexSource({
+      knowledgeId,
+      payload,
+      orgId,
+      sourceFactory,
+    });
+    await knowledgeDb.setKnowledgeBranch(knowledgeId, branch);
+    await knowledgeGraph.setKnowledgeBranchInGraph(knowledgeId, branch).catch(() => undefined);
 
     progressContext.phaseChanged("scan");
     const metaPaths = pathsFor(location);
 
-    // Persist `source.commitId` BEFORE strategy execution so MCP tools
-    // invoked during enrichment (`retrieve_file_content`, `smart_search`)
-    // can resolve the on-disk clone via the commit-scoped path layout.
-    // The full history entry with token totals is written after the
-    // strategy completes via `setKnowledgeCommit`.
+    // Persist `source.commitId` BEFORE strategy execution so MCP tools invoked
+    // during enrichment can resolve the on-disk clone via the commit-scoped path.
     await knowledgeDb.setKnowledgeCommitHead(knowledgeId, commitHash);
 
     const baseContext: Parameters<typeof strategy.execute>[0]["context"] = {
       knowledgeId,
       orgId,
       repoId: knowledgeId,
-      owner: parsed.owner,
-      repo: parsed.repo,
+      owner,
+      repo,
       commitHash,
       ignoreSets: ignoreSetsFromPayload(payload),
     };
-    // Bridge the per-job usage guard onto the LLM context so every fresh call
-    // is metered to the user's bill progressively (see `withUsageMeter`).
     const llmCallContext = withUsageMeter(llmCallContextFromPayload(payload), usageGuard);
     if (llmCallContext !== undefined) {
       baseContext.llmCallContext = llmCallContext;
     }
-
     const unitsLlmCallContext = withUsageMeter(unitsLlmCallContextFromPayload(payload), usageGuard);
     if (unitsLlmCallContext !== undefined) {
       baseContext.unitsLlmCallContext = unitsLlmCallContext;
@@ -211,7 +136,6 @@ async function runGithub(
       strategyInput.usageGuard = usageGuard;
     }
     // TEST-ONLY: one-shot forced transient failure to exercise HALTED → retry.
-    // No-op unless BYTEBELL_FORCE_HALT_ONCE=1. Remove with fault-injection.ts.
     maybeInjectOneShotHalt(knowledgeId);
     const result = await strategy.execute(strategyInput);
 
@@ -256,20 +180,11 @@ async function runGithub(
     }
     const { category, reason, detail } = classifyFailure(cause);
     if (isRetryable(category)) {
-      // Transient — record HALTED and re-throw so the queue retries. The
-      // queue finalizer emits the RETRYING SSE and (on exhaustion) FAILED.
       await persistHalted(knowledgeId, category, reason, detail);
       throw new IngestError(knowledgeId, `github_index pipeline failed: ${reason}`, cause);
     }
-    // Non-retryable — terminal now. Emit FAILED SSE and tell the queue not to
-    // retry (worker wrapper converts a `retryable === false` error into a
-    // BullMQ UnrecoverableError).
     await persistFailure(knowledgeId, category, reason, detail);
     progressContext.failed(reason, undefined, category, detail);
     throw markNonRetryable(new IngestError(knowledgeId, `github_index pipeline failed: ${reason}`, cause));
   }
 }
-
-// `runLocal` lives in `./run-local.ts`. Shared helpers (`transitionState`,
-// `persistFailure`, `isGithubPayload`) live in `./pull-helpers.ts` and
-// `./run-helpers.ts` so this file stays under the 300-line cap.

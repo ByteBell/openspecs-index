@@ -7,8 +7,7 @@
 //   - flat-folder    : per-file analysis + folder/repo summaries (default)
 //   - concept-graph  : per-file analysis + MCP hypergraph enrichment
 //
-// The private `intermediate-representation` strategy lives in the enterprise
-// `@bytebell/ingest-strategies` package, not here.
+// Private strategies live in their own downstream package, not here.
 
 export { createFlatFolderStrategy } from "#src/flat-folder/index.ts";
 export type { FlatFolderStrategyDeps } from "#src/flat-folder/index.ts";

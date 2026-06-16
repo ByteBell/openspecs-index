@@ -23,7 +23,7 @@ export interface StrategyContext {
   llmCallContext?: AskLlmOptions;
   /**
    * Optional second LLM context for fine-grained (per-unit) analysis. When a strategy runs a
-   * high-volume per-unit pass (e.g. the IR strategy's phase 7), it routes those calls through this
+   * high-volume per-unit pass, it routes those calls through this
    * context instead of {@link llmCallContext} — letting a job point them at a cheaper model. Built
    * from the payload's `unitsLlmModel`; absent when unset, and the strategy falls back to
    * {@link llmCallContext}.
