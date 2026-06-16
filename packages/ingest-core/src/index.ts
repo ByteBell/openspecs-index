@@ -46,6 +46,12 @@ export { FALLBACK_LANGUAGE, emptyFileAnalysis } from "#src/types/file-analysis.t
 export type { IngestRunnerDeps, IngestRunnerInput } from "#src/types/ingest-runner.ts";
 export type { TokenUsage, TokenAccumulator } from "#src/types/token-usage.ts";
 export { ZERO_USAGE, addUsage, subUsage, createTokenAccumulator } from "#src/types/token-usage.ts";
+export type {
+  PullSourceResolution,
+  ResolvePullSourceInput,
+  PullSourceResolver,
+  PullRunner,
+} from "#src/types/pull-runner.ts";
 
 // ── Paths ──────────────────────────────────────────────────────────────────
 export {

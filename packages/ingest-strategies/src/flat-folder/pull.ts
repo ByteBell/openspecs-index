@@ -12,32 +12,36 @@ import { knowledgeDb } from "@bb/db";
 import { filesGraph } from "@bb/graph-db";
 import type { PipelineSummary } from "@bb/ingest-core";
 import { resolveOrgId, llmCallContextFromPayload, ignoreSetsFromPayload, withUsageMeter } from "@bb/ingest-core";
-import { IngestError } from "@bb/errors";
 import { transitionState, emptyPullSummary } from "@bb/ingest-core";
 import { throwPullFailure } from "@bb/ingest-core";
+// (IngestError no longer needed here — owner/repo parsing moved to the resolver.)
 import { preflightPull } from "@bb/ingest-core";
 import { logger } from "@bb/logger";
 import { pathsFor } from "@bb/ingest-core";
-import { parseGithubRepo } from "#src/githubUrl.ts";
 import { clearCancellation, throwIfCancelled } from "@bb/ingest-core";
 import { affectedFoldersFromDiff } from "@bb/ingest-core";
-import { resolvePullSource } from "./pull-source-resolver.ts";
-import type { PullFactory } from "@bb/ingest-core";
+import type { PullFactory, PullSourceResolver } from "@bb/ingest-core";
 import type { ProgressContextFactory } from "@bb/ingest-core";
 import { nullProgressContextFactory } from "@bb/ingest-core";
-import { analyseChangedFiles } from "@bb/ingest-strategies";
+import { analyseChangedFiles } from "./analyse-changed.ts";
 import { processBigFilesQueue } from "@bb/ingest-core";
 import { backfillMissingFields } from "@bb/ingest-core";
 import { FileAnalysisCache } from "@bb/ingest-core";
-import { runSelectiveFolderSummary } from "@bb/ingest-strategies";
-import { makeRepoSummaryEnvelope, persistRepoSummary, summariseRepo } from "@bb/ingest-strategies";
-import { storePullAnalysis } from "@bb/ingest-strategies";
+import { runSelectiveFolderSummary } from "./folder-summary-selective.ts";
+import { makeRepoSummaryEnvelope, persistRepoSummary, summariseRepo } from "./repo-summary.ts";
+import { storePullAnalysis } from "./store-pull.ts";
 import { createTokenAccumulator } from "@bb/ingest-core";
 import { createLlmFileAnalyzer } from "@bb/ingest-core";
 import { COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT, buildFileAnalysisUserPrompt } from "@bb/ingest-core";
 
+/**
+ * Flat-folder pull driver. Provider-agnostic: the provider's clone + diff
+ * resolver (`resolvePullSource`) is injected by the composition root, so this
+ * driver never imports github / gitlab.
+ */
 export async function runPull(
   msg: JobMessage<GithubPullPayload>,
+  resolvePullSource: PullSourceResolver,
   pullFactory?: PullFactory,
   progressContextFactory: ProgressContextFactory = nullProgressContextFactory,
   usageGuard?: UsageGuard,
@@ -51,12 +55,6 @@ export async function runPull(
 
   try {
     throwIfCancelled(knowledgeId);
-    // Parse owner/repo up front — the resolver needs them to build the
-    // commit-scoped path under the new layout.
-    const parsed = parseGithubRepo(repoUrl);
-    if (parsed === null) {
-      throw new IngestError(knowledgeId, `could not parse owner/repo from repoUrl=${repoUrl}`);
-    }
     // Use the job payload's orgId (multi-tenant UUID), not an empty object —
     // `resolveOrgId({})` would fall back to Config.OrgId (the env ORG_ID slug) and
     // overwrite the index-written `Knowledge.org_id`, dropping the KB out of the
@@ -74,8 +72,6 @@ export async function runPull(
       repoUrl,
       gitToken,
       orgId,
-      owner: parsed.owner,
-      repo: parsed.repo,
       pullFactory,
     });
     if (resolution.kind === "noop") {
@@ -83,7 +79,7 @@ export async function runPull(
       await transitionState(knowledgeId, KnowledgeState.Processed);
       return emptyPullSummary(resolution.targetCommit, currentCommit);
     }
-    const { source, diff, targetCommit, location, archiveSink } = resolution;
+    const { source, diff, targetCommit, location, owner, repo, archiveSink } = resolution;
     // Copy-forward the raw-file snapshot: seed the target commit's archive folder
     // from the parent so it is a complete tree before changed files are pushed
     // over it, then drop deleted / renamed-away paths. No-ops for sinks that are
@@ -215,8 +211,8 @@ export async function runPull(
       scope,
       payload: { knowledgeId, repoUrl, branch },
       branch,
-      owner: parsed.owner,
-      repo: parsed.repo,
+      owner,
+      repo,
       commitHash: targetCommit,
       metaPaths,
       diff,

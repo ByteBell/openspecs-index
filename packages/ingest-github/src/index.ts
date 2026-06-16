@@ -2,35 +2,33 @@ import path from "node:path";
 import { JobType } from "@bb/types";
 import { getBytebellHome } from "@bb/config";
 import { registerWorker } from "@bb/queue";
-import type { PullFactory, SourceFactory, ProgressContextFactory } from "@bb/ingest-core";
-import { createLlmFileAnalyzer, dbProgressContextFactory, orgsRoot } from "@bb/ingest-core";
-import { COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT, buildFileAnalysisUserPrompt } from "@bb/ingest-core";
-import { pickStrategy } from "@bb/ingest-strategies";
+import type { IngestStrategy, PullFactory, PullRunner, SourceFactory, ProgressContextFactory } from "@bb/ingest-core";
+import { dbProgressContextFactory, orgsRoot } from "@bb/ingest-core";
 import { createPipelineRunner } from "./pipeline/run.ts";
-import { runPull } from "./pipeline/pull.ts";
 import { createGithubIngestHandler, createLocalIngestHandler } from "./handlers/ingest-job.ts";
 
 /**
- * Optional dependencies for the GitHub workers. Factories are documented in
- * `docs/extension-points.md`. The open-source binary leaves them undefined —
- * index and pull use the default disk-backed readers, and progress events
- * are discarded by `nullProgressContextFactory`.
+ * Dependencies for the GitHub workers. The composition root resolves the
+ * active `strategy` (e.g. via `@bb/ingest-strategies`' `pickStrategy`) and the
+ * `pullRunner` (a flat-folder pull driver bound to this package's
+ * `resolvePullSource`), then injects them here — `@bb/ingest-github` never
+ * imports a strategy. The optional source/pull factories are documented in
+ * `docs/extension-points.md`; the OSS binary leaves them undefined and uses the
+ * default disk-backed readers.
  */
 export interface RegisterGithubWorkersDeps {
+  strategy: IngestStrategy;
+  pullRunner: PullRunner;
   sourceFactory?: SourceFactory;
   pullFactory?: PullFactory;
   progressContextFactory?: ProgressContextFactory;
 }
 
 function buildRunner(
+  strategy: IngestStrategy,
   sourceFactory: SourceFactory | undefined,
   progressContextFactory: ProgressContextFactory,
 ): ReturnType<typeof createPipelineRunner> {
-  const fileAnalyzer = createLlmFileAnalyzer({
-    buildSystemPrompt: () => COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
-    buildUserPrompt: buildFileAnalysisUserPrompt,
-  });
-  const strategy = pickStrategy({ fileAnalyzer, progressContextFactory });
   const runnerDeps: Parameters<typeof createPipelineRunner>[0] = {
     reposRootDir: orgsRoot(),
     strategy,
@@ -42,26 +40,25 @@ function buildRunner(
   return createPipelineRunner(runnerDeps);
 }
 
-export function registerGithubWorkers(deps: RegisterGithubWorkersDeps = {}): void {
+export function registerGithubWorkers(deps: RegisterGithubWorkersDeps): void {
   const progressContextFactory = deps.progressContextFactory ?? dbProgressContextFactory;
-  const runner = buildRunner(deps.sourceFactory, progressContextFactory);
-  // `registerWorker` expects `Promise<void>`; the handler now returns
+  const runner = buildRunner(deps.strategy, deps.sourceFactory, progressContextFactory);
+  // `registerWorker` expects `Promise<void>`; the handler returns
   // `Promise<PipelineSummary>` so the enterprise queue bridge can mirror
   // per-commit tokens + cost into the knowledge record. The OSS in-process
-  // worker discards the summary — local stats are read off
-  // `source.commitHashes[]` via `bytebell stats` instead.
+  // worker discards the summary.
   const indexHandler = createGithubIngestHandler({ runner });
   registerWorker(JobType.GithubIndex, async (msg) => {
     await indexHandler(msg);
   });
-  const pullFactory = deps.pullFactory;
+  const { pullRunner, pullFactory } = deps;
   registerWorker(JobType.GithubPull, async (msg) => {
-    await runPull(msg, pullFactory, progressContextFactory);
+    await pullRunner(msg, pullFactory, progressContextFactory);
   });
 }
 
-export function registerLocalIngestWorker(): void {
-  const runner = buildRunner(undefined, dbProgressContextFactory);
+export function registerLocalIngestWorker(strategy: IngestStrategy): void {
+  const runner = buildRunner(strategy, undefined, dbProgressContextFactory);
   const localHandler = createLocalIngestHandler({ runner });
   registerWorker(JobType.LocalIngest, async (msg) => {
     await localHandler(msg);
@@ -85,7 +82,6 @@ export { createPipelineRunner } from "./pipeline/run.ts";
 export type { CreatePipelineRunnerDeps } from "./pipeline/run.ts";
 export { createGithubIngestHandler, createLocalIngestHandler } from "./handlers/ingest-job.ts";
 export type { IngestJobHandlerDeps } from "./handlers/ingest-job.ts";
-export { runPull } from "./pipeline/pull.ts";
 export {
   fetchLatestCommitHash,
   fetchRecentCommits,
@@ -96,27 +92,20 @@ export {
 export type { CommitEntry, FetchCommitsResult, ParsedRepo, DefaultBranchResult } from "./githubApi.ts";
 export { bootstrapRuntime } from "./bootstrap.ts";
 export type { BootstrapRuntimeOptions } from "./bootstrap.ts";
-// GitHub-specific pull-source resolver (clone + diff). Provider-agnostic pull
-// drivers receive this via the PullSourceResolver seam.
+// GitHub implementation of the provider-agnostic `PullSourceResolver` seam
+// (clone + diff). The composition root injects this into the flat-folder pull
+// driver (`@bb/ingest-strategies`' runPull).
 export { resolvePullSource } from "./pipeline/pull-source-resolver.ts";
-export type { PullSourceResolution, ResolvePullSourceInput } from "./pipeline/pull-source-resolver.ts";
-
-// ── Back-compat shim: public strategies now live in @bb/ingest-strategies ────
-// Re-exported so the composition roots (OSS server, enterprise queue-bootstrap)
-// keep importing these names from `@bb/ingest-github` until Phase 4 wires them
-// to inject the strategy directly.
-export { createFlatFolderStrategy, createConceptGraphStrategy, pickStrategy } from "@bb/ingest-strategies";
-export { COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT, buildFileAnalysisUserPrompt } from "@bb/ingest-core";
-// Shared phase primitives re-exported from core for existing consumers (IR).
-export { classifyByTokens } from "@bb/ingest-core";
-export { readScanManifest, writeScanManifest, emptyManifest } from "@bb/ingest-core";
-export type { ScanManifest, ScanManifestEntry } from "@bb/ingest-core";
-export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "@bb/ingest-core";
 
 // ── Back-compat shim: re-export the provider-agnostic SDK from @bb/ingest-core ─
 // Existing consumers (enterprise IR, gitlab) still import these names from
 // `@bb/ingest-github`. They now live in `@bb/ingest-core`; these re-exports keep
 // the old import paths working until those consumers are repointed (Phase 5/6).
+export { COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT, buildFileAnalysisUserPrompt } from "@bb/ingest-core";
+export { classifyByTokens } from "@bb/ingest-core";
+export { readScanManifest, writeScanManifest, emptyManifest } from "@bb/ingest-core";
+export type { ScanManifest, ScanManifestEntry } from "@bb/ingest-core";
+export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "@bb/ingest-core";
 export {
   createLlmFileAnalyzer,
   createDiskSourceReader,
@@ -180,6 +169,10 @@ export type {
   PullFactory,
   PullFactoryInput,
   PullFactoryResult,
+  PullRunner,
+  PullSourceResolution,
+  ResolvePullSourceInput,
+  PullSourceResolver,
   PipelineSummary,
   DiffResult,
   RenamedFile,

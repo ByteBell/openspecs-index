@@ -17,7 +17,6 @@
   "dependencies": {
     "@bb/config": "workspace:*",
     "@bb/ingest-core": "workspace:*",
-    "@bb/ingest-strategies": "workspace:*",
     "@bb/db": "workspace:*",
     "@bb/errors": "workspace:*",
     "@bb/graph-db": "workspace:*",

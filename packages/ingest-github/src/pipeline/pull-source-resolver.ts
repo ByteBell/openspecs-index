@@ -1,13 +1,20 @@
-import { type GithubPullPayload } from "@bb/types";
 import { IngestError } from "@bb/errors";
 import { logger } from "@bb/logger";
-import { ensureCommitDirs, pathsFor, type RepoLocation } from "@bb/ingest-core";
+import {
+  ensureCommitDirs,
+  pathsFor,
+  type RepoLocation,
+  assertReachableFromBranch,
+  checkoutCommit,
+  computePullDiff,
+  materialiseEndpoints,
+  createDiskSourceReader,
+  type ResolvePullSourceInput,
+  type PullSourceResolution,
+} from "@bb/ingest-core";
 import { readHeadCommitHash, syncRepository } from "./source.ts";
-import { assertReachableFromBranch, checkoutCommit, type DiffResult } from "@bb/ingest-core";
-import { computePullDiff, materialiseEndpoints } from "@bb/ingest-core";
-import { createDiskSourceReader } from "@bb/ingest-core";
 import { fetchLatestCommitHash } from "#src/githubApi.ts";
-import type { ArchiveSink, PullFactory, SourceReader } from "@bb/ingest-core";
+import { parseGithubRepo } from "#src/githubUrl.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Resolves the "repository state" prelude for `runPull`:
@@ -22,35 +29,20 @@ import type { ArchiveSink, PullFactory, SourceReader } from "@bb/ingest-core";
 // summary) or `{ kind: "ready", source, diff, targetCommit, location,
 // archiveSink? }` (caller proceeds with the analysis phases).
 //
-// Extracted from `pull.ts` to keep that file under the 300-line cap.
+// Extracted from `pull.ts` to keep that file under the 300-line cap. The
+// `PullSourceResolution` / `ResolvePullSourceInput` contracts live in
+// `@bb/ingest-core`; this is the GitHub implementation of `PullSourceResolver`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PullSourceResolution =
-  | { kind: "noop"; targetCommit: string }
-  | {
-      kind: "ready";
-      source: SourceReader;
-      diff: DiffResult;
-      targetCommit: string;
-      location: RepoLocation;
-      archiveSink: ArchiveSink | undefined;
-    };
-
-export interface ResolvePullSourceInput {
-  knowledgeId: string;
-  payload: GithubPullPayload;
-  currentCommit: string;
-  branch: string;
-  repoUrl: string;
-  gitToken: string | undefined;
-  orgId: string;
-  owner: string;
-  repo: string;
-  pullFactory: PullFactory | undefined;
-}
-
 export async function resolvePullSource(input: ResolvePullSourceInput): Promise<PullSourceResolution> {
-  const { knowledgeId, payload, currentCommit, branch, repoUrl, gitToken, orgId, owner, repo, pullFactory } = input;
+  const { knowledgeId, payload, currentCommit, branch, repoUrl, gitToken, orgId, pullFactory } = input;
+  // GitHub-specific: derive owner/repo from the repo URL. The provider-agnostic
+  // driver no longer parses this — it is the resolver's concern.
+  const parsed = parseGithubRepo(repoUrl);
+  if (parsed === null) {
+    throw new IngestError(knowledgeId, `could not parse owner/repo from repoUrl=${repoUrl}`);
+  }
+  const { owner, repo } = parsed;
 
   if (pullFactory !== undefined) {
     const factoryResult = await pullFactory({ knowledgeId, payload, currentCommit, branch });
@@ -80,6 +72,8 @@ export async function resolvePullSource(input: ResolvePullSourceInput): Promise<
       diff: factoryResult.diff,
       targetCommit: factoryResult.targetCommit,
       location,
+      owner,
+      repo,
       archiveSink: factoryResult.archiveSink,
     };
   }
@@ -152,5 +146,5 @@ export async function resolvePullSource(input: ResolvePullSourceInput): Promise<
   await checkoutCommit(repoDir, targetCommit);
   const source = createDiskSourceReader({ repoDir, commitHash: targetCommit });
 
-  return { kind: "ready", source, diff, targetCommit, location, archiveSink: undefined };
+  return { kind: "ready", source, diff, targetCommit, location, owner, repo, archiveSink: undefined };
 }

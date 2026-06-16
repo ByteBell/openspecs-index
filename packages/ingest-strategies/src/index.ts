@@ -30,3 +30,7 @@ export type {
 export { summariseRepo, persistRepoSummary, makeRepoSummaryEnvelope } from "#src/flat-folder/repo-summary.ts";
 export { storePullAnalysis } from "#src/flat-folder/store-pull.ts";
 export type { StorePullInput, StorePullResult } from "#src/flat-folder/store-pull.ts";
+
+// The flat-folder pull driver. Provider-agnostic: the composition root injects
+// the provider's `PullSourceResolver` (e.g. @bb/ingest-github's resolvePullSource).
+export { runPull } from "#src/flat-folder/pull.ts";
