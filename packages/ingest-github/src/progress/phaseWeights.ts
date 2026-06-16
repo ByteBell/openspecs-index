@@ -13,7 +13,12 @@ import type { ProgressPhase } from "./types.ts";
  * flat-folder has no `enrichment`) simply jump forward.
  */
 
-/** Percent the bar jumps to when a phase begins (the granular span for `file_analysis` is below). */
+/**
+ * Percent the bar jumps to when a phase begins (the granular span for
+ * `file_analysis` is below). The `analyse_files`/`analyse_units`/`write_graph`
+ * entries are the IR-strategy band starts; the OSS CLI never runs the IR
+ * strategy, so they exist for type completeness / parity only.
+ */
 const PHASE_FLOOR: Record<ProgressPhase, number> = {
   clone: 1,
   scan: 3,
@@ -21,6 +26,9 @@ const PHASE_FLOOR: Record<ProgressPhase, number> = {
   folder_analysis: 72,
   indexing: 82,
   enrichment: 92,
+  analyse_files: 10,
+  analyse_units: 40,
+  write_graph: 85,
 };
 
 const FILE_ANALYSIS_FLOOR = PHASE_FLOOR.file_analysis;
