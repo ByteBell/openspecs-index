@@ -91,6 +91,14 @@ export interface CypherStep {
  * either every statement commits or none do. Used by the batched upsert APIs
  * so a 50-file batch lands as one transaction instead of 12 × 50 sessions.
  *
+ * Statements are PIPELINED: every `tx.run` is dispatched up-front (the driver
+ * queues the RUN messages on the connection in call order; the server executes
+ * them sequentially within the transaction) and awaited together. Semantics are
+ * identical to awaiting each statement in turn — later statements still see
+ * earlier writes — but the whole batch costs ~one network round-trip instead of
+ * one per statement. Over a WAN that is the difference between seconds and
+ * minutes for a thousand-statement batch.
+ *
  * Uses the driver's `executeWrite` which retries automatically on transient
  * errors (deadlock, leader switch) up to a few attempts.
  */
@@ -101,9 +109,7 @@ export async function _runInTransaction(steps: readonly CypherStep[]): Promise<v
   const session: Session = _getDriver().session();
   try {
     await session.executeWrite(async (tx) => {
-      for (const step of steps) {
-        await tx.run(step.query, step.params);
-      }
+      await Promise.all(steps.map((step) => tx.run(step.query, step.params)));
     });
   } finally {
     await session.close();

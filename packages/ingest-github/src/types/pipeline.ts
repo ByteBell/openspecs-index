@@ -98,6 +98,13 @@ export interface SourceReader {
   /** The resolved HEAD commit hash. Populated by the time the reader is returned. */
   readonly commitHash: string;
 
+  /**
+   * The committed timestamp of `commitHash` (ISO-8601, e.g. from `git log -1 --format=%cI`).
+   * Optional: disk-backed readers populate it when the caller supplies it; other readers leave
+   * it `undefined`. Consumers that record a commit date should coalesce to `null`.
+   */
+  readonly commitDate?: string | null;
+
   /** A stable on-disk path for the cloned tree when the reader is disk-backed; `""` otherwise. */
   readonly localRepoDir: string;
 }

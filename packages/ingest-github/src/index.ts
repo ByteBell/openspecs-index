@@ -205,3 +205,46 @@ export {
   throwIfCancelled,
   CancellationError,
 } from "./pipeline/cancellation.ts";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IR-strategy support surface. These are internal pipeline primitives surfaced
+// so an out-of-tree strategy (the private `@bytebell/ingest-ir`) can reuse the
+// same scan / classify / file-analysis / skip-decision building blocks without
+// reaching into this package's internals. No new behaviour — re-exports only.
+// ─────────────────────────────────────────────────────────────────────────────
+export { withConcurrency, runInPool } from "./pipeline/concurrency.ts";
+export type { ConcurrencyLimiter } from "./pipeline/concurrency.ts";
+export { classifyFailure } from "./pipeline/failure-classifier.ts";
+export { makeSkipDecider } from "./pipeline/skip-decisions/index.ts";
+export { buildEffectiveIgnoreSets } from "./pipeline/skip-decisions/effective.ts";
+export type { EffectiveIgnoreSets } from "./pipeline/skip-decisions/effective.ts";
+export { encodeMetaPath, decodeMetaPath } from "./pipeline/paths.ts";
+export type { MetaPaths } from "./types/meta-paths.ts";
+export type { ChunkAnalysisResult, FileChunk } from "./types/big-file.ts";
+export type { SkipDecider } from "./types/pipeline.ts";
+export { FALLBACK_LANGUAGE, emptyFileAnalysis } from "./types/file-analysis.ts";
+export { languageFromPath, shapeAnalysis } from "./adapters/llm-file-analyzer.ts";
+export { classifyByTokens } from "./strategies/flat-folder/big-file/detector.ts";
+export { readScanManifest, writeScanManifest, emptyManifest } from "./strategies/flat-folder/scan-manifest.ts";
+export type { ScanManifest, ScanManifestEntry } from "./strategies/flat-folder/scan-manifest.ts";
+export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "./strategies/flat-folder/eligible-files.ts";
+// Pull-prelude primitives surfaced for the out-of-tree IR pull driver
+// (`@bytebell/ingest-ir`'s `runIrPull`). It reuses OSS's strategy-agnostic pull
+// prelude (preflight → source/diff resolution → failure classification) and
+// lifecycle writes, then swaps the flat-folder analysis phases for the IR
+// strategy. Additive re-exports + the `recordPullCommit` lifecycle wrapper — no
+// behaviour change to `runPull` itself.
+export { preflightPull } from "./pipeline/pull-preflight.ts";
+export type { PullPreflight } from "./pipeline/pull-preflight.ts";
+export { resolvePullSource } from "./pipeline/pull-source-resolver.ts";
+export type { PullSourceResolution, ResolvePullSourceInput } from "./pipeline/pull-source-resolver.ts";
+export { transitionState, emptyPullSummary, recordPullCommit } from "./pipeline/pull-helpers.ts";
+export { throwPullFailure } from "./pipeline/pull-failure.ts";
+export type { PullFailureDeps } from "./pipeline/pull-failure.ts";
+export {
+  resolveOrgId,
+  ignoreSetsFromPayload,
+  llmCallContextFromPayload,
+  unitsLlmCallContextFromPayload,
+  withUsageMeter,
+} from "./pipeline/context.ts";
