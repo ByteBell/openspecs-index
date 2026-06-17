@@ -1,8 +1,8 @@
 import "./provider.ts";
 
 export { connectNeo4j, closeNeo4j, pingNeo4j } from "./client.ts";
-export { _runCypher as runCypher, toNeo4jInt } from "./client.ts";
-export type { PingResult } from "./client.ts";
+export { _runCypher as runCypher, _runInTransaction as runInTransaction, toNeo4jInt } from "./client.ts";
+export type { CypherStep, PingResult } from "./client.ts";
 
 export { ensureKnowledgeIndexes } from "./indexes.ts";
 export { ensureFlatFolderIndexes } from "./flatFolderIndexes.ts";

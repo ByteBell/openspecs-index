@@ -18,7 +18,13 @@ import { readHeadCommitHash, syncRepository } from "./source.ts";
 import { resolveBranch } from "./branch.ts";
 import { CancellationError, clearCancellation, throwIfCancelled } from "./cancellation.ts";
 import { createDiskSourceReader } from "./disk-source-reader.ts";
-import { resolveOrgId, llmCallContextFromPayload, ignoreSetsFromPayload, withUsageMeter } from "./context.ts";
+import {
+  resolveOrgId,
+  llmCallContextFromPayload,
+  unitsLlmCallContextFromPayload,
+  ignoreSetsFromPayload,
+  withUsageMeter,
+} from "./context.ts";
 import { fetchLatestCommitHash } from "#src/githubApi.ts";
 import { parseGithubRepo } from "#src/githubUrl.ts";
 
@@ -185,6 +191,12 @@ async function runGithub(
     if (llmCallContext !== undefined) {
       baseContext.llmCallContext = llmCallContext;
     }
+
+    const unitsLlmCallContext = withUsageMeter(unitsLlmCallContextFromPayload(payload), usageGuard);
+    if (unitsLlmCallContext !== undefined) {
+      baseContext.unitsLlmCallContext = unitsLlmCallContext;
+    }
+
     const strategyInput: Parameters<typeof strategy.execute>[0] = {
       payload,
       branch,

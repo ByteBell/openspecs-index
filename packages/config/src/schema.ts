@@ -9,7 +9,7 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export const LLM_PROVIDERS = ["openrouter", "ollama"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
-export const INGESTION_STRATEGIES = ["flat-folder", "concept-graph"] as const;
+export const INGESTION_STRATEGIES = ["flat-folder", "concept-graph", "intermediate-representation"] as const;
 export type IngestionStrategy = (typeof INGESTION_STRATEGIES)[number];
 
 const concurrencySchema = z
@@ -63,6 +63,7 @@ export const configSchema = z
     sqlite_path: z.string().default(""),
     ladybug_path: z.string().default(""),
     "ingestion.strategy": z.enum(INGESTION_STRATEGIES).default("flat-folder"),
+    "units.model": z.string().default(""),
     "enrichment.model": z.string().default(""),
     "enrichment.max.tool.calls.per.file": z.number().int().positive().default(15),
     "enrichment.max.iterations.per.file": z.number().int().positive().default(8),
@@ -120,6 +121,7 @@ export type ConfigValueMap = {
   [Config.SqlitePath]: string;
   [Config.LadybugPath]: string;
   [Config.IngestionStrategy]: IngestionStrategy;
+  [Config.UnitsModel]: string;
   [Config.EnrichmentModel]: string;
   [Config.EnrichmentMaxToolCallsPerFile]: number;
   [Config.EnrichmentMaxIterationsPerFile]: number;
@@ -191,6 +193,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.SqlitePath]: "bytebell set sqlite-path <path>",
   [Config.LadybugPath]: "bytebell set ladybug-path <path>",
   [Config.IngestionStrategy]: "bytebell set ingestion.strategy <flat-folder|concept-graph>",
+  [Config.UnitsModel]: "bytebell set units.model <model-id>",
   [Config.EnrichmentModel]: "bytebell set enrichment.model <model-id>",
   [Config.EnrichmentMaxToolCallsPerFile]: "bytebell set enrichment.max.tool.calls.per.file <n>",
   [Config.EnrichmentMaxIterationsPerFile]: "bytebell set enrichment.max.iterations.per.file <n>",

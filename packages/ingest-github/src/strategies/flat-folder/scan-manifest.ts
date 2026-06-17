@@ -23,13 +23,20 @@ export interface ScanManifestSummary {
 
 export interface ScanManifest {
   generatedAt: string;
+  /**
+   * The commit the manifest was scanned at. Optional: when present, a consumer can treat an
+   * existing manifest stamped with the current commit as an authoritative cache hit and skip the
+   * rescan. Manifests written before this field force a fresh scan.
+   */
+  commitHash?: string;
   summary: ScanManifestSummary;
   entries: ScanManifestEntry[];
 }
 
-export function emptyManifest(): ScanManifest {
+export function emptyManifest(commitHash?: string): ScanManifest {
   return {
     generatedAt: new Date().toISOString(),
+    ...(commitHash !== undefined ? { commitHash } : {}),
     summary: { totalFiles: 0, smallCount: 0, bigCount: 0, oversizedCount: 0, totalTokens: 0, estimatedBigChunks: 0 },
     entries: [],
   };
