@@ -21,6 +21,9 @@ const PHASE_FLOOR: Record<ProgressPhase, number> = {
   folder_analysis: 72,
   indexing: 82,
   enrichment: 92,
+  // Optional trailing phase (IR spec-site generation). Floors at 95 so the bar shows 95→100 while it
+  // runs; only emitted when spec generation is enabled, otherwise the bar completes from `indexing`.
+  spec_generation: 95,
 };
 
 const FILE_ANALYSIS_FLOOR = PHASE_FLOOR.file_analysis;
