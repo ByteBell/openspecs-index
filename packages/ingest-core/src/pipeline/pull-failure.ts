@@ -3,7 +3,7 @@ import { logger } from "@bb/logger";
 import { KnowledgeState, type UsageGuard } from "@bb/types";
 import { CancellationError, clearCancellation } from "./cancellation.ts";
 import { classifyFailure, isRetryable } from "./failure-classifier.ts";
-import { persistFailure, persistHalted, markNonRetryable } from "./run-helpers.ts";
+import { persistCorrupted, persistFailure, persistHalted, markNonRetryable } from "./run-helpers.ts";
 import { transitionState } from "./pull-helpers.ts";
 import type { ProgressContext } from "#src/progress/types.ts";
 
@@ -45,6 +45,17 @@ export async function throwPullFailure(cause: unknown, deps: PullFailureDeps): P
     });
   }
   const { category, reason, detail } = classifyFailure(cause);
+  if (category === "repo_unavailable") {
+    // Terminal: the source repo is gone or inaccessible (deleted/renamed, or the
+    // token lost access). No retry fixes it, and preserving PROCESSED on auto-pull
+    // would let the sweep re-pull it every cycle (a Slack-alert loop). Mark the
+    // knowledge CORRUPTED so the sweep (PROCESSED-only) drops it; the indexed data
+    // stays queryable. Applies to both auto-pull and initial-index paths.
+    logger.warn(`pull: ${knowledgeId} source repo unavailable (${reason}); marking CORRUPTED`);
+    await persistCorrupted(knowledgeId, category, reason, detail);
+    progressContext.failed(reason, undefined, category, detail);
+    throw markNonRetryable(new IngestError(knowledgeId, `github_pull failed (corrupted): ${reason}`, cause));
+  }
   if (isAutoPull === true) {
     // Background refresh of already-PROCESSED knowledge must never degrade it.
     // Restore the prior PROCESSED state (the pull set PROCESSING on entry), skip

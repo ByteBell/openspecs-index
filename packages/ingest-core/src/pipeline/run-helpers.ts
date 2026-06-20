@@ -43,6 +43,23 @@ export async function persistHalted(
 }
 
 /**
+ * Persists the terminal CORRUPTED state + structured failure reason to Mongo,
+ * then mirrors it into Neo4j (best-effort). Used for the `repo_unavailable`
+ * category: the source repo is gone/inaccessible, so the row leaves PROCESSED
+ * and the auto-pull sweep stops re-pulling it. Mirrors `persistFailure` so the
+ * throw path is preserved.
+ */
+export async function persistCorrupted(
+  knowledgeId: string,
+  category: KnowledgeFailureCategory,
+  reason: string,
+  detail?: string,
+): Promise<void> {
+  await knowledgeDb.markKnowledgeCorrupted(knowledgeId, reason, category, detail).catch(() => undefined);
+  await knowledgeGraph.setKnowledgeStateInGraph(knowledgeId, KnowledgeState.Corrupted).catch(() => undefined);
+}
+
+/**
  * Stamps `retryable = false` on a thrown error. Property contract read by the
  * queue worker wrappers (`@bytebell/queue` BullMQManager and OSS `queue-bullmq`)
  * to convert the failure into a BullMQ `UnrecoverableError` — stopping further

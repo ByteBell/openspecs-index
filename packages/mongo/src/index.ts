@@ -7,9 +7,6 @@ export {
   getKnowledge,
   setKnowledgeCommit,
   setKnowledgeState,
-  markKnowledgeFailed,
-  markKnowledgeHalted,
-  promoteHaltedToFailed,
   setKnowledgeBranch,
   updateKnowledgeProgress,
   upsertKnowledge,
@@ -17,6 +14,12 @@ export {
   deleteKnowledge,
 } from "./knowledge.ts";
 export type { KnowledgeListEntry, DeleteKnowledgeResult } from "./knowledge.ts";
+export {
+  markKnowledgeFailed,
+  markKnowledgeHalted,
+  markKnowledgeCorrupted,
+  promoteHaltedToFailed,
+} from "./knowledge-failure.ts";
 
 export { upsertRawFile, listRawFileShas, deleteRawFiles } from "./raw.ts";
 export type { FileAnalysis, FileAnalysisSection, RawFileDoc } from "./raw.ts";

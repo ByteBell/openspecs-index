@@ -1,4 +1,4 @@
-import { LlmConfigError, LlmError, UsageLimitExceededError } from "@bb/errors";
+import { LlmConfigError, LlmError, RepoUnavailableError, UsageLimitExceededError } from "@bb/errors";
 import type { KnowledgeFailureCategory } from "@bb/types";
 import { describe } from "./stats.ts";
 
@@ -39,6 +39,13 @@ export function classifyFailure(cause: unknown): ClassifiedFailure {
     return {
       category: "llm_config",
       reason: `LLM configuration missing. Run: ${cause.hint}`,
+      detail: cause.message,
+    };
+  }
+  if (cause instanceof RepoUnavailableError) {
+    return {
+      category: "repo_unavailable",
+      reason: "Source repository not found or inaccessible (deleted/renamed, or token lacks access).",
       detail: cause.message,
     };
   }
