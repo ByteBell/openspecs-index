@@ -24,7 +24,34 @@ const MONGO_RX = /^mongodb(\+srv)?:\/\//u;
 const NEO4J_RX = /^(bolt|neo4j)(\+s|\+ssc)?:\/\//u;
 const REDIS_RX = /^rediss?:\/\//u;
 
+// Server + LLM settings come first (always shown); the Docker infra connection
+// rows render below them and only in Docker (non-embedded) mode.
 const ROWS: Row[] = [
+  {
+    id: "port",
+    label: "Server port",
+    cliKey: "port",
+    validate: (s) => (/^\d+$/u.test(s) && Number(s) > 0 && Number(s) <= 65535 ? null : "expected integer 1-65535"),
+  },
+  {
+    id: "concurrency-github",
+    label: "GitHub Concurrency",
+    cliKey: "concurrency.github",
+    validate: (s) => (/^\d+$/u.test(s) && Number(s) > 0 ? null : "expected positive integer"),
+  },
+  {
+    id: "openrouter-api-key",
+    label: "OpenRouter API key",
+    cliKey: "openrouter-api-key",
+    mask: true,
+    validate: (s) => (s.length > 0 ? null : "required — get one at openrouter.ai/keys"),
+  },
+  {
+    id: "openrouter-model",
+    label: "OpenRouter model",
+    cliKey: "openrouter-model",
+    validate: (s) => (s.length > 0 ? null : "required — e.g. deepseek/deepseek-v4-flash"),
+  },
   {
     id: "mongo",
     label: "Mongo URI",
@@ -60,31 +87,6 @@ const ROWS: Row[] = [
     cliKey: "redis",
     infra: true,
     validate: (s) => (REDIS_RX.test(s) ? null : "expected redis:// or rediss://"),
-  },
-  {
-    id: "port",
-    label: "Server port",
-    cliKey: "port",
-    validate: (s) => (/^\d+$/u.test(s) && Number(s) > 0 && Number(s) <= 65535 ? null : "expected integer 1-65535"),
-  },
-  {
-    id: "concurrency-github",
-    label: "GitHub Concurrency",
-    cliKey: "concurrency.github",
-    validate: (s) => (/^\d+$/u.test(s) && Number(s) > 0 ? null : "expected positive integer"),
-  },
-  {
-    id: "openrouter-api-key",
-    label: "OpenRouter API key",
-    cliKey: "openrouter-api-key",
-    mask: true,
-    validate: (s) => (s.length > 0 ? null : "required — get one at openrouter.ai/keys"),
-  },
-  {
-    id: "openrouter-model",
-    label: "OpenRouter model",
-    cliKey: "openrouter-model",
-    validate: (s) => (s.length > 0 ? null : "required — e.g. deepseek/deepseek-v4-flash"),
   },
 ];
 

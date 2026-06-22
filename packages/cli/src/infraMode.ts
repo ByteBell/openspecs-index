@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only WITH non-commercial-clause
-import path from "node:path";
 import { Config, DbProviderType, GraphProviderType, QueueProviderType } from "@bb/types";
-import { getBytebellHome, getConfigValue, setConfigValue } from "@bb/config";
+import { getConfigValue, setConfigValue } from "@bb/config";
+import { applyInfraDefaults, type ApplyDefaultsResult } from "./infraDefaults.ts";
 
 /**
  * Infrastructure mode is not a stored flag — it's derived from the three
@@ -98,31 +98,22 @@ export function isEmbedded(): boolean {
   return !needsDocker();
 }
 
-/**
- * Embedded-mode store paths, derived from the bytebell home so the user never
- * has to set them by hand. Filled on entering embedded mode; an existing
- * non-empty value (an explicit override) is left untouched.
- */
-const EMBEDDED_PATH_DEFAULTS: ReadonlyArray<readonly [Config, string]> = [
-  [Config.SqlitePath, "data.sqlite"],
-  [Config.LadybugPath, "ladybug.lbug"],
-  [Config.QueueDbPath, "queue.db"],
-];
+/** The infra mode the active provider combo corresponds to. */
+export function currentInfraMode(): InfraMode {
+  return isEmbedded() ? "embedded" : "docker";
+}
 
-/** Apply one of the two presets to the three provider config keys. */
-export function applyInfraMode(mode: InfraMode): void {
+/**
+ * Apply one of the two presets to the three provider config keys, then
+ * auto-fill the per-service config the new providers need so the user never has
+ * to set every detail by hand: docker mode fills the mongo/neo4j/redis URIs and
+ * the neo4j password; embedded mode fills the file-based store paths. Any value
+ * the user already set is left untouched. Returns the keys that were filled.
+ */
+export function applyInfraMode(mode: InfraMode): ApplyDefaultsResult {
   const providers = mode === "embedded" ? EMBEDDED_PROVIDERS : DOCKER_PROVIDERS;
   setConfigValue(Config.DbProvider, providers.db);
   setConfigValue(Config.GraphProvider, providers.graph);
   setConfigValue(Config.QueueProvider, providers.queue);
-  if (mode !== "embedded") {
-    return;
-  }
-  const home = getBytebellHome();
-  for (const [key, filename] of EMBEDDED_PATH_DEFAULTS) {
-    const current = getConfigValue(key);
-    if (typeof current === "string" && current.length === 0) {
-      setConfigValue(key, path.join(home, filename));
-    }
-  }
+  return applyInfraDefaults();
 }
