@@ -8,7 +8,7 @@ import { analyzeBusinessContextParallel } from "#src/llm/analyze-parallel.ts";
 import { collectEnrichmentData } from "#src/llm/enrichment-reader.ts";
 import { generateBusinessContextTitle } from "#src/llm/title.ts";
 import { assertCommitIndexed } from "#src/strategy/commit-validator.ts";
-import { businessContextDir } from "@bb/ingest-github";
+import { businessContextDir } from "@bb/ingest-core";
 import path from "node:path";
 import type { BusinessContextInput, BusinessContextLlmOptions, BusinessContextStorageResult } from "#src/types.ts";
 

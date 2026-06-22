@@ -34,7 +34,10 @@ Today the catalog covers:
   completion; carries `cause`).
 - **Ingest** — `GitCloneError` (git binary failed; redacts userinfo in
   the repo URL), `IngestError` (catch-all worker failure; carries
-  `knowledgeId` and `cause`), `IngestPathError` (`bytebell ingest <path>`
+  `knowledgeId` and `cause`), `RepoUnavailableError` (source repo gone or
+  inaccessible — terminal; the failure classifier maps it to the
+  `repo_unavailable` category → knowledge marked `CORRUPTED`),
+  `IngestPathError` (`bytebell ingest <path>`
   pre-flight failure: missing path / not a directory),
   `UsageLimitExceededError` (thrown by a runtime `UsageGuard`
   implementation when a token quota would be exceeded mid-run; carries

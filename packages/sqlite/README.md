@@ -9,7 +9,7 @@ Stores knowledge entries, raw file documents, activity logs, and usage records i
 ## Public Interfaces
 
 - `connectSqlite()`, `closeSqlite()`, `pingSqlite()` — lifecycle and health probe
-- Knowledge CRUD: `setKnowledgeState`, `setKnowledgeCommit`, `setKnowledgeBranch`, `updateKnowledgeProgress`, `upsertKnowledge`, `deleteKnowledge`, `listKnowledge`, `getKnowledge`, `markKnowledgeFailed`
+- Knowledge CRUD: `setKnowledgeState`, `setKnowledgeCommit`, `setKnowledgeBranch`, `updateKnowledgeProgress`, `upsertKnowledge`, `deleteKnowledge`, `listKnowledge`, `getKnowledge`, `markKnowledgeFailed`, `markKnowledgeHalted`, `markKnowledgeCorrupted`, `promoteHaltedToFailed`
 - Raw files: `upsertRawFile`, `listRawFileShas`, `deleteRawFiles`
 - Stats: `aggregateStats`
 - Activity: `recordActivity`

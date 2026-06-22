@@ -1,16 +1,16 @@
 import { KnowledgeState, type LocalIngestPayload, type UsageGuard } from "@bb/types";
 import { IngestError, UsageLimitExceededError } from "@bb/errors";
 import { logger } from "@bb/logger";
-import { classifyFailure, isRetryable } from "./failure-classifier.ts";
-import { transitionState } from "./pull-helpers.ts";
-import { persistFailure, persistHalted, markNonRetryable } from "./run-helpers.ts";
-import type { IngestStrategy } from "#src/types/strategy.ts";
-import type { PipelineSummary } from "#src/types/pipeline.ts";
-import { ensureCommitDirs, pathsFor, type RepoLocation } from "./paths.ts";
-import { CancellationError, clearCancellation, throwIfCancelled } from "./cancellation.ts";
-import { createDiskSourceReader } from "./disk-source-reader.ts";
-import { resolveOrgId, withUsageMeter } from "./context.ts";
-import { localRepoName } from "./stats.ts";
+import { classifyFailure, isRetryable } from "@bb/ingest-core";
+import { transitionState } from "@bb/ingest-core";
+import { persistFailure, persistHalted, markNonRetryable } from "@bb/ingest-core";
+import type { IngestStrategy } from "@bb/ingest-core";
+import type { PipelineSummary } from "@bb/ingest-core";
+import { ensureCommitDirs, pathsFor, type RepoLocation } from "@bb/ingest-core";
+import { CancellationError, clearCancellation, throwIfCancelled } from "@bb/ingest-core";
+import { createDiskSourceReader } from "@bb/ingest-core";
+import { resolveOrgId, withUsageMeter } from "@bb/ingest-core";
+import { localRepoName } from "@bb/ingest-core";
 
 /**
  * Runs the local-disk ingestion pipeline. Identical control flow to `runGithub`

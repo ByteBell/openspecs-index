@@ -9,8 +9,11 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export const LLM_PROVIDERS = ["openrouter", "ollama"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
-export const INGESTION_STRATEGIES = ["flat-folder", "concept-graph", "intermediate-representation"] as const;
-export type IngestionStrategy = (typeof INGESTION_STRATEGIES)[number];
+// The PUBLIC strategies the open-source engine ships. A downstream deployment
+// may set `ingestion.strategy` to a private strategy name this list does not
+// enumerate, so the stored config value is a free string (validated below).
+export const INGESTION_STRATEGIES = ["flat-folder", "concept-graph"] as const;
+export type IngestionStrategy = string;
 
 const concurrencySchema = z
   .object({
@@ -62,7 +65,10 @@ export const configSchema = z
     queue_db_path: z.string().default(""),
     sqlite_path: z.string().default(""),
     ladybug_path: z.string().default(""),
-    "ingestion.strategy": z.enum(INGESTION_STRATEGIES).default("flat-folder"),
+    // Free string: the OSS engine routes the public strategies it knows
+    // (flat-folder / concept-graph) and lets any other value pass through to a
+    // downstream deployment that supplies its own (private) strategy.
+    "ingestion.strategy": z.string().default("flat-folder"),
     "units.model": z.string().default(""),
     "enrichment.model": z.string().default(""),
     "enrichment.max.tool.calls.per.file": z.number().int().positive().default(15),

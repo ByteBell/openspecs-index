@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "bytebell-public",
@@ -94,10 +93,30 @@
         "@bb/config": "workspace:*",
         "@bb/errors": "workspace:*",
         "@bb/graph-db": "workspace:*",
+        "@bb/ingest-core": "workspace:*",
         "@bb/ingest-github": "workspace:*",
         "@bb/llm": "workspace:*",
         "@bb/logger": "workspace:*",
         "@bb/queue": "workspace:*",
+        "@bb/types": "workspace:*",
+      },
+    },
+    "packages/ingest-core": {
+      "name": "@bb/ingest-core",
+      "version": "0.0.0",
+      "dependencies": {
+        "@bb/config": "workspace:*",
+        "@bb/db": "workspace:*",
+        "@bb/db-core": "workspace:*",
+        "@bb/errors": "workspace:*",
+        "@bb/graph-core": "workspace:*",
+        "@bb/graph-db": "workspace:*",
+        "@bb/ladybug": "workspace:*",
+        "@bb/llm": "workspace:*",
+        "@bb/logger": "workspace:*",
+        "@bb/mongo": "workspace:*",
+        "@bb/neo4j": "workspace:*",
+        "@bb/sqlite": "workspace:*",
         "@bb/types": "workspace:*",
       },
     },
@@ -111,6 +130,7 @@
         "@bb/errors": "workspace:*",
         "@bb/graph-core": "workspace:*",
         "@bb/graph-db": "workspace:*",
+        "@bb/ingest-core": "workspace:*",
         "@bb/ladybug": "workspace:*",
         "@bb/llm": "workspace:*",
         "@bb/logger": "workspace:*",
@@ -119,6 +139,23 @@
         "@bb/neo4j": "workspace:*",
         "@bb/queue": "workspace:*",
         "@bb/sqlite": "workspace:*",
+        "@bb/types": "workspace:*",
+      },
+    },
+    "packages/ingest-strategies": {
+      "name": "@bb/ingest-strategies",
+      "version": "0.0.0",
+      "dependencies": {
+        "@bb/config": "workspace:*",
+        "@bb/db": "workspace:*",
+        "@bb/errors": "workspace:*",
+        "@bb/graph-core": "workspace:*",
+        "@bb/graph-db": "workspace:*",
+        "@bb/ingest-core": "workspace:*",
+        "@bb/llm": "workspace:*",
+        "@bb/logger": "workspace:*",
+        "@bb/mcp": "workspace:*",
+        "@bb/mongo": "workspace:*",
         "@bb/types": "workspace:*",
       },
     },
@@ -278,7 +315,9 @@
         "@bb/db": "workspace:*",
         "@bb/errors": "workspace:*",
         "@bb/graph-db": "workspace:*",
+        "@bb/ingest-core": "workspace:*",
         "@bb/ingest-github": "workspace:*",
+        "@bb/ingest-strategies": "workspace:*",
         "@bb/ladybug": "workspace:*",
         "@bb/mcp": "workspace:*",
         "@bb/mongo": "workspace:*",
@@ -337,7 +376,11 @@
 
     "@bb/ingest-business-context": ["@bb/ingest-business-context@workspace:packages/ingest-business-context"],
 
+    "@bb/ingest-core": ["@bb/ingest-core@workspace:packages/ingest-core"],
+
     "@bb/ingest-github": ["@bb/ingest-github@workspace:packages/ingest-github"],
+
+    "@bb/ingest-strategies": ["@bb/ingest-strategies@workspace:packages/ingest-strategies"],
 
     "@bb/ladybug": ["@bb/ladybug@workspace:packages/ladybug"],
 

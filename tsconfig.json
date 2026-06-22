@@ -24,6 +24,8 @@
     { "path": "packages/queue" },
     { "path": "packages/llm" },
     { "path": "packages/path-migration" },
+    { "path": "packages/ingest-core" },
+    { "path": "packages/ingest-strategies" },
     { "path": "packages/ingest-github" },
     { "path": "packages/ingest-business-context" },
     { "path": "packages/mcp" },

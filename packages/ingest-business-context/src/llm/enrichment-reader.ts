@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { metaRootFor, orgRegistryDir } from "@bb/ingest-github";
+import { metaRootFor, orgRegistryDir } from "@bb/ingest-core";
 import { logger } from "@bb/logger";
 
 const TOP_N = 50;

@@ -1,5 +1,6 @@
 import { connectMongo, closeMongo, pingMongo } from "./client.ts";
 import * as knowledgeRepo from "./knowledge.ts";
+import * as knowledgeFailure from "./knowledge-failure.ts";
 import * as rawRepo from "./raw.ts";
 import * as statsRepo from "./aggregateStats.ts";
 import * as activityRepo from "./activity.ts";
@@ -19,9 +20,10 @@ class MongoDatabaseProvider implements IDocumentDatabaseProvider {
     deleteKnowledge: knowledgeRepo.deleteKnowledge,
     listKnowledge: knowledgeRepo.listKnowledge,
     getKnowledge: knowledgeRepo.getKnowledge,
-    markKnowledgeFailed: knowledgeRepo.markKnowledgeFailed,
-    markKnowledgeHalted: knowledgeRepo.markKnowledgeHalted,
-    promoteHaltedToFailed: knowledgeRepo.promoteHaltedToFailed,
+    markKnowledgeFailed: knowledgeFailure.markKnowledgeFailed,
+    markKnowledgeHalted: knowledgeFailure.markKnowledgeHalted,
+    promoteHaltedToFailed: knowledgeFailure.promoteHaltedToFailed,
+    markKnowledgeCorrupted: knowledgeFailure.markKnowledgeCorrupted,
   };
 
   raw = {

@@ -12,6 +12,15 @@ export enum KnowledgeState {
    */
   Halted = "HALTED",
   Failed = "FAILED",
+  /**
+   * Terminal: the source repository is gone or inaccessible (deleted/renamed, or
+   * private + the token can't see it). The previously-indexed data stays
+   * queryable, but the row is removed from the auto-pull sweep (which selects
+   * only `PROCESSED`) so it is not re-pulled every cycle. Distinct from `Failed`
+   * (a failed ingest run) — here the index is fine; the upstream source vanished.
+   * Recovered by re-pointing/re-ingesting the repo.
+   */
+  Corrupted = "CORRUPTED",
 }
 
 export interface CommitHashRecord {
@@ -56,6 +65,7 @@ export interface KnowledgeInfo {
  * - `llm_unreachable` — 5xx / network / timeout (transient infra issue)
  * - `cancelled` — operator-initiated cancellation
  * - `usage_limit_exceeded` — downstream subscription quota tripped mid-run; partial usage was charged
+ * - `repo_unavailable` — source repo gone or inaccessible (deleted/renamed, or private + no token access); terminal, drives CORRUPTED
  * - `internal` — anything else (bug, infra, unexpected exception)
  */
 export type KnowledgeFailureCategory =
@@ -66,6 +76,7 @@ export type KnowledgeFailureCategory =
   | "llm_unreachable"
   | "cancelled"
   | "usage_limit_exceeded"
+  | "repo_unavailable"
   | "internal";
 
 /**

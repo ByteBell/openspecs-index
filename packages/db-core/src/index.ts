@@ -78,6 +78,19 @@ export interface IKnowledgeRepository {
    * is idempotent. Resolves to `true` when a document was promoted.
    */
   promoteHaltedToFailed(knowledgeId: string): Promise<boolean>;
+  /**
+   * Marks a knowledge as terminal CORRUPTED (source repo gone/inaccessible) and
+   * records the structured `failure` subdoc, mirroring `markKnowledgeFailed`.
+   * Used for the `repo_unavailable` category so the auto-pull sweep (which
+   * selects only `PROCESSED`) stops re-pulling a dead repo. The indexed data
+   * stays queryable; recovery is a re-point/re-ingest.
+   */
+  markKnowledgeCorrupted(
+    knowledgeId: string,
+    reason: string,
+    category: KnowledgeFailureCategory,
+    detail?: string,
+  ): Promise<void>;
 }
 
 export interface IRawRepository {

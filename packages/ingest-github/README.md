@@ -259,9 +259,9 @@ Driving a pull with an out-of-tree strategy:
 
 The `github_pull` worker (`runPull`) is hardcoded to the flat-folder
 analysis phases. An out-of-tree strategy that needs its own incremental
-pull (e.g. the private `@bytebell/ingest-ir`) does **not** fork `runPull`;
+pull (a private downstream strategy) does **not** fork `runPull`;
 instead it reuses the strategy-agnostic pull prelude re-exported from
-`index.ts`'s IR-support surface — `preflightPull`, `resolvePullSource`,
+`index.ts`'s strategy-agnostic pull prelude — `preflightPull`, `resolvePullSource`,
 `transitionState`, `emptyPullSummary`, `recordPullCommit`,
 `throwPullFailure`, and the `context.ts` builders (`resolveOrgId`,
 `ignoreSetsFromPayload`, `llmCallContextFromPayload`,
