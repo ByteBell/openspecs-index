@@ -8,6 +8,7 @@ export {
   GitCloneError,
   IngestError,
   IngestPathError,
+  RepoUnavailableError,
   UsageLimitExceededError,
 } from "./ingest-errors.ts";
 export type { UsageLimitExceededDetail } from "./ingest-errors.ts";

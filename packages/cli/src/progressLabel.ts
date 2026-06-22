@@ -20,6 +20,7 @@ const PHASE_LABELS: Record<string, string> = {
   folder_analysis: "summarising folders",
   indexing: "indexing",
   enrichment: "enriching",
+  spec_generation: "generating spec site",
 };
 
 /** Human-friendly label for a progress phase, or `null` when none is set. */

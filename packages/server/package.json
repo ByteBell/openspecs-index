@@ -20,6 +20,8 @@
     "@bb/errors": "workspace:*",
     "@bb/graph-db": "workspace:*",
     "@bb/ingest-github": "workspace:*",
+    "@bb/ingest-core": "workspace:*",
+    "@bb/ingest-strategies": "workspace:*",
     "@bb/mcp": "workspace:*",
     "@bb/mongo": "workspace:*",
     "@bb/path-migration": "workspace:*",

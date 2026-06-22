@@ -9,7 +9,7 @@ Defines the contract that every document database backend (Mongo, SQLite, etc.) 
 ## Public Interfaces
 
 - `IDocumentDatabaseProvider` — composite of all repository interfaces plus `connect`/`close`/`ping`
-- `IKnowledgeRepository` — CRUD for knowledge entries. Failure lifecycle: `markKnowledgeFailed` (terminal), `markKnowledgeHalted` (transient, auto-retry pending — same `failure` subdoc), and `promoteHaltedToFailed` (HALTED → FAILED, scoped to current HALTED so it is idempotent; called by the queue finalizer on retry exhaustion).
+- `IKnowledgeRepository` — CRUD for knowledge entries. Failure lifecycle: `markKnowledgeFailed` (terminal), `markKnowledgeHalted` (transient, auto-retry pending — same `failure` subdoc), `markKnowledgeCorrupted` (terminal CORRUPTED — source repo gone/inaccessible, `repo_unavailable` category; index stays queryable but the auto-pull sweep drops it), and `promoteHaltedToFailed` (HALTED → FAILED, scoped to current HALTED so it is idempotent; called by the queue finalizer on retry exhaustion).
 - `IRawRepository` — upsert, list SHA map, delete raw file docs
 - `IAggregateStatsRepository` — `aggregateStats()`
 - `IActivityRepository` — `recordActivity()`

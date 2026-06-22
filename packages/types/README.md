@@ -29,9 +29,10 @@ llmModel?, llmKeyId? }` mixin that lets downstream consumers carry per-job
   it's an audit pointer kept by downstream consumers. Mixed into both
   GitHub payloads.
 - `KnowledgeState` — the processing-status lifecycle enum (`CREATED →
-QUEUED → INGESTED → PROCESSING → PROCESSED ↘ FAILED`) referenced by
-  `@bb/queue` (writes `QUEUED`), `@bb/mongo` (`setKnowledgeState`), and
-  future ingest workers.
+QUEUED → INGESTED → PROCESSING → PROCESSED ↘ FAILED`, plus the terminal
+  `CORRUPTED` for a source repo that is gone/inaccessible — indexed data stays
+  queryable but the auto-pull sweep drops it) referenced by `@bb/queue` (writes
+  `QUEUED`), `@bb/mongo` (`setKnowledgeState`), and future ingest workers.
 - `KnowledgeDoc`, `KnowledgeSource`, `GithubKnowledgeSource`,
   `LocalKnowledgeSource`, `KnowledgeInfo` — the cross-package shape of the
   Mongo `knowledge` document. Split into two substructures with
@@ -62,7 +63,9 @@ QUEUED → INGESTED → PROCESSING → PROCESSED ↘ FAILED`) referenced by
   categories stamped on `KnowledgeDoc.failure` when a run ends in `FAILED`.
   Drives operator triage and UI hints. Categories:
   `llm_config | llm_auth | llm_quota | llm_rate_limit | llm_unreachable |
-cancelled | usage_limit_exceeded | internal`. `usage_limit_exceeded`
+cancelled | usage_limit_exceeded | repo_unavailable | internal`.
+  `repo_unavailable` is terminal — the source repo is gone/inaccessible; it
+  drives the `CORRUPTED` state. `usage_limit_exceeded`
   exists for downstream consumers that enforce a token quota outside the
   LLM provider's own billing — OSS standalone never produces it.
 - `TokenUsage` — `{ inputTokens, outputTokens, costUsd }`. Mirrors the

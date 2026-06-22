@@ -6,8 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./ignore-defaults": "./src/pipeline/skip-decisions/effective.ts"
+    ".": "./src/index.ts"
   },
   "imports": {
     "#src/*": "./src/*"
@@ -17,6 +16,7 @@
   },
   "dependencies": {
     "@bb/config": "workspace:*",
+    "@bb/ingest-core": "workspace:*",
     "@bb/db": "workspace:*",
     "@bb/errors": "workspace:*",
     "@bb/graph-db": "workspace:*",

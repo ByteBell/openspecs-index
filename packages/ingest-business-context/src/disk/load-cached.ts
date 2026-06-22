@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { businessContextDir } from "@bb/ingest-github";
+import { businessContextDir } from "@bb/ingest-core";
 import { logger } from "@bb/logger";
 import type { BusinessContextAnalysisMetadata } from "#src/types.ts";
 

@@ -1,45 +1,34 @@
 import path from "node:path";
-import { Config, JobType } from "@bb/types";
-import { getBytebellHome, getConfigValue } from "@bb/config";
-import { logger } from "@bb/logger";
+import { JobType } from "@bb/types";
+import { getBytebellHome } from "@bb/config";
 import { registerWorker } from "@bb/queue";
+import type { IngestStrategy, PullFactory, PullRunner, SourceFactory, ProgressContextFactory } from "@bb/ingest-core";
+import { dbProgressContextFactory, orgsRoot } from "@bb/ingest-core";
 import { createPipelineRunner } from "./pipeline/run.ts";
-import { orgsRoot } from "./pipeline/paths.ts";
-import { runPull } from "./pipeline/pull.ts";
 import { createGithubIngestHandler, createLocalIngestHandler } from "./handlers/ingest-job.ts";
-import { createFlatFolderStrategy } from "./strategies/flat-folder/index.ts";
-import { createConceptGraphStrategy } from "./strategies/concept-graph/index.ts";
-import type { IngestStrategy } from "./types/strategy.ts";
-import { createLlmFileAnalyzer } from "./adapters/llm-file-analyzer.ts";
-import {
-  COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
-  buildFileAnalysisUserPrompt,
-} from "./strategies/flat-folder/prompts/file-analysis.ts";
-import type { PullFactory, SourceFactory } from "./types/pipeline.ts";
-import type { ProgressContextFactory } from "./progress/types.ts";
-import { dbProgressContextFactory } from "./progress/DbProgressReporter.ts";
 
 /**
- * Optional dependencies for the GitHub workers. Factories are documented in
- * `docs/extension-points.md`. The open-source binary leaves them undefined —
- * index and pull use the default disk-backed readers, and progress events
- * are discarded by `nullProgressContextFactory`.
+ * Dependencies for the GitHub workers. The composition root resolves the
+ * active `strategy` (e.g. via `@bb/ingest-strategies`' `pickStrategy`) and the
+ * `pullRunner` (a flat-folder pull driver bound to this package's
+ * `resolvePullSource`), then injects them here — `@bb/ingest-github` never
+ * imports a strategy. The optional source/pull factories are documented in
+ * `docs/extension-points.md`; the OSS binary leaves them undefined and uses the
+ * default disk-backed readers.
  */
 export interface RegisterGithubWorkersDeps {
+  strategy: IngestStrategy;
+  pullRunner: PullRunner;
   sourceFactory?: SourceFactory;
   pullFactory?: PullFactory;
   progressContextFactory?: ProgressContextFactory;
 }
 
 function buildRunner(
+  strategy: IngestStrategy,
   sourceFactory: SourceFactory | undefined,
   progressContextFactory: ProgressContextFactory,
 ): ReturnType<typeof createPipelineRunner> {
-  const fileAnalyzer = createLlmFileAnalyzer({
-    buildSystemPrompt: () => COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
-    buildUserPrompt: buildFileAnalysisUserPrompt,
-  });
-  const strategy = pickStrategy({ fileAnalyzer, progressContextFactory });
   const runnerDeps: Parameters<typeof createPipelineRunner>[0] = {
     reposRootDir: orgsRoot(),
     strategy,
@@ -51,68 +40,30 @@ function buildRunner(
   return createPipelineRunner(runnerDeps);
 }
 
-interface PickStrategyDeps {
-  fileAnalyzer: Parameters<typeof createFlatFolderStrategy>[0]["fileAnalyzer"];
-  progressContextFactory: ProgressContextFactory;
-}
-
-/**
- * Resolves the active ingestion strategy from `Config.IngestionStrategy`.
- * Defaults to flat-folder when the config value is unset or unrecognised
- * (with a warning so the operator knows their typo silently fell back).
- */
-export function pickStrategy(deps: PickStrategyDeps): IngestStrategy {
-  const selected = getConfigValue(Config.IngestionStrategy);
-  switch (selected) {
-    case "concept-graph":
-      logger.info("ingest-github: active strategy = concept-graph");
-      return createConceptGraphStrategy({
-        fileAnalyzer: deps.fileAnalyzer,
-        progressContextFactory: deps.progressContextFactory,
-      });
-    case "flat-folder":
-      logger.info("ingest-github: active strategy = flat-folder");
-      return createFlatFolderStrategy({
-        fileAnalyzer: deps.fileAnalyzer,
-        progressContextFactory: deps.progressContextFactory,
-      });
-    default:
-      logger.warn(`ingest-github: Config.IngestionStrategy="${selected}" unrecognised; falling back to flat-folder`);
-      return createFlatFolderStrategy({
-        fileAnalyzer: deps.fileAnalyzer,
-        progressContextFactory: deps.progressContextFactory,
-      });
-  }
-}
-
-export function registerGithubWorkers(deps: RegisterGithubWorkersDeps = {}): void {
+export function registerGithubWorkers(deps: RegisterGithubWorkersDeps): void {
   const progressContextFactory = deps.progressContextFactory ?? dbProgressContextFactory;
-  const runner = buildRunner(deps.sourceFactory, progressContextFactory);
-  // `registerWorker` expects `Promise<void>`; the handler now returns
+  const runner = buildRunner(deps.strategy, deps.sourceFactory, progressContextFactory);
+  // `registerWorker` expects `Promise<void>`; the handler returns
   // `Promise<PipelineSummary>` so the enterprise queue bridge can mirror
   // per-commit tokens + cost into the knowledge record. The OSS in-process
-  // worker discards the summary — local stats are read off
-  // `source.commitHashes[]` via `bytebell stats` instead.
+  // worker discards the summary.
   const indexHandler = createGithubIngestHandler({ runner });
   registerWorker(JobType.GithubIndex, async (msg) => {
     await indexHandler(msg);
   });
-  const pullFactory = deps.pullFactory;
+  const { pullRunner, pullFactory } = deps;
   registerWorker(JobType.GithubPull, async (msg) => {
-    await runPull(msg, pullFactory, progressContextFactory);
+    await pullRunner(msg, pullFactory, progressContextFactory);
   });
 }
 
-export function registerLocalIngestWorker(): void {
-  const runner = buildRunner(undefined, dbProgressContextFactory);
+export function registerLocalIngestWorker(strategy: IngestStrategy): void {
+  const runner = buildRunner(strategy, undefined, dbProgressContextFactory);
   const localHandler = createLocalIngestHandler({ runner });
   registerWorker(JobType.LocalIngest, async (msg) => {
     await localHandler(msg);
   });
 }
-
-export { createFlatFolderStrategy } from "./strategies/flat-folder/index.ts";
-export { createConceptGraphStrategy } from "./strategies/concept-graph/index.ts";
 
 /**
  * Compatibility shim — the legacy `<bytebellHome>/repos/` directory still
@@ -125,52 +76,12 @@ export { createConceptGraphStrategy } from "./strategies/concept-graph/index.ts"
 export function reposRoot(): string {
   return path.join(getBytebellHome(), "repos");
 }
-export { createLlmFileAnalyzer } from "./adapters/llm-file-analyzer.ts";
-export { createDiskSourceReader } from "./pipeline/disk-source-reader.ts";
+
+// ── GitHub provider surface (lives in this package) ─────────────────────────
 export { createPipelineRunner } from "./pipeline/run.ts";
 export type { CreatePipelineRunnerDeps } from "./pipeline/run.ts";
 export { createGithubIngestHandler, createLocalIngestHandler } from "./handlers/ingest-job.ts";
 export type { IngestJobHandlerDeps } from "./handlers/ingest-job.ts";
-export { runPull } from "./pipeline/pull.ts";
-// kube-v2 path resolver entry points. `pathsFor(loc)` is the pure path
-// builder; the knowledgeId-keyed helpers (`metaRootFor`, `businessContextDir`,
-// `orgRegistryDir`) are async — they look up `KnowledgeDoc` from Mongo to
-// derive the `RepoLocation` before resolving the path.
-export {
-  pathsFor,
-  orgsRoot,
-  ensureCommitDirs,
-  metaRootFor,
-  businessContextDir,
-  orgRegistryDir,
-} from "./pipeline/paths.ts";
-export type { RepoLocation } from "./pipeline/paths.ts";
-export type { IngestRunnerDeps, IngestRunnerInput } from "./types/ingest-runner.ts";
-export type { IngestStrategy, StrategyInput, StrategyResult, StrategyContext } from "./types/strategy.ts";
-export type {
-  FileAnalyzer,
-  AnalyzedFileResult,
-  ScanEntry,
-  ScannedFile,
-  OversizedFile,
-  ScanDeps,
-  SourceReader,
-  ArchiveSink,
-  ArchiveSinkInput,
-  SourceFactory,
-  SourceFactoryInput,
-  SourceFactoryResult,
-  PullFactory,
-  PullFactoryInput,
-  PullFactoryResult,
-  PipelineSummary,
-} from "./types/pipeline.ts";
-export type { DiffResult, RenamedFile } from "./pipeline/git-diff.ts";
-// Provider-agnostic pull-diff helpers (deepen a shallow clone, then diff two
-// commits with a merge-base fallback). Reused by provider wrappers (e.g. GitLab)
-// whose pull factory must compute the changed-file set itself.
-export { materialiseEndpoints, computePullDiff } from "./pipeline/pull-diff-resolver.ts";
-export type { CondensedFileAnalysis } from "./types/condensed-file-analysis.ts";
 export {
   fetchLatestCommitHash,
   fetchRecentCommits,
@@ -181,70 +92,11 @@ export {
 export type { CommitEntry, FetchCommitsResult, ParsedRepo, DefaultBranchResult } from "./githubApi.ts";
 export { bootstrapRuntime } from "./bootstrap.ts";
 export type { BootstrapRuntimeOptions } from "./bootstrap.ts";
-export {
-  COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
-  buildFileAnalysisUserPrompt,
-} from "./strategies/flat-folder/prompts/file-analysis.ts";
-export type {
-  ProgressContext,
-  ProgressContextFactory,
-  ProgressPhase,
-  ProgressReporter,
-  ProgressReporterInput,
-  ProgressTotalMode,
-} from "./progress/types.ts";
-export { nullProgressContextFactory } from "./progress/NullProgressReporter.ts";
-export { dbProgressContextFactory } from "./progress/DbProgressReporter.ts";
-// Cooperative cancellation: the pipeline polls `throwIfCancelled` at every file /
-// phase boundary. A consumer (e.g. the enterprise worker) calls `markCancelled`
-// when the knowledge is deleted so an in-flight job aborts at its next checkpoint.
-export {
-  markCancelled,
-  clearCancellation,
-  isCancelled,
-  throwIfCancelled,
-  CancellationError,
-} from "./pipeline/cancellation.ts";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// IR-strategy support surface. These are internal pipeline primitives surfaced
-// so an out-of-tree strategy (the private `@bytebell/ingest-ir`) can reuse the
-// same scan / classify / file-analysis / skip-decision building blocks without
-// reaching into this package's internals. No new behaviour — re-exports only.
-// ─────────────────────────────────────────────────────────────────────────────
-export { withConcurrency, runInPool } from "./pipeline/concurrency.ts";
-export type { ConcurrencyLimiter } from "./pipeline/concurrency.ts";
-export { classifyFailure } from "./pipeline/failure-classifier.ts";
-export { makeSkipDecider } from "./pipeline/skip-decisions/index.ts";
-export { buildEffectiveIgnoreSets } from "./pipeline/skip-decisions/effective.ts";
-export type { EffectiveIgnoreSets } from "./pipeline/skip-decisions/effective.ts";
-export { encodeMetaPath, decodeMetaPath } from "./pipeline/paths.ts";
-export type { MetaPaths } from "./types/meta-paths.ts";
-export type { ChunkAnalysisResult, FileChunk } from "./types/big-file.ts";
-export type { SkipDecider } from "./types/pipeline.ts";
-export { FALLBACK_LANGUAGE, emptyFileAnalysis } from "./types/file-analysis.ts";
-export { languageFromPath, shapeAnalysis } from "./adapters/llm-file-analyzer.ts";
-export { classifyByTokens } from "./strategies/flat-folder/big-file/detector.ts";
-export { readScanManifest, writeScanManifest, emptyManifest } from "./strategies/flat-folder/scan-manifest.ts";
-export type { ScanManifest, ScanManifestEntry } from "./strategies/flat-folder/scan-manifest.ts";
-export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "./strategies/flat-folder/eligible-files.ts";
-// Pull-prelude primitives surfaced for the out-of-tree IR pull driver
-// (`@bytebell/ingest-ir`'s `runIrPull`). It reuses OSS's strategy-agnostic pull
-// prelude (preflight → source/diff resolution → failure classification) and
-// lifecycle writes, then swaps the flat-folder analysis phases for the IR
-// strategy. Additive re-exports + the `recordPullCommit` lifecycle wrapper — no
-// behaviour change to `runPull` itself.
-export { preflightPull } from "./pipeline/pull-preflight.ts";
-export type { PullPreflight } from "./pipeline/pull-preflight.ts";
+// GitHub implementation of the provider-agnostic `PullSourceResolver` seam
+// (clone + diff). The composition root injects this into the flat-folder pull
+// driver (`@bb/ingest-strategies`' runPull).
 export { resolvePullSource } from "./pipeline/pull-source-resolver.ts";
-export type { PullSourceResolution, ResolvePullSourceInput } from "./pipeline/pull-source-resolver.ts";
-export { transitionState, emptyPullSummary, recordPullCommit } from "./pipeline/pull-helpers.ts";
-export { throwPullFailure } from "./pipeline/pull-failure.ts";
-export type { PullFailureDeps } from "./pipeline/pull-failure.ts";
-export {
-  resolveOrgId,
-  ignoreSetsFromPayload,
-  llmCallContextFromPayload,
-  unitsLlmCallContextFromPayload,
-  withUsageMeter,
-} from "./pipeline/context.ts";
+// GitHub implementation of the provider-agnostic `IndexSourceResolver` seam
+// (branch + clone/stream). The composition root injects this into the public
+// index runner and into any private out-of-tree index router.
+export { resolveGithubIndexSource } from "./pipeline/github-index-source.ts";

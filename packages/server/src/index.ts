@@ -19,7 +19,14 @@ import "@bb/ladybug";
 import "@bb/queue-bullmq";
 import "@bb/queue-honker";
 
-import { registerGithubWorkers, registerLocalIngestWorker } from "@bb/ingest-github";
+import { registerGithubWorkers, registerLocalIngestWorker, resolvePullSource } from "@bb/ingest-github";
+import { pickStrategy, runPull } from "@bb/ingest-strategies";
+import {
+  createLlmFileAnalyzer,
+  dbProgressContextFactory,
+  COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
+  buildFileAnalysisUserPrompt,
+} from "@bb/ingest-core";
 import { ServerConfigError } from "@bb/errors";
 import { registerRoutes } from "./routes.ts";
 import { installShutdownHandlers } from "./shutdown.ts";
@@ -101,8 +108,21 @@ async function main(): Promise<void> {
   const queueProvider = getConfigValue(Config.QueueProvider);
   await indexesGraph.ensureConceptGraphIndexes();
   await connectQueue(queueProvider);
-  registerGithubWorkers();
-  registerLocalIngestWorker();
+  // Compose the active strategy + the github-backed pull driver here at the
+  // composition root, then inject them into the github workers. The provider
+  // package never imports a strategy.
+  const progressContextFactory = dbProgressContextFactory;
+  const fileAnalyzer = createLlmFileAnalyzer({
+    buildSystemPrompt: () => COMBINED_CODE_ANALYSIS_SYSTEM_PROMPT,
+    buildUserPrompt: buildFileAnalysisUserPrompt,
+  });
+  const strategy = pickStrategy({ fileAnalyzer, progressContextFactory });
+  registerGithubWorkers({
+    strategy,
+    pullRunner: (msg, pullFactory, pcf, usageGuard) => runPull(msg, resolvePullSource, pullFactory, pcf, usageGuard),
+    progressContextFactory,
+  });
+  registerLocalIngestWorker(strategy);
 
   // Boot-time orphan recovery: re-publish any knowledge doc stuck in
   // KnowledgeState.Queued because the previous server crashed between

@@ -19,6 +19,11 @@ The package owns:
 - Domain CRUD helpers:
   - `setKnowledgeState` — the knowledge-document state mutator. Called
     by `@bb/queue` publishers on enqueue.
+  - Failure lifecycle (`knowledge-failure.ts`): `markKnowledgeFailed`
+    (terminal), `markKnowledgeHalted` (transient, auto-retry pending),
+    `markKnowledgeCorrupted` (terminal `CORRUPTED` — source repo
+    gone/inaccessible, dropped from the auto-pull sweep), and
+    `promoteHaltedToFailed`. All stamp the structured `failure` subdoc.
   - `upsertKnowledge` / `listKnowledge` — knowledge-doc upsert and list
     (with file count joined from `raw`). Used by the github / local
     index routes and by `@bb/cli`'s `ls` and `delete` flows.

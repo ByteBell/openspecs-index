@@ -20,6 +20,25 @@ export class IngestError extends Error {
   }
 }
 
+/**
+ * The source repository is gone or inaccessible — a TERMINAL pull failure that no
+ * retry will fix (repo deleted/renamed, or private + token lacks access; the git
+ * remote returns the same "Repository not found" for all three). Thrown when the
+ * clone-server's /compare answers 404. The failure classifier maps this to the
+ * non-retryable `repo_unavailable` category so the knowledge is marked CORRUPTED
+ * instead of being re-pulled on every auto-pull sweep.
+ */
+export class RepoUnavailableError extends Error {
+  override readonly name = "RepoUnavailableError";
+
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    if (cause !== undefined) {
+      this.cause = cause;
+    }
+  }
+}
+
 export class IngestPathError extends Error {
   override readonly name = "IngestPathError";
   readonly path: string;

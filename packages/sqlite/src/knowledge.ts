@@ -70,6 +70,35 @@ export async function markKnowledgeHalted(
 }
 
 /**
+ * Marks a knowledge as terminal CORRUPTED (source repo gone/inaccessible),
+ * recording the same structured `failure` subdoc as `markKnowledgeFailed`.
+ * CORRUPTED removes the row from the auto-pull sweep while leaving indexed data
+ * queryable.
+ */
+export async function markKnowledgeCorrupted(
+  knowledgeId: string,
+  reason: string,
+  category: KnowledgeFailureCategory,
+  detail?: string,
+): Promise<void> {
+  const db = getSqliteDb();
+  const now = new Date().toISOString();
+  const failure = {
+    reason,
+    category,
+    at: now,
+    detail: detail || undefined,
+  };
+  const result = db.run(
+    "UPDATE knowledge SET value = json_set(value, '$.status.state', 'CORRUPTED', '$.updatedAt', ?, '$.failure', json(?)) WHERE key = ?",
+    [now, JSON.stringify(failure), knowledgeId],
+  );
+  if (result.changes === 0) {
+    throw new KnowledgeNotFoundError(knowledgeId);
+  }
+}
+
+/**
  * Promotes a HALTED knowledge to terminal FAILED, preserving the `failure`
  * subdoc. Scoped to current state HALTED so it is idempotent. Resolves to
  * `true` when a document was promoted.

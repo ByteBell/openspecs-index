@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { businessContextDir } from "@bb/ingest-github";
+import { businessContextDir } from "@bb/ingest-core";
 import { logger } from "@bb/logger";
 
 const DIR_MODE = 0o700;
