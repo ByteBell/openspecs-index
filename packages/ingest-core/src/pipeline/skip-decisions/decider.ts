@@ -16,7 +16,7 @@ import {
   setFileDecision,
   type DecisionsCache,
 } from "./cache.ts";
-import { matchesAnyGlob } from "./seed.ts";
+import { matchesAnyGlob, KNOWN_LANGUAGE_EXTENSIONS, normalizeExt } from "./seed.ts";
 import { buildEffectiveIgnoreSets, type EffectiveIgnoreSets } from "./effective.ts";
 import { SKIP_DECISION_SYSTEM_PROMPT, buildSkipDecisionUserPrompt } from "./prompts/skip-decision.ts";
 
@@ -66,6 +66,14 @@ export function makeSkipDecider(deps: SkipDeciderDeps = {}): SkipDecider {
     }
     if (matchesAnyGlob(filename, ignoreSets.globs)) {
       return "reject-static";
+    }
+
+    // README step 5: a file whose extension is a known source language and that
+    // survived every reject list above is admitted statically — no LLM call. The
+    // per-content LLM gate (below) exists to vet *unknown* extensions; real
+    // source files (.go, .ts, .py, …) don't need it.
+    if (input.ext.length > 0 && KNOWN_LANGUAGE_EXTENSIONS.has(normalizeExt(input.ext))) {
+      return "accept";
     }
 
     // Feature flag off: no LLM gate, accept everything that survived the cheap
@@ -174,7 +182,7 @@ async function askLlmDecision(
   const content = fullContent.slice(0, maxChars);
 
   logger.info(
-    `skip-decisions: asking LLM about unknown=${input.ext.length > 0 ? input.ext : "<no-ext>"} file=${input.relativePath} repo=${repositoryName ?? "<unknown>"}`,
+    `skip-decisions: asking LLM about ext=${input.ext.length > 0 ? input.ext : "<no-ext>"} file=${input.relativePath} repo=${repositoryName ?? "<unknown>"}`,
   );
   const result = await askYesNoLLM(
     SKIP_DECISION_SYSTEM_PROMPT,
