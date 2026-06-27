@@ -105,6 +105,10 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg["enrichment.concurrency"] as ConfigValue<K>;
     case Config.EnrichmentMaxToolResultChars:
       return cfg["enrichment.max.tool.result.chars"] as ConfigValue<K>;
+    case Config.OpenrouterReasoningMaxTokens:
+      return cfg["openrouter.reasoning.max.tokens"] as ConfigValue<K>;
+    case Config.OpenrouterMaxCompletionTokens:
+      return cfg["openrouter.max.completion.tokens"] as ConfigValue<K>;
     default:
       throw new Error(`Unknown config key: ${key}`);
   }
@@ -212,6 +216,10 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, "enrichment.concurrency": value as number };
     case Config.EnrichmentMaxToolResultChars:
       return { ...cfg, "enrichment.max.tool.result.chars": value as number };
+    case Config.OpenrouterReasoningMaxTokens:
+      return { ...cfg, "openrouter.reasoning.max.tokens": value as number };
+    case Config.OpenrouterMaxCompletionTokens:
+      return { ...cfg, "openrouter.max.completion.tokens": value as number };
     default:
       throw new Error(`Unknown config key: ${key}`);
   }
