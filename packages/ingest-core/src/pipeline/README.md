@@ -38,7 +38,12 @@ pull lifecycle.
 - `pull-preflight.ts`, `pull-helpers.ts`, `pull-failure.ts`, `run-helpers.ts` —
   the pull/run lifecycle: `preflightPull`, `transitionState`,
   `emptyPullSummary`, `recordPullCommit`, `throwPullFailure`, `persistFailure`,
-  `persistHalted`, `markNonRetryable`, `isGithubPayload`.
+  `persistHalted`, `markNonRetryable`, `isGithubPayload`. `throwPullFailure`'s
+  `PullFailureDeps` carries an optional `onAutoPullUsageLimit` hook: on an
+  auto-pull (`isAutoPull`) failure classified `usage_limit_exceeded`, it fires
+  the hook (best-effort, under `.catch()`) before preserving PROCESSED, so the
+  multi-tenant wrapper can disable auto-pull for the maxed-out account. OSS
+  standalone (single-tenant, no sweep) leaves it undefined.
 - `retry-llm.ts` — `retryLlmCall`, `MAX_LLM_ATTEMPTS`, `RETRY_BACKOFF_MS`: the
   bounded-retry wrapper every phase uses around an LLM call.
 - `stats.ts` — naming/describe helpers: `repoNameFromUrl`, `localRepoName`,
