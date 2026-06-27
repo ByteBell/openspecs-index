@@ -18,6 +18,15 @@ export interface PullFailureDeps {
    * queue stops (the next sweep retries on its interval).
    */
   isAutoPull?: boolean;
+  /**
+   * Enterprise hook fired when an auto-pull (`isAutoPull`) fails specifically on
+   * a usage/billing limit (`usage_limit_exceeded`). Lets the multi-tenant wrapper
+   * switch off auto-pull so the hourly sweep stops re-pulling a maxed-out account
+   * every cycle. OSS standalone is single-tenant with no sweep — it leaves this
+   * undefined. Best-effort: invoked under a `.catch()`, never blocks the
+   * preserve-`PROCESSED` path.
+   */
+  onAutoPullUsageLimit?: () => Promise<void>;
 }
 
 /**
@@ -31,7 +40,7 @@ export interface PullFailureDeps {
  * - Terminal: persist FAILED, emit the failure SSE, throw a non-retryable error.
  */
 export async function throwPullFailure(cause: unknown, deps: PullFailureDeps): Promise<never> {
-  const { knowledgeId, usageGuard, progressContext, isAutoPull } = deps;
+  const { knowledgeId, usageGuard, progressContext, isAutoPull, onAutoPullUsageLimit } = deps;
   if (cause instanceof CancellationError) {
     clearCancellation(knowledgeId);
     logger.info(`pull: cancelled for ${knowledgeId}`);
@@ -63,6 +72,16 @@ export async function throwPullFailure(cause: unknown, deps: PullFailureDeps): P
     // not retry. The row stays PROCESSED, so the finalizer's promoteHaltedToFailed
     // is inert and onJobExhausted early-returns. The next sweep retries.
     logger.warn(`pull: auto-pull failed for ${knowledgeId} (${category}: ${reason}); preserving PROCESSED`);
+    if (category === "usage_limit_exceeded" && onAutoPullUsageLimit !== undefined) {
+      // Maxed-out account: disable auto-pull (via the enterprise hook) so the
+      // hourly sweep stops re-pulling and re-failing this repo every cycle.
+      logger.warn(`pull: disabling auto-pull for ${knowledgeId} after usage limit (re-enable after upgrade)`);
+      await onAutoPullUsageLimit().catch((hookErr: unknown) => {
+        logger.warn(
+          `pull: onAutoPullUsageLimit failed for ${knowledgeId}: ${hookErr instanceof Error ? hookErr.message : String(hookErr)}`,
+        );
+      });
+    }
     await transitionState(knowledgeId, KnowledgeState.Processed).catch(() => undefined);
     throw markNonRetryable(new IngestError(knowledgeId, `github_pull auto-pull failed (preserved): ${reason}`, cause));
   }
