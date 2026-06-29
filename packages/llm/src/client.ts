@@ -41,6 +41,12 @@ export interface AskLlmOptions {
    */
   maxCompletionTokens?: number;
   /**
+   * Per-call override of the OpenRouter reasoning ("thinking") budget (provider `reasoning.max_tokens`).
+   * When set, takes precedence over `Config.OpenrouterReasoningMaxTokens`; `0` → omit (no cap sent).
+   * Paired with `maxCompletionTokens` so the IR fan-out keeps visible-output headroom over thinking.
+   */
+  reasoningMaxTokens?: number;
+  /**
    * Per-call usage observer. Invoked once for every provider resolution — both
    * fresh calls (`usage.cached !== true`) and disk-cache hits (`true`) — so a
    * consumer can meter spend progressively. Fire-and-forget: `askLLM` swallows
