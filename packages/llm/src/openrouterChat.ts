@@ -133,13 +133,16 @@ export async function openRouterRawChat(
       body.tool_choice = toolChoice;
     }
   }
-  // Bound a reasoning model's thinking budget + total output. 0 → omit (provider default, uncapped) so
-  // a non-reasoning model / unconfigured deployment behaves exactly as before.
-  const reasoningMaxTokens = getConfigValue(Config.OpenrouterReasoningMaxTokens);
+  // Bound a reasoning model's thinking budget. Per-call `opts` (the IR fan-out's per-process budget)
+  // takes precedence over the global config. 0 → omit (provider default, uncapped) so a non-reasoning
+  // model / unconfigured deployment behaves exactly as before.
+  const reasoningMaxTokens = opts.reasoningMaxTokens ?? getConfigValue(Config.OpenrouterReasoningMaxTokens);
   if (reasoningMaxTokens > 0) {
     body.reasoning = { max_tokens: reasoningMaxTokens };
   }
-  const maxCompletionTokens = getConfigValue(Config.OpenrouterMaxCompletionTokens);
+  // Per-call cap (opts) takes precedence over the global config — lets the IR fan-out bound each
+  // process's output to its own budget. 0 → omit (provider default, uncapped).
+  const maxCompletionTokens = opts.maxCompletionTokens ?? getConfigValue(Config.OpenrouterMaxCompletionTokens);
   if (maxCompletionTokens > 0) {
     body.max_tokens = maxCompletionTokens;
   }

@@ -1,4 +1,4 @@
-import type { GithubIndexPayload, UsageGuard } from "@bb/types";
+import type { GithubIndexPayload, RepoLocation, UsageGuard } from "@bb/types";
 import type { AskLlmOptions } from "@bb/llm";
 import type { MetaPaths } from "./meta-paths.ts";
 import type { ArchiveSink, SourceReader } from "./pipeline.ts";
@@ -14,6 +14,12 @@ export interface StrategyContext {
   repo: string;
   /** Resolved commit hash the clone is checked out to. */
   commitHash: string;
+  /**
+   * The full repo location (provider + ids + commit). Set by the driver. Lets a strategy that fans
+   * work out to standalone workers (the IR queue-per-process path) hand them a `RepoLocation` to
+   * rebuild `MetaPaths`. Absent in OSS standalone — the monolith path never needs it.
+   */
+  location?: RepoLocation;
   /**
    * Per-job LLM credential overrides extracted from the job payload. When
    * present, phases pass these to every `askLLM` / `askJsonLLM` call so the
