@@ -139,7 +139,9 @@ export async function openRouterRawChat(
   if (reasoningMaxTokens > 0) {
     body.reasoning = { max_tokens: reasoningMaxTokens };
   }
-  const maxCompletionTokens = getConfigValue(Config.OpenrouterMaxCompletionTokens);
+  // Per-call cap (opts) takes precedence over the global config — lets the IR fan-out bound each
+  // process's output to its own budget. 0 → omit (provider default, uncapped).
+  const maxCompletionTokens = opts.maxCompletionTokens ?? getConfigValue(Config.OpenrouterMaxCompletionTokens);
   if (maxCompletionTokens > 0) {
     body.max_tokens = maxCompletionTokens;
   }

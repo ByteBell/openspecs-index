@@ -35,6 +35,12 @@ export interface AskLlmOptions {
    */
   temperature?: number;
   /**
+   * Per-call override of the OpenRouter completion cap (provider `max_tokens`). When set, takes
+   * precedence over `Config.OpenrouterMaxCompletionTokens`; `0`/undefined → the global config applies.
+   * Lets a caller bound one call's output independently (e.g. the IR fan-out's per-process budget).
+   */
+  maxCompletionTokens?: number;
+  /**
    * Per-call usage observer. Invoked once for every provider resolution — both
    * fresh calls (`usage.cached !== true`) and disk-cache hits (`true`) — so a
    * consumer can meter spend progressively. Fire-and-forget: `askLLM` swallows
