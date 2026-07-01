@@ -48,6 +48,10 @@ interface OpenRouterUsageAccounting {
 
 interface OpenRouterProviderRouting {
   allow_fallbacks: boolean;
+  // Only route to providers that support every request parameter (tools / tool_choice /
+  // response_format). Lets fallback rerouting stay safe — a fallback provider that can't do tools
+  // is skipped instead of returning a 400.
+  require_parameters?: boolean;
 }
 
 /**
@@ -68,6 +72,10 @@ interface OpenRouterRequest {
   tools?: OpenRouterToolDef[];
   tool_choice?: OpenRouterToolChoice;
   temperature?: number;
+  // Hard ceiling on total completion tokens (reasoning + visible). Omitted when the config cap is 0.
+  max_tokens?: number;
+  // Reasoning ("thinking") token budget for reasoning models. Omitted when the config cap is 0.
+  reasoning?: { max_tokens: number };
   usage: OpenRouterUsageAccounting;
   provider: OpenRouterProviderRouting;
 }
@@ -105,7 +113,10 @@ export async function openRouterRawChat(
     model,
     messages,
     usage: { include: true },
-    provider: { allow_fallbacks: false },
+    // Allow OpenRouter to reroute around a rate-limited/erroring provider (a 429 on one provider
+    // should not hard-fail the call); `require_parameters` keeps fallback only on providers that
+    // support this request's params (e.g. tools), avoiding a non-capable provider returning 400.
+    provider: { allow_fallbacks: true, require_parameters: true },
   };
   if (opts.temperature !== undefined) {
     body.temperature = opts.temperature;
@@ -121,6 +132,19 @@ export async function openRouterRawChat(
     if (toolChoice !== undefined) {
       body.tool_choice = toolChoice;
     }
+  }
+  // Bound a reasoning model's thinking budget. Per-call `opts` (the IR fan-out's per-process budget)
+  // takes precedence over the global config. 0 → omit (provider default, uncapped) so a non-reasoning
+  // model / unconfigured deployment behaves exactly as before.
+  const reasoningMaxTokens = opts.reasoningMaxTokens ?? getConfigValue(Config.OpenrouterReasoningMaxTokens);
+  if (reasoningMaxTokens > 0) {
+    body.reasoning = { max_tokens: reasoningMaxTokens };
+  }
+  // Per-call cap (opts) takes precedence over the global config — lets the IR fan-out bound each
+  // process's output to its own budget. 0 → omit (provider default, uncapped).
+  const maxCompletionTokens = opts.maxCompletionTokens ?? getConfigValue(Config.OpenrouterMaxCompletionTokens);
+  if (maxCompletionTokens > 0) {
+    body.max_tokens = maxCompletionTokens;
   }
 
   const controller = new AbortController();

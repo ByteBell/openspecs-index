@@ -76,6 +76,10 @@ export const configSchema = z
     "enrichment.wall.time.ms.per.file": z.number().int().positive().default(400000),
     "enrichment.concurrency": z.number().int().positive().default(16),
     "enrichment.max.tool.result.chars": z.number().int().positive().default(20000),
+    // Reasoning + total-output caps for OpenRouter. Default 0 = omit (provider default, uncapped) so
+    // OSS standalone is unchanged; a deployment sets these to bound a reasoning model's thinking/output.
+    "openrouter.reasoning.max.tokens": z.number().int().nonnegative().default(0),
+    "openrouter.max.completion.tokens": z.number().int().nonnegative().default(0),
   })
   .strict();
 
@@ -134,6 +138,8 @@ export type ConfigValueMap = {
   [Config.EnrichmentWallTimeMsPerFile]: number;
   [Config.EnrichmentConcurrency]: number;
   [Config.EnrichmentMaxToolResultChars]: number;
+  [Config.OpenrouterReasoningMaxTokens]: number;
+  [Config.OpenrouterMaxCompletionTokens]: number;
 };
 
 export type ConfigValue<K extends Config> = ConfigValueMap[K];
@@ -206,6 +212,8 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.EnrichmentWallTimeMsPerFile]: "bytebell set enrichment.wall.time.ms.per.file <ms>",
   [Config.EnrichmentConcurrency]: "bytebell set enrichment.concurrency <n>",
   [Config.EnrichmentMaxToolResultChars]: "bytebell set enrichment.max.tool.result.chars <n>",
+  [Config.OpenrouterReasoningMaxTokens]: "bytebell set openrouter.reasoning.max.tokens <n>",
+  [Config.OpenrouterMaxCompletionTokens]: "bytebell set openrouter.max.completion.tokens <n>",
 };
 
 export { readField, writeField } from "./schema-fields.ts";
