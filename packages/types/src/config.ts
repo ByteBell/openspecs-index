@@ -54,6 +54,16 @@ export enum Config {
   EnrichmentWallTimeMsPerFile = "enrichment.wall.time.ms.per.file",
   EnrichmentConcurrency = "enrichment.concurrency",
   EnrichmentMaxToolResultChars = "enrichment.max.tool.result.chars",
+  /**
+   * Per-call reasoning ("thinking") token budget sent to OpenRouter as `reasoning.max_tokens`.
+   * Bounds how long a reasoning model (e.g. minimax-m3) thinks. 0 → omit (provider default, uncapped).
+   */
+  OpenrouterReasoningMaxTokens = "openrouter.reasoning.max.tokens",
+  /**
+   * Per-call hard ceiling on total completion tokens sent to OpenRouter as `max_tokens` (reasoning +
+   * visible). 0 → omit (provider default, uncapped).
+   */
+  OpenrouterMaxCompletionTokens = "openrouter.max.completion.tokens",
 }
 
 export enum DbProviderType {
