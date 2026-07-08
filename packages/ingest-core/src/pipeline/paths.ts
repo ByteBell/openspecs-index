@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { getBytebellHome, getConfigValue } from "@bb/config";
@@ -191,4 +192,18 @@ export function encodeMetaPath(relativePath: string): string {
 
 export function decodeMetaPath(encoded: string): string {
   return encoded.replace(ENCODED_SLASH_RE, "/").replace(ENCODED_BACKSLASH_RE, "\\");
+}
+
+/**
+ * Deterministic, collision-safe, filesystem-safe id for a repo-relative path (or any path-shaped key:
+ * folder paths, per-unit `<rel>__<qn>` / `<rel>:chunk-N__<qn>` ids). The storage-key scheme that REPLACES
+ * `encodeMetaPath`: a single 64-hex SHA-256 component is always well under NAME_MAX (255) no matter how
+ * deep the repo, so deeply-nested trees never hit `ENAMETOOLONG` (which `encodeMetaPath` does — it collapses
+ * the whole path into one component). Deterministic (not a UUID) so a record stays locatable by recomputing
+ * the hash and the cross-commit incremental cache still matches by name. Backslashes are normalised to `/`
+ * so a key hashes identically regardless of scan platform; nothing else is normalised (paths are
+ * case-sensitive — no lowercasing). The `<id> → path` inverse is persisted in `path-map.json` (see path-map.ts).
+ */
+export function metaId(key: string): string {
+  return crypto.createHash("sha256").update(key.replace(BACKSLASH_RE, "/")).digest("hex");
 }
