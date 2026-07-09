@@ -5,6 +5,7 @@ import type { AskLlmOptions } from "@bb/llm";
 import { logger } from "@bb/logger";
 import type { ChunkAnalysisResult, HugeFileManifest } from "#src/types/big-file.ts";
 import type { CondensedFileAnalysis } from "#src/types/condensed-file-analysis.ts";
+import { metaId } from "#src/pipeline/paths.ts";
 import type { MetaPaths } from "#src/types/meta-paths.ts";
 import type { ProgressContext } from "#src/progress/types.ts";
 import { throwIfCancelled } from "#src/pipeline/cancellation.ts";
@@ -80,7 +81,7 @@ export async function processBigFile(input: ProcessBigFileInput): Promise<Conden
   throwIfCancelled(input.knowledgeId);
   const merged = await condenseChunks(input.relativePath, results, input.llmCallContext);
 
-  const chunkPaths = chunks.map((_, i) => `chunks/${encodeFolder(input.relativePath)}/chunk-${i}.json`);
+  const chunkPaths = chunks.map((_, i) => `chunks/${metaId(input.relativePath)}/chunk-${i}.json`);
   const totalTokenCount = chunks.reduce((acc, c) => acc + c.tokenCount, 0);
 
   const chunkInputTokens = results.reduce((acc, r) => acc + (r.tokenUsage?.inputTokens ?? 0), 0);
@@ -121,8 +122,4 @@ export async function processBigFile(input: ProcessBigFileInput): Promise<Conden
 
 function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
-}
-
-function encodeFolder(relativePath: string): string {
-  return relativePath.replace(/\//gu, "__SL__").replace(/\\/gu, "__BS__");
 }

@@ -7,7 +7,7 @@ import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import type { CondensedFileAnalysis } from "@bb/ingest-core";
 import type { MetaPaths } from "@bb/ingest-core";
-import { encodeMetaPath } from "@bb/ingest-core";
+import { metaId } from "@bb/ingest-core";
 import {
   FOLDER_ANALYSIS_SYSTEM_PROMPT,
   FOLDER_BATCH_SYSTEM_PROMPT,
@@ -183,7 +183,7 @@ export async function summariseFolderBatch(
 }
 
 export async function persistFolderSummary(metaPaths: MetaPaths, summary: FolderSummary): Promise<void> {
-  const file = path.join(metaPaths.folderSummariesDir, `${encodeMetaPath(summary.folderPath || "__ROOT__")}.json`);
+  const file = path.join(metaPaths.folderSummariesDir, `${metaId(summary.folderPath || "__ROOT__")}.json`);
   await writeFile(file, JSON.stringify(summary, null, 2), "utf8");
 }
 

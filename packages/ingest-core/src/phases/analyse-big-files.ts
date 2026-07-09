@@ -4,6 +4,7 @@ import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import type { AskLlmOptions } from "@bb/llm";
 import { LlmConfigError, LlmError } from "@bb/errors";
+import { metaId } from "#src/pipeline/paths.ts";
 import type { MetaPaths } from "#src/types/meta-paths.ts";
 import type { AnalyzedFileResult, SourceReader } from "#src/types/pipeline.ts";
 import type { ProgressContext } from "#src/progress/types.ts";
@@ -163,7 +164,7 @@ export async function analyseBigFiles(input: AnalyseBigFilesInput): Promise<Proc
             relativePath: state.entry.relativePath,
             totalChunks: state.chunks.length,
             totalTokenCount,
-            chunkPaths: state.chunks.map((_, i) => `chunks/${encodeFolder(state.entry.relativePath)}/chunk-${i}.json`),
+            chunkPaths: state.chunks.map((_, i) => `chunks/${metaId(state.entry.relativePath)}/chunk-${i}.json`),
             generatedAt: new Date().toISOString(),
           };
           await saveManifest(input.metaPaths, manifest);
@@ -280,8 +281,4 @@ export async function analyseBigFiles(input: AnalyseBigFilesInput): Promise<Proc
 
 function sha256(content: string): string {
   return createHash("sha256").update(content).digest("hex");
-}
-
-function encodeFolder(relativePath: string): string {
-  return relativePath.replace(/\//gu, "__SL__").replace(/\\/gu, "__BS__");
 }
