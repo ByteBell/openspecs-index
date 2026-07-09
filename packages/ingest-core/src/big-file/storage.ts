@@ -1,6 +1,6 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { encodeMetaPath } from "#src/pipeline/paths.ts";
+import { metaId } from "#src/pipeline/paths.ts";
 import type { CondensedFileAnalysis } from "#src/types/condensed-file-analysis.ts";
 import type { ChunkAnalysisResult, HugeFileManifest } from "#src/types/big-file.ts";
 import type { MetaPaths } from "#src/types/meta-paths.ts";
@@ -8,7 +8,7 @@ import type { MetaPaths } from "#src/types/meta-paths.ts";
 const DIR_MODE = 0o700;
 
 function chunkDir(metaPaths: MetaPaths, relativePath: string): string {
-  return path.join(metaPaths.bigFileChunksDir, encodeMetaPath(relativePath));
+  return path.join(metaPaths.bigFileChunksDir, metaId(relativePath));
 }
 
 function chunkFile(metaPaths: MetaPaths, relativePath: string, chunkIndex: number): string {
@@ -16,11 +16,11 @@ function chunkFile(metaPaths: MetaPaths, relativePath: string, chunkIndex: numbe
 }
 
 function manifestFile(metaPaths: MetaPaths, relativePath: string): string {
-  return path.join(metaPaths.bigFileAnalysisDir, `${encodeMetaPath(relativePath)}.manifest.json`);
+  return path.join(metaPaths.bigFileAnalysisDir, `${metaId(relativePath)}.manifest.json`);
 }
 
 function condensedFile(metaPaths: MetaPaths, relativePath: string): string {
-  return path.join(metaPaths.fileAnalysisDir, `${encodeMetaPath(relativePath)}.json`);
+  return path.join(metaPaths.fileAnalysisDir, `${metaId(relativePath)}.json`);
 }
 
 export async function saveChunk(metaPaths: MetaPaths, result: ChunkAnalysisResult): Promise<string> {

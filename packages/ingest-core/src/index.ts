@@ -64,6 +64,7 @@ export {
   orgRegistryDir,
   encodeMetaPath,
   decodeMetaPath,
+  metaId,
 } from "#src/pipeline/paths.ts";
 export type { RepoLocation } from "#src/pipeline/paths.ts";
 
@@ -186,6 +187,15 @@ export { FileAnalysisCache } from "#src/file-analysis-cache.ts";
 export { analyseScannedFile, buildOversizedStub } from "#src/analyse-file.ts";
 export { directFolderOf, affectedFolderPaths } from "#src/folder-path.ts";
 export { readScanManifest, writeScanManifest, emptyManifest } from "#src/scan-manifest.ts";
+export {
+  buildPathMap,
+  writePathMap,
+  readPathMap,
+  pathMapPath,
+  PATH_MAP_RELATIVE_PATH,
+  PATH_MAP_SCHEMA_VERSION,
+} from "#src/path-map.ts";
+export type { PathMap } from "#src/path-map.ts";
 export type { ScanManifest, ScanManifestEntry, ScanManifestSummary, ScanEntryKind } from "#src/scan-manifest.ts";
 export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "#src/eligible-files.ts";
 export type { EligibleFilesDocument, WriteEligibleFilesInput } from "#src/eligible-files.ts";
