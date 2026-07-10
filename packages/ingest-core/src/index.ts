@@ -195,7 +195,7 @@ export {
   PATH_MAP_RELATIVE_PATH,
   PATH_MAP_SCHEMA_VERSION,
 } from "#src/path-map.ts";
-export type { PathMap } from "#src/path-map.ts";
+export type { PathMap, PathMapUnitEntry } from "#src/path-map.ts";
 export type { ScanManifest, ScanManifestEntry, ScanManifestSummary, ScanEntryKind } from "#src/scan-manifest.ts";
 export { writeEligibleFiles, ELIGIBLE_FILES_RELATIVE_PATH } from "#src/eligible-files.ts";
 export type { EligibleFilesDocument, WriteEligibleFilesInput } from "#src/eligible-files.ts";

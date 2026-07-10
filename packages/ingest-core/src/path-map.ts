@@ -17,6 +17,16 @@ import type { MetaPaths } from "#src/types/meta-paths.ts";
 export const PATH_MAP_RELATIVE_PATH = "path-map.json";
 export const PATH_MAP_SCHEMA_VERSION = 1;
 
+/** One code unit's identity + on-disk location, recorded so `unit → file` is an explicit lookup. */
+export interface PathMapUnitEntry {
+  /** `metaId(qualifiedName)` — the unit's dir name under `<file|big-file>-analysis/<fileMetaId>/codeUnits/`. */
+  unitHash: string;
+  qualifiedName: string;
+  unitId: string;
+  /** Analysis window for a big-file unit (1-based); `null` for a small file. Not part of the storage path. */
+  chunkNumber: number | null;
+}
+
 export interface PathMap {
   version: number;
   algo: "sha256";
@@ -24,6 +34,12 @@ export interface PathMap {
   files: Record<string, string>;
   /** `metaId(folderPath) → folderPath` for every ancestor folder; the repo root is `"__ROOT__" → ""`. */
   folders: Record<string, string>;
+  /**
+   * `metaId(relativePath) → units of that file` (same key as `files`). OPTIONAL: added by a post-analysis
+   * augmentation (units are unknown when `buildPathMap` runs from the scan manifest). Answers "which units
+   * belong to this file?" in O(1); each unit's records live at `<...>-analysis/<key>/codeUnits/<unitHash>/`.
+   */
+  unitsByFile?: Record<string, PathMapUnitEntry[]>;
 }
 
 /** PURE. Builds the `id → path` map for every file in the manifest plus every ancestor folder. */
