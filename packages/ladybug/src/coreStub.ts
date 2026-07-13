@@ -17,8 +17,7 @@
 
 export type LbugValue = unknown;
 
-const UNAVAILABLE =
-  "LadybugDB native provider (@ladybugdb/core) is not available in this build.";
+const UNAVAILABLE = "LadybugDB native provider (@ladybugdb/core) is not available in this build.";
 
 export interface QueryResult {
   getAll(): Promise<unknown[]>;
@@ -53,10 +52,7 @@ export class Connection {
     throw new Error(UNAVAILABLE);
   }
 
-  execute(
-    _prepared: PreparedStatement,
-    _params: Record<string, LbugValue>,
-  ): Promise<QueryResult | QueryResult[]> {
+  execute(_prepared: PreparedStatement, _params: Record<string, LbugValue>): Promise<QueryResult | QueryResult[]> {
     throw new Error(UNAVAILABLE);
   }
 }
