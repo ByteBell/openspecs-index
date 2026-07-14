@@ -31,12 +31,34 @@ export interface CommitHashRecord {
   costUsd: string;
 }
 
+/**
+ * One indexed branch of a knowledge base. Branch support lets a single
+ * `knowledgeId` hold many branches side by side (see
+ * `code_history/004-branch-support.md`). `branchId` is `branchIdFor(name)`
+ * (sha256) — the same value used as the on-disk `<branchId>` path segment and
+ * the branch-scoped graph key. `commitHashes` is this branch's own indexed
+ * commit history (per-branch, deduped, oldest → newest); `headCommit` is its
+ * current head; `state` is this branch's own processing state (a branch can be
+ * PROCESSING while a sibling is PROCESSED).
+ */
+export interface BranchRecord {
+  name: string;
+  branchId: string;
+  headCommit?: string;
+  state?: KnowledgeState;
+  commitHashes?: (string | CommitHashRecord)[];
+}
+
 export interface GithubKnowledgeSource {
   kind: "github";
-  /** Current head pointer — the most recently indexed commit. */
+  /** Current head pointer — the most recently indexed commit (of the default branch). */
   commitId?: string;
   /** Every commit this knowledge has been indexed at, oldest → newest. Pull appends to this list. */
   commitHashes?: (string | CommitHashRecord)[];
+  /** The branch treated as "current" for default reads. Seeded on first branch indexed. */
+  defaultBranch?: string;
+  /** Per-branch indexed state. One `knowledgeId` may hold many branches. */
+  branches?: BranchRecord[];
 }
 
 export interface LocalKnowledgeSource {

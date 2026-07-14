@@ -1,16 +1,23 @@
+import crypto from "node:crypto";
 import path from "node:path";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure-typed on-disk path resolver shared across packages that need to read
 // or write knowledge artifacts. No I/O, no FS calls — every helper returns
-// strings derived from the inputs. Callers compose with their own
-// `getBytebellHome()` (the package boundary that holds the home-dir state).
+// strings derived from the inputs (a sha256 of a branch name is such a
+// derivation; `node:crypto` is a runtime builtin, not a package dependency).
+// Callers compose with their own `getBytebellHome()` (the package boundary
+// that holds the home-dir state).
 //
-// Layout (per knowledge + provider + commit):
-//   `<home>/<provider>/<knowledgeId>/<owner>/<repo>/<commit>/repository/`
-//   `<home>/<provider>/<knowledgeId>/<owner>/<repo>/<commit>/meta-output/`
+// Layout (per knowledge + provider + branch + commit):
+//   `<home>/<provider>/<knowledgeId>/<owner>/<repo>/<branchId>/<commit>/repository/`
+//   `<home>/<provider>/<knowledgeId>/<owner>/<repo>/<branchId>/<commit>/meta-output/`
 // For local sources the `<owner>/<repo>` segments collapse:
-//   `<home>/local/<knowledgeId>/<commit>/repository/`
+//   `<home>/local/<knowledgeId>/<branchId>/<commit>/repository/`
+//
+// `<branchId>` is `branchIdFor(loc.branch)` — a sha256 of the branch name, so
+// one repo knowledge can hold many indexed branches side by side, each a
+// self-contained subtree (see `branchIdFor` for why it is hashed, not raw).
 //
 // `<home>` is the per-tenant base directory:
 //   • OSS standalone: `~/.bytebell/` (single-tenant; no org segment)
@@ -32,12 +39,14 @@ export type RepoLocation =
       knowledgeId: string;
       owner: string;
       repo: string;
+      branch: string;
       commitHash: string;
     }
   | {
       provider: "local";
       orgId: string;
       knowledgeId: string;
+      branch: string;
       commitHash: string;
     };
 
@@ -70,11 +79,32 @@ export function orgsRootFor(home: string): string {
   return path.join(home, "orgs");
 }
 
+const BRANCH_BACKSLASH_RE = /\\/gu;
+
+/**
+ * Deterministic, filesystem-safe id for a git branch name — the `<branchId>`
+ * path segment and the `branchId` key on `:Branch`/`:FileVersion`/other
+ * branch-scoped graph nodes. A single 64-hex SHA-256 component sidesteps every
+ * branch-name hazard at once: embedded slashes (`feat/x`), length caps, and
+ * case-insensitive filesystems (`Feature` vs `feature` hash differently, so no
+ * collision). The human-readable name is kept on Mongo `knowledge.info.branch`
+ * and the `:Branch` node, never on disk. Mirrors the hashing of
+ * `@bb/ingest-core`'s `metaId`; kept here in the kernel so every tier can
+ * derive a branch id without importing upward (same rationale as the
+ * duplicated `parseGithubOwnerRepo`). Backslashes normalise to `/` so a name
+ * hashes identically regardless of platform; nothing else is normalised
+ * (branch names are case-sensitive).
+ */
+export function branchIdFor(branch: string): string {
+  return crypto.createHash("sha256").update(branch.replace(BRANCH_BACKSLASH_RE, "/")).digest("hex");
+}
+
 export function commitBaseDirFor(home: string, loc: RepoLocation): string {
+  const branchId = branchIdFor(loc.branch);
   if (loc.provider === "github") {
-    return path.join(home, "github", loc.knowledgeId, loc.owner, loc.repo, loc.commitHash);
+    return path.join(home, "github", loc.knowledgeId, loc.owner, loc.repo, branchId, loc.commitHash);
   }
-  return path.join(home, "local", loc.knowledgeId, loc.commitHash);
+  return path.join(home, "local", loc.knowledgeId, branchId, loc.commitHash);
 }
 
 export function repositoryDirFor(home: string, loc: RepoLocation): string {

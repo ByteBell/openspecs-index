@@ -1,4 +1,4 @@
-import type { KnowledgeDoc, KnowledgeState } from "@bb/types";
+import { branchIdFor, type KnowledgeDoc, type KnowledgeState } from "@bb/types";
 import { KnowledgeNotFoundError } from "@bb/errors";
 import { _getDb } from "./client.ts";
 import { Collections } from "./collections.ts";
@@ -87,6 +87,74 @@ export async function setKnowledgeBranch(knowledgeId: string, branch: string): P
   if (result.matchedCount === 0) {
     throw new KnowledgeNotFoundError(knowledgeId);
   }
+}
+
+/**
+ * Records that `branch` is indexed at `commitHash` on this knowledge, under the
+ * branch-per-KB model (`source.branches[]`). Upserts the branch element:
+ * advances its `headCommit`, appends `commitHash` to the branch's own deduped
+ * `commitHashes` history, and (optionally) sets the branch's processing
+ * `state`. Seeds `source.defaultBranch` on the first branch recorded. Idempotent
+ * per (branch, commit). Throws `KnowledgeNotFoundError` if the doc is missing.
+ *
+ * Callers: the branch-add trigger (state = PROCESSING at enqueue) and the
+ * worker on completion (state = PROCESSED + token usage).
+ */
+export async function setBranchHead(
+  knowledgeId: string,
+  branch: string,
+  commitHash: string,
+  opts: { state?: KnowledgeState; inputTokens?: string; outputTokens?: string; costUsd?: string } = {},
+): Promise<void> {
+  const db = _getDb();
+  const commitEntry = {
+    hash: commitHash,
+    inputTokens: opts.inputTokens ?? "",
+    outputTokens: opts.outputTokens ?? "",
+    costUsd: opts.costUsd ?? "0",
+  };
+
+  // 1. Create the branch element if it doesn't exist yet (first commit seeds its history).
+  const inserted = await db.collection(Collections.Knowledge).updateOne(
+    { knowledgeId, "source.branches.name": { $ne: branch } },
+    {
+      $addToSet: {
+        "source.branches": {
+          name: branch,
+          branchId: branchIdFor(branch),
+          headCommit: commitHash,
+          commitHashes: [commitEntry],
+          ...(opts.state !== undefined ? { state: opts.state } : {}),
+        },
+      },
+      $set: { updatedAt: new Date() },
+    },
+  );
+
+  // 2. Otherwise advance the existing branch's head + append its commit.
+  if (inserted.modifiedCount === 0) {
+    const set: Record<string, unknown> = { "source.branches.$.headCommit": commitHash, updatedAt: new Date() };
+    if (opts.state !== undefined) {
+      set["source.branches.$.state"] = opts.state;
+    }
+    const updated = await db
+      .collection(Collections.Knowledge)
+      .updateOne(
+        { knowledgeId, "source.branches.name": branch },
+        { $set: set, $addToSet: { "source.branches.$.commitHashes": commitEntry } },
+      );
+    if (updated.matchedCount === 0) {
+      throw new KnowledgeNotFoundError(knowledgeId);
+    }
+  }
+
+  // 3. Seed the default branch on the first branch recorded.
+  await db
+    .collection(Collections.Knowledge)
+    .updateOne(
+      { knowledgeId, "source.defaultBranch": { $exists: false } },
+      { $set: { "source.defaultBranch": branch } },
+    );
 }
 
 export async function updateKnowledgeProgress(

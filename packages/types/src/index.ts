@@ -22,6 +22,7 @@ export type {
   LocalKnowledgeSource,
   KnowledgeListEntry,
   CommitHashRecord,
+  BranchRecord,
   TokenUsage,
   UsageGuard,
 } from "./knowledge.ts";
@@ -54,6 +55,7 @@ export type { EnrichmentFailure, EnrichmentFailureReason } from "./knowledge.ts"
 export { IngestionStrategyType } from "./config.ts";
 export {
   orgsRootFor,
+  branchIdFor,
   commitBaseDirFor,
   repositoryDirFor,
   metaOutputRootFor,

@@ -52,6 +52,7 @@ export async function resolvePullSource(input: ResolvePullSourceInput): Promise<
       knowledgeId,
       owner,
       repo,
+      branch,
       commitHash: factoryResult.targetCommit,
     };
     logger.info(
@@ -99,6 +100,7 @@ export async function resolvePullSource(input: ResolvePullSourceInput): Promise<
     knowledgeId,
     owner,
     repo,
+    branch,
     commitHash: resolvedTarget,
   };
   await ensureCommitDirs(location);

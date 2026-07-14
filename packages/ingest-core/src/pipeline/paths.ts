@@ -117,6 +117,7 @@ async function repoLocationFor(knowledgeId: string, commitHash?: string): Promis
       provider: "local",
       orgId,
       knowledgeId,
+      branch: kDoc.info.branch ?? "main",
       commitHash: commitHash ?? kDoc.source.sourcePath, // best-effort fallback when no commit
     };
   }
@@ -142,6 +143,7 @@ async function repoLocationFor(knowledgeId: string, commitHash?: string): Promis
     knowledgeId,
     owner: parsed.owner,
     repo: parsed.repo,
+    branch: kDoc.info.branch ?? "main",
     commitHash: effectiveCommit,
   };
 }
