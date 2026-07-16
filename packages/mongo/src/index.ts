@@ -8,6 +8,7 @@ export {
   setKnowledgeCommit,
   setKnowledgeState,
   setKnowledgeBranch,
+  setBranchHead,
   updateKnowledgeProgress,
   upsertKnowledge,
   listKnowledge,
