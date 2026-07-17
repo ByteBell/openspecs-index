@@ -123,7 +123,13 @@ export async function migrateOne(input: MigrateOneInput): Promise<void> {
 
   if (doc.source.kind === "local") {
     const syntheticCommit = `migrated-${doc.updatedAt.getTime()}`;
-    const newLoc: RepoLocation = { provider: "local", orgId, knowledgeId, commitHash: syntheticCommit };
+    const newLoc: RepoLocation = {
+      provider: "local",
+      orgId,
+      knowledgeId,
+      branch: doc.info.branch ?? "main",
+      commitHash: syntheticCommit,
+    };
     await moveMetaIfPresent(ctx, legacyMetaRoot, newLoc);
     return;
   }
@@ -149,6 +155,7 @@ export async function migrateOne(input: MigrateOneInput): Promise<void> {
     knowledgeId,
     owner: parsed.owner,
     repo: parsed.repo,
+    branch: doc.info.branch ?? "main",
     commitHash: commitId,
   };
   await moveCloneIfPresent(ctx, legacyCloneDir, newLoc);

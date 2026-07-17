@@ -35,7 +35,9 @@ export async function runLocal(
     // repository/ dir); only meta-output lives under the kube-v2 tree.
     const commitHash = `local-${startedAt}`;
     const orgId = resolveOrgId(payload);
-    const location: RepoLocation = { provider: "local", orgId, knowledgeId, commitHash };
+    // Local sources have no git branch; use a stable synthetic segment so the
+    // branch-scoped layout slot is populated.
+    const location: RepoLocation = { provider: "local", orgId, knowledgeId, branch: "main", commitHash };
     await ensureCommitDirs(location);
     const metaPaths = pathsFor(location);
 

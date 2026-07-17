@@ -47,7 +47,7 @@ export const resolveGithubIndexSource: IndexSourceResolver = async (input) => {
     source = factoryResult.source;
     commitHash = factoryResult.commitHash;
     archiveSink = factoryResult.archiveSink;
-    location = { provider: "github", orgId, knowledgeId, owner, repo, commitHash };
+    location = { provider: "github", orgId, knowledgeId, owner, repo, branch, commitHash };
     // The factory has already produced the source tree; meta-output dirs still
     // need to exist before the strategy writes scan-manifest.json. Idempotent.
     await ensureCommitDirs(location);
@@ -65,7 +65,7 @@ export const resolveGithubIndexSource: IndexSourceResolver = async (input) => {
       `could not resolve HEAD commit hash for ${owner}/${repo}@${branch} before clone`,
     );
   }
-  location = { provider: "github", orgId, knowledgeId, owner, repo, commitHash: resolvedSha };
+  location = { provider: "github", orgId, knowledgeId, owner, repo, branch, commitHash: resolvedSha };
   await ensureCommitDirs(location);
   const repoDir = pathsFor(location).repositoryDir;
   const cloneOpts: { repoUrl: string; branch: string; destinationDir: string; gitToken?: string } = {
