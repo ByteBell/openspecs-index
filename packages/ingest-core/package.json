@@ -22,7 +22,6 @@
     "@bb/errors": "workspace:*",
     "@bb/graph-core": "workspace:*",
     "@bb/graph-db": "workspace:*",
-    "@bb/ladybug": "workspace:*",
     "@bb/llm": "workspace:*",
     "@bb/logger": "workspace:*",
     "@bb/mongo": "workspace:*",

@@ -66,6 +66,9 @@ export async function resolveCloneDir(knowledgeId: string): Promise<string> {
     knowledgeId,
     owner: parsed.owner,
     repo: parsed.repo,
+    // Read-side resolves the branch the KB was indexed under (info.branch is set
+    // at index time). Multi-branch read selection is a separate MCP-side effort.
+    branch: kDoc.info.branch ?? "main",
     commitHash: commitId,
   };
   return repositoryDirFor(getBytebellHome(), loc);

@@ -21,6 +21,16 @@ import "@bb/neo4j";
 export interface BootstrapRuntimeOptions {
   config: unknown;
   loggerFactory: LoggerFactory;
+  /**
+   * Skip the OSS knowledge/concept-graph index bootstrap (`ensureKnowledgeIndexes`
+   * / `ensureConceptGraphIndexes`). A composition root sets this when it owns the
+   * Neo4j graph schema itself — e.g. the enterprise ingestion engine, whose
+   * `ensureIrGraphSchema()` is the sole (branch-scoped) authority for the `:File`
+   * / `:FileVersion` / … constraints; the OSS branchless `file_unique` here would
+   * otherwise reject a second branch's file. Connections are still established.
+   * Default `false` (OSS standalone keeps creating its own indexes).
+   */
+  skipGraphIndexes?: boolean;
 }
 
 export async function bootstrapRuntime(opts: BootstrapRuntimeOptions): Promise<void> {
@@ -35,6 +45,9 @@ export async function bootstrapRuntime(opts: BootstrapRuntimeOptions): Promise<v
 
   // Fulltext indexes the MCP smart_search / keyword_lookup tools query against.
   // Idempotent (MERGE-based) so duplicate calls across composition roots are safe.
-  await indexesGraph.ensureKnowledgeIndexes();
-  await indexesGraph.ensureConceptGraphIndexes();
+  // Skipped when the composition root owns the graph schema (see `skipGraphIndexes`).
+  if (opts.skipGraphIndexes !== true) {
+    await indexesGraph.ensureKnowledgeIndexes();
+    await indexesGraph.ensureConceptGraphIndexes();
+  }
 }
