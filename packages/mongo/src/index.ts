@@ -1,6 +1,6 @@
 import "./provider.ts";
 
-export { connectMongo, closeMongo, pingMongo } from "./client.ts";
+export { connectMongo, closeMongo, pingMongo, getMongoDb } from "./client.ts";
 export type { PingResult } from "./client.ts";
 
 export {

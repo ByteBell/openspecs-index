@@ -23,8 +23,19 @@ pull lifecycle.
   `decodeMetaPath`, and the `RepoLocation` type.
 - `disk-source-reader.ts` — `createDiskSourceReader`: the OSS-default
   `SourceReader` backed by a cloned tree on disk.
-- `scan.ts` / `scan-helpers.ts` — `readScannedFile`, `decisionKey`,
-  `countLines`, and the repository walk used by phase 1.
+- `scan.ts` / `scan-twopass.ts` / `scan-helpers.ts` — `scanRepository`,
+  `readScannedFile`, `decisionKey`, `countLines`, and the repository walk used by
+  phase 1. `scan.ts` holds the inline walk; `scan-twopass.ts` the parallel
+  two-pass walk (split out for the file-size rule); `scan-helpers.ts` the shared
+  `ScanRepositoryDeps` / counts / limits.
+- `ignored-files.ts` — `makeIgnoreSink`, `IGNORED_FILES_COLLECTION`,
+  `IgnoreReason`. Records every file the scan skips — and why (`ignore_dir` /
+  `ignore_filename` / `ignore_extension` / `ignore_glob` / `binary` / `llm`) —
+  into the `ignored_files` Mongo collection, keyed `(orgId, knowledgeId,
+  filePath)`, via a single batched `bulkWrite` at end of scan. Connection comes
+  from `@bb/mongo` (`getMongoDb`); the collection shape + write logic live here.
+  No-op unless the caller threads `knowledgeId` + `orgId` through `ScanDeps`;
+  fail-open so a Mongo error never aborts the scan.
 - `filters.ts` — the legacy default ignore sets (`SKIP_DIRS`, `SKIP_FILES`,
   `BINARY_EXTENSIONS`), `looksBinary`, `passesPathFilters`. Owns the built-in
   defaults that `skip-decisions/effective.ts` merges into the effective sets.
@@ -76,3 +87,6 @@ pull-diff resolution", "Pull lifecycle", "LLM retry", "Skip decisions", and
 - One shared `ConcurrencyLimiter` per job bounds all LLM concurrency.
 - The effective ignore sets used by `scan.ts` (walk pruning) and the
   skip-decider must be the identical set, so index and pull filter the same way.
+- The `ignored_files` collection is an **audit trail only** — the scan drops
+  ignored files regardless; nothing downstream reads this collection. Its write
+  is best-effort (fail-open) and never gates or alters the scan result.

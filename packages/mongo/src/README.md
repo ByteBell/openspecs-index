@@ -7,12 +7,14 @@ package-level contract; this file documents how the source tree is split.
 
 - **[index.ts](index.ts)** — public re-exports. The only entry point other
   packages may import. Exposes `connectMongo`, `closeMongo`, `pingMongo`,
-  `setKnowledgeState`, `markKnowledgeFailed`, `upsertRawFile`, and the
-  `PingResult` / `FileAnalysis` / `RawFileDoc` types. Anything not
+  `getMongoDb`, `setKnowledgeState`, `markKnowledgeFailed`, `upsertRawFile`, and
+  the `PingResult` / `FileAnalysis` / `RawFileDoc` types. Anything not
   re-exported here is internal.
 - **[client.ts](client.ts)** — module-scoped `MongoClient` singleton plus
   the lifecycle (`connectMongo`, `closeMongo`), the health probe
-  (`pingMongo`), and the **internal** `_getDb()` accessor. Reads the URI via
+  (`pingMongo`), the **internal** `_getDb()` accessor, and its public wrapper
+  `getMongoDb()` (a raw `Db` handle for consumers that own their own collection
+  shape). Reads the URI via
   `getConfigValue(Config.MongoUri)` from `@bb/config` + `@bb/types`. Throws
   typed errors from `@bb/errors` (`MongoConfigError`, `MongoConnectError`,
   `MongoNotConnectedError`). Also exposes `__resetForTests()` — test seam
@@ -96,9 +98,11 @@ the two helpers composing `_getDb()` today.
 - **Close is graceful and re-entrant.** `closeMongo()` clears the cached
   client _before_ awaiting `client.close()` so a subsequent `connectMongo()`
   cleanly re-establishes; calling `closeMongo()` twice is a no-op.
-- **No raw `Db` leak.** `_getDb()` is not in `index.ts`. Future typed
-  collection helpers will live in this folder and compose `_getDb()`
-  internally; consumers in higher tiers see only the typed helper signatures.
+- **Db access is deliberate.** `_getDb()` stays internal; typed collection
+  helpers in this folder compose it. `getMongoDb()` is the one public wrapper —
+  added for consumers that own a collection shape that does not belong in this
+  infra package (e.g. `@bb/ingest-core`'s `ignored_files`), so they borrow the
+  connection while keeping their document shape + write logic in their own tier.
 - **No env reads.** Only `getConfigValue(Config.MongoUri)` provides the URI.
   Repo-wide ESLint rule blocks `process.env`.
 - **Errors carry typed metadata.** Construction sites use the catalog in

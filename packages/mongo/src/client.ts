@@ -66,6 +66,16 @@ export function _getDb(): Db {
   return client.db();
 }
 
+/**
+ * Public accessor for the connected database handle. Consumers that own their own collection
+ * logic — e.g. `@bb/ingest-core`'s scan, which writes the `ignored_files` audit collection — call
+ * this to reach Mongo without a per-collection helper living here. Throws `MongoNotConnectedError`
+ * until `connectMongo()` has completed.
+ */
+export function getMongoDb(): Db {
+  return _getDb();
+}
+
 export function __resetForTests(): void {
   client = null;
   connecting = null;

@@ -75,6 +75,7 @@ The package does **not** own:
 function connectMongo(): Promise<void>;
 function closeMongo(): Promise<void>;
 function pingMongo(): Promise<PingResult>;
+function getMongoDb(): Db; // connected Db handle for consumers that own their own collection
 
 function setKnowledgeState(knowledgeId: string, state: KnowledgeState): Promise<void>;
 function upsertRawFile(doc: Omit<RawFileDoc, "updatedAt">): Promise<void>;
@@ -113,10 +114,13 @@ interface RawFileDoc {
 graduate to `@bb/types` when a second consumer (e.g. `@bb/mcp` retrieval)
 needs to read Raw docs.
 
-`_getDb()` and the `Collections` enum are **internal** — consumed only
-by helpers inside this package. Higher tiers cannot reach a raw `Db`
-handle; they go through typed domain helpers that this package will
-expose as they are added.
+The `Collections` enum is **internal** — consumed only by helpers inside this
+package. The preferred way to touch Mongo is still a typed domain helper exported
+from here. `getMongoDb()` is the one sanctioned escape hatch: a public wrapper
+over the internal `_getDb()` for a consumer that owns a collection whose shape
+does **not** belong in this infra package (e.g. `@bb/ingest-core`'s `ignored_files`
+audit collection). Such consumers own their own document shape + write logic and
+only borrow the connection.
 
 ## Data ownership
 
@@ -135,9 +139,10 @@ migrations are intentionally not owned here.
    `client.close()` so a subsequent `connectMongo()` cleanly re-establishes.
 4. **Errors are typed, not strings.** `MongoConfigError` carries the exact
    `bytebell set …` hint; `MongoConnectError` redacts credentials in the URI.
-5. **No raw `Db` leaks.** `_getDb()` is not in `src/index.ts`. The only way
-   higher tiers touch Mongo is through typed helpers exported from this
-   package.
+5. **Db access is deliberate.** `_getDb()` stays internal; the only public
+   raw-handle accessor is `getMongoDb()`, added for consumers that own their own
+   collection shape (they borrow the connection, not the schema). Everything with
+   a shape this package owns is still reached through a typed helper.
 
 ## External dependencies
 

@@ -86,6 +86,14 @@ export interface ScanDeps {
    * for directory-walk pruning and path filtering. Absent → built-in defaults.
    */
   ignoreSets?: EffectiveIgnoreSets;
+  /**
+   * Ingest-run identity used to attribute skipped files to a knowledge + org in the `ignored_files`
+   * audit collection. All three are absent in OSS standalone / legacy runs — the scan then records
+   * nothing. `commitHash` stamps each audit row with the scanned commit.
+   */
+  knowledgeId?: string;
+  orgId?: string;
+  commitHash?: string;
 }
 
 export interface SourceReader {

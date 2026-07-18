@@ -1,6 +1,6 @@
 import type { IgnoreOverridePatch, IgnoreOverrides } from "@bb/types";
 import { BINARY_EXTENSIONS, SKIP_DIRS, SKIP_FILES } from "#src/pipeline/filters.ts";
-import { SEED_GLOBS, normalizeExt } from "./seed.ts";
+import { SEED_GLOBS, matchesAnyGlob, normalizeExt } from "./seed.ts";
 
 /**
  * The four ignore sets a single ingest job filters against, after overlaying
@@ -59,6 +59,39 @@ export function buildEffectiveIgnoreSets(overrides?: IgnoreOverrides): Effective
     extensions: applyPatch(BINARY_EXTENSIONS, overrides?.extensions, normalizeExt),
     globs: applyGlobPatch(SEED_GLOBS, overrides?.globs),
   };
+}
+
+/** Which static rule rejected a file — the granular reason mirrored into the `ignored_files` audit trail. */
+export type StaticIgnoreReason = "ignore_dir" | "ignore_filename" | "ignore_extension" | "ignore_glob";
+
+/**
+ * Report WHICH static rule a rejected file matched, checking in the same order the decider's static
+ * gate does (directory-in-path → filename → extension → glob). Pure: derives the reason from the
+ * effective sets alone, so the scan can attribute a `reject-static` decision without the decider
+ * having to surface its internal branch. Returns `null` only if nothing matches (caller falls back).
+ */
+export function classifyStaticIgnore(
+  relativePath: string,
+  ext: string,
+  sets: EffectiveIgnoreSets,
+): StaticIgnoreReason | null {
+  const segments = relativePath.split("/");
+  const filename = segments[segments.length - 1] ?? relativePath;
+  for (const segment of segments.slice(0, -1)) {
+    if (sets.directories.has(segment)) {
+      return "ignore_dir";
+    }
+  }
+  if (sets.filenames.has(filename)) {
+    return "ignore_filename";
+  }
+  if (ext.length > 0 && sets.extensions.has(normalizeExt(ext))) {
+    return "ignore_extension";
+  }
+  if (matchesAnyGlob(filename, sets.globs)) {
+    return "ignore_glob";
+  }
+  return null;
 }
 
 /**
