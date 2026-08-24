@@ -4,17 +4,13 @@ import { Config, DbProviderType, GraphProviderType, QueueProviderType } from "@b
 import { getBytebellHome, getConfigValue, setConfigValue } from "@bb/config";
 
 /**
- * Infrastructure mode is not a stored flag — it's derived from the three
- * provider settings. There are two coherent presets:
+ * Infrastructure mode defines how ByteBell runs its databases:
  *
- *   • "docker"   (non-embedded) — Mongo + Neo4j + BullMQ. Requires Docker.
- *   • "embedded"                — SQLite + Ladybug + Honker. Zero Docker.
- *
- * The providers remain the single source of truth; `mode` is a convenience the
- * setup surfaces use to set all three at once and to decide whether `boot`
- * should bring Docker up.
+ *   • "embedded" — SQLite + Ladybug + Honker. Zero Docker.
+ *   • "cloud"    — Mongo + Neo4j + Redis hosted in the cloud (Atlas, Neo4j Aura, etc.). Zero Docker.
+ *   • "docker"   — Mongo + Neo4j + Redis local instances. Requires Docker.
  */
-export type InfraMode = "docker" | "embedded";
+export type InfraMode = "docker" | "cloud" | "embedded";
 
 export interface InfraModeOption {
   value: InfraMode;
@@ -23,7 +19,7 @@ export interface InfraModeOption {
 }
 
 /**
- * UI metadata for the two infra presets, recommended preset first. This is the
+ * UI metadata for the infra presets, recommended preset first. This is the
  * single source for the labels/hints shown by the install wizard and the `set`
  * setup form — keep mode descriptions here, not inlined per surface.
  */
@@ -36,7 +32,12 @@ export const INFRA_MODE_OPTIONS: readonly InfraModeOption[] = [
   {
     value: "docker",
     label: "Docker",
-    hint: "Mongo + Neo4j + Redis — Docker needed (Docker Desktop/engine must be running)",
+    hint: "Mongo + Neo4j + Redis in local Docker containers (auto-configured, Docker must be running)",
+  },
+  {
+    value: "cloud",
+    label: "Cloud",
+    hint: "Mongo + Neo4j + Redis in the cloud — provide your cloud instance URLs below (zero Docker)",
   },
 ];
 
@@ -62,6 +63,12 @@ export const DOCKER_PROVIDERS: ProviderTriple = {
   queue: QueueProviderType.Bullmq,
 };
 
+export const CLOUD_PROVIDERS: ProviderTriple = {
+  db: DbProviderType.Mongo,
+  graph: GraphProviderType.Neo4j,
+  queue: QueueProviderType.Bullmq,
+};
+
 export const EMBEDDED_PROVIDERS: ProviderTriple = {
   db: DbProviderType.Sqlite,
   graph: GraphProviderType.Ladybug,
@@ -72,10 +79,13 @@ export type ComposeService = "mongo" | "neo4j" | "redis";
 
 /**
  * The Docker compose services the current provider combo requires. Empty when
- * every provider is file-based (embedded mode).
+ * every provider is file-based (embedded mode) or cloud-hosted.
  */
 export function composeServicesNeeded(): Set<ComposeService> {
   const needed = new Set<ComposeService>();
+  if (isCloud() || isEmbedded()) {
+    return needed;
+  }
   if (getConfigValue(Config.DbProvider) === DbProviderType.Mongo) {
     needed.add("mongo");
   }
@@ -88,14 +98,35 @@ export function composeServicesNeeded(): Set<ComposeService> {
   return needed;
 }
 
-/** True when at least one provider needs a Docker container. */
-export function needsDocker(): boolean {
-  return composeServicesNeeded().size > 0;
+/** Get the currently configured infra mode (or derive from provider settings). */
+export function getInfraMode(): InfraMode {
+  const stored = getConfigValue(Config.InfraMode);
+  if (stored === "cloud" || stored === "docker" || stored === "embedded") {
+    return stored;
+  }
+  if (
+    getConfigValue(Config.DbProvider) === DbProviderType.Sqlite &&
+    getConfigValue(Config.GraphProvider) === GraphProviderType.Ladybug &&
+    getConfigValue(Config.QueueProvider) === QueueProviderType.Honker
+  ) {
+    return "embedded";
+  }
+  return "docker";
+}
+
+/** True when the active infra mode is cloud-hosted external instances (no Docker). */
+export function isCloud(): boolean {
+  return getInfraMode() === "cloud";
 }
 
 /** True when the active provider combo is fully file-based (no Docker). */
 export function isEmbedded(): boolean {
-  return !needsDocker();
+  return getInfraMode() === "embedded";
+}
+
+/** True when at least one provider needs a Docker container. */
+export function needsDocker(): boolean {
+  return !isCloud() && !isEmbedded() && composeServicesNeeded().size > 0;
 }
 
 /**
@@ -109,20 +140,34 @@ const EMBEDDED_PATH_DEFAULTS: ReadonlyArray<readonly [Config, string]> = [
   [Config.QueueDbPath, "queue.db"],
 ];
 
-/** Apply one of the two presets to the three provider config keys. */
+const DOCKER_DEFAULTS: ReadonlyArray<readonly [Config, string]> = [
+  [Config.MongoUri, "mongodb://127.0.0.1:27017/bytebell"],
+  [Config.Neo4jUri, "bolt://127.0.0.1:7687"],
+  [Config.Neo4jUser, "neo4j"],
+  [Config.RedisUrl, "redis://127.0.0.1:6379"],
+];
+
+/** Apply one of the presets to the provider config keys. */
 export function applyInfraMode(mode: InfraMode): void {
-  const providers = mode === "embedded" ? EMBEDDED_PROVIDERS : DOCKER_PROVIDERS;
+  setConfigValue(Config.InfraMode, mode);
+  const providers = mode === "embedded" ? EMBEDDED_PROVIDERS : mode === "cloud" ? CLOUD_PROVIDERS : DOCKER_PROVIDERS;
   setConfigValue(Config.DbProvider, providers.db);
   setConfigValue(Config.GraphProvider, providers.graph);
   setConfigValue(Config.QueueProvider, providers.queue);
-  if (mode !== "embedded") {
-    return;
-  }
-  const home = getBytebellHome();
-  for (const [key, filename] of EMBEDDED_PATH_DEFAULTS) {
-    const current = getConfigValue(key);
-    if (typeof current === "string" && current.length === 0) {
-      setConfigValue(key, path.join(home, filename));
+  if (mode === "embedded") {
+    const home = getBytebellHome();
+    for (const [key, filename] of EMBEDDED_PATH_DEFAULTS) {
+      const current = getConfigValue(key);
+      if (typeof current === "string" && current.length === 0) {
+        setConfigValue(key, path.join(home, filename));
+      }
+    }
+  } else if (mode === "docker") {
+    for (const [key, def] of DOCKER_DEFAULTS) {
+      const current = getConfigValue(key);
+      if (typeof current === "string" && current.length === 0) {
+        setConfigValue(key, def);
+      }
     }
   }
 }

@@ -9,6 +9,9 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export const LLM_PROVIDERS = ["openrouter", "ollama", "anthropic", "bedrock", "gemini", "openai"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
+export const INFRA_MODES = ["docker", "cloud", "embedded"] as const;
+export type InfraMode = (typeof INFRA_MODES)[number];
+
 // The PUBLIC strategies the open-source engine ships. A downstream deployment
 // may set `ingestion.strategy` to a private strategy name this list does not
 // enumerate, so the stored config value is a free string (validated below).
@@ -78,6 +81,7 @@ export const configSchema = z
     db_provider: z.string().default("mongo"),
     graph_provider: z.string().default("neo4j"),
     queue_provider: z.string().default("bullmq"),
+    infra_mode: z.enum(INFRA_MODES).default("docker"),
     queue_db_path: z.string().default(""),
     sqlite_path: z.string().default(""),
     ladybug_path: z.string().default(""),
@@ -156,6 +160,7 @@ export type ConfigValueMap = {
   [Config.DbProvider]: string;
   [Config.GraphProvider]: string;
   [Config.QueueProvider]: string;
+  [Config.InfraMode]: InfraMode;
   [Config.QueueDbPath]: string;
   [Config.SqlitePath]: string;
   [Config.LadybugPath]: string;
@@ -254,6 +259,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.DbProvider]: "bytebell set db-provider <mongo|...>",
   [Config.GraphProvider]: "bytebell set graph-provider <neo4j|...>",
   [Config.QueueProvider]: "bytebell set queue-provider <bullmq|honker>",
+  [Config.InfraMode]: "bytebell set infra-mode <docker|cloud|embedded>",
   [Config.QueueDbPath]: "bytebell set queue-db-path <path>",
   [Config.SqlitePath]: "bytebell set sqlite-path <path>",
   [Config.LadybugPath]: "bytebell set ladybug-path <path>",

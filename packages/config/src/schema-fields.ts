@@ -1,7 +1,7 @@
 import type { BytebellConfig } from "./schema.ts";
 import { Config } from "@bb/types";
 import type { ConfigValue } from "./schema.ts";
-import type { LogLevel, LlmProvider, IngestionStrategy } from "./schema.ts";
+import type { LogLevel, LlmProvider, IngestionStrategy, InfraMode } from "./schema.ts";
 
 export function readField<K extends Config>(cfg: BytebellConfig, key: K): ConfigValue<K> {
   switch (key) {
@@ -109,6 +109,8 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg.graph_provider as ConfigValue<K>;
     case Config.QueueProvider:
       return cfg.queue_provider as ConfigValue<K>;
+    case Config.InfraMode:
+      return cfg.infra_mode as ConfigValue<K>;
     case Config.QueueDbPath:
       return cfg.queue_db_path as ConfigValue<K>;
     case Config.SqlitePath:
@@ -246,6 +248,8 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, graph_provider: value as string };
     case Config.QueueProvider:
       return { ...cfg, queue_provider: value as string };
+    case Config.InfraMode:
+      return { ...cfg, infra_mode: value as InfraMode };
     case Config.QueueDbPath:
       return { ...cfg, queue_db_path: value as string };
     case Config.SqlitePath:

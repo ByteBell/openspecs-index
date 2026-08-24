@@ -1,4 +1,12 @@
-import { LLM_PROVIDERS, LOG_LEVELS, setConfigValue, type LlmProvider, type LogLevel } from "@bb/config";
+import {
+  LLM_PROVIDERS,
+  LOG_LEVELS,
+  INFRA_MODES,
+  setConfigValue,
+  type LlmProvider,
+  type LogLevel,
+  type InfraMode,
+} from "@bb/config";
 import { Config, DbProviderType, GraphProviderType, IngestionStrategyType, QueueProviderType } from "@bb/types";
 
 type Setter = (raw: string) => void;
@@ -274,6 +282,12 @@ export const KEY_MAP: Record<string, KeyEntry> = {
     configKey: Config.LadybugPath,
     redact: false,
     setter: (s) => setConfigValue(Config.LadybugPath, s),
+  },
+  "infra-mode": {
+    configKey: Config.InfraMode,
+    redact: false,
+    setter: (s) => setConfigValue(Config.InfraMode, parseEnum(s, "infra-mode", INFRA_MODES) as InfraMode),
+    toggleValues: ["docker", "cloud"],
   },
 };
 

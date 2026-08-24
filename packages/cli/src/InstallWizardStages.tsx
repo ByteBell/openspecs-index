@@ -180,7 +180,14 @@ export function ConfirmStage({ spec, values, infraMode, indexUrl, onBack, onDone
         </Text>
         <Text>
           {" "}
-          Infra : <Text color="cyan">{infraMode === "embedded" ? "embedded (no Docker)" : "docker"}</Text>
+          Infra :{" "}
+          <Text color="cyan">
+            {infraMode === "embedded"
+              ? "embedded (no Docker)"
+              : infraMode === "cloud"
+                ? "cloud (external databases, no Docker)"
+                : "docker (local containers)"}
+          </Text>
         </Text>
         {spec.fields.map((field) => {
           const raw = (values[field.cliKey] ?? "").trim();

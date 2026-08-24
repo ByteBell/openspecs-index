@@ -6,7 +6,7 @@ import { getBytebellHome, getConfigValue, requiredKeysFor } from "@bb/config";
 import { bringInfraUp } from "./dockerBoot.ts";
 import { KEY_MAP } from "./keyMap.ts";
 import { success, error, info } from "./output.ts";
-import { isEmbedded } from "./infraMode.ts";
+import { isCloud, isEmbedded } from "./infraMode.ts";
 import { startServer } from "./serverLifecycle.ts";
 
 const DEFAULT_MONGO_URI = "mongodb://127.0.0.1:27017/bytebell";
@@ -77,6 +77,12 @@ export interface ApplyDefaultsResult {
 
 export function applyInfraDefaults(): ApplyDefaultsResult {
   const written: { cliKey: string; redacted: boolean }[] = [];
+  if (isCloud()) {
+    return {
+      written,
+      neo4jPassword: readString(Config.Neo4jPassword),
+    };
+  }
   for (const entry of DEFAULTS) {
     if (!entry.needed()) {
       continue;
@@ -136,10 +142,12 @@ export async function runBootSequence(): Promise<boolean> {
     }
   }
 
-  // Embedded mode (sqlite + ladybug + honker) needs no external services — skip
-  // Docker entirely and go straight to starting the server.
+  // Embedded mode (sqlite + ladybug + honker) and Cloud mode (remote databases)
+  // need no local Docker services — skip Docker entirely and start the server.
   if (isEmbedded()) {
     info("embedded mode — no Docker required (sqlite + ladybug + honker).");
+  } else if (isCloud()) {
+    info("cloud mode — using external/cloud databases (Mongo + Neo4j + Redis), no Docker required.");
   } else {
     if (getConfigValue(Config.GraphProvider) === GraphProviderType.Neo4j && defaults.neo4jPassword.length === 0) {
       error("internal: neo4j password is empty after applyInfraDefaults — refusing to start docker.");
