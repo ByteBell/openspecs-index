@@ -1,6 +1,13 @@
 import { LlmError } from "@bb/errors";
 import { logger } from "@bb/logger";
+import { getConfigValue } from "@bb/config";
+import { Config } from "@bb/types";
 import { resolveOpenRouterChain } from "./openrouter.ts";
+import { resolveAnthropicChain } from "./anthropic.ts";
+import { resolveBedrockChain } from "./bedrock.ts";
+import { resolveGeminiChain } from "./gemini.ts";
+import { resolveOpenAiChain } from "./openai.ts";
+import { toolChat, type ToolChatResult } from "./toolChat.ts";
 import { openRouterRawChat, type OpenRouterMessageInput, type OpenRouterToolDef } from "./openrouterChat.ts";
 import type {
   AskLLMWithToolsOptions,
@@ -9,7 +16,7 @@ import type {
   ToolDefinition,
   ToolInvocation,
 } from "./toolTypes.ts";
-import type { AskLlmOptions, AskLlmUsage } from "./client.ts";
+import type { AskLlmOptions, AskLlmUsage, LlmProviderName } from "./client.ts";
 
 const DEFAULT_PER_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_TOOL_RESULT_CHARS = 20_000;
@@ -37,12 +44,24 @@ const TRUNCATED_MARKER = "\n…[truncated]";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function askLLMWithTools(opts: AskLLMWithToolsOptions): Promise<AskLLMWithToolsResult> {
-  const provider = opts.provider ?? "openrouter";
-  if (provider !== "openrouter") {
-    throw new LlmError(`askLLMWithTools: provider "${provider}" does not support tool use`);
+  // Default to the *configured* provider, not to OpenRouter. Defaulting to
+  // OpenRouter made a non-OpenRouter deployment fail inside
+  // `resolveOpenRouterChain` with "bytebell keys set" — an error about a key
+  // the operator deliberately never set. Now the capability guard below fires
+  // first and names the real problem.
+  const provider: LlmProviderName = opts.provider ?? (getConfigValue(Config.LlmProvider) as LlmProviderName);
+  if (!providerSupportsTools(provider)) {
+    throw new LlmError(
+      `askLLMWithTools: provider "${provider}" does not support tool use. ` +
+        `The concept-graph strategy requires it — either run ` +
+        `\`bytebell set ingestion.strategy flat-folder\`, or switch to a ` +
+        `tool-capable provider.`,
+    );
   }
   const subOpts = buildSubOpts(opts);
-  const chain = resolveOpenRouterChain(subOpts);
+  // OpenRouter keeps its own chain resolver: it carries the key check, the
+  // capped 3-model server-side chain, and its typed LlmConfigError.
+  const chain = provider === "openrouter" ? resolveOpenRouterChain(subOpts) : resolveToolChain(provider, subOpts);
   const perRequestTimeoutMs = opts.perRequestTimeoutMs ?? DEFAULT_PER_REQUEST_TIMEOUT_MS;
   const maxToolResultChars = opts.maxToolResultChars ?? DEFAULT_MAX_TOOL_RESULT_CHARS;
   const toolDefs = toOpenRouterTools(opts.tools);
@@ -77,7 +96,7 @@ export async function askLLMWithTools(opts: AskLLMWithToolsOptions): Promise<Ask
     // we drop back to "auto" so the model can produce its terminal JSON
     // turn without being forced into more tool calls.
     const toolChoice = iterations === 0 && toolDefs !== undefined ? ("required" as const) : undefined;
-    const chatResult = await openRouterRawChat(messages, chain, subOpts, timeoutForThisCall, toolDefs, toolChoice);
+    const chatResult = await runTurn(provider, chain, messages, subOpts, timeoutForThisCall, toolDefs, toolChoice);
     iterations += 1;
     accumulateUsage(cumulativeUsage, chatResult.usage);
 
@@ -200,4 +219,51 @@ function finalize(
   content: string,
 ): AskLLMWithToolsResult {
   return { content, usage, toolCalls, iterations, terminationReason };
+}
+
+/** Providers with an OpenAI-shaped `tools` / `tool_calls` surface. */
+const TOOL_CAPABLE: readonly LlmProviderName[] = ["openrouter", "anthropic", "bedrock", "gemini", "openai"];
+
+export function providerSupportsTools(provider: LlmProviderName): boolean {
+  return TOOL_CAPABLE.includes(provider);
+}
+
+/** Model chain for a non-OpenRouter tool provider — reuses each provider's own resolver. */
+function resolveToolChain(provider: LlmProviderName, opts: AskLlmOptions): string[] {
+  switch (provider) {
+    case "anthropic":
+      return resolveAnthropicChain(opts);
+    case "bedrock":
+      return resolveBedrockChain(opts);
+    case "gemini":
+      return resolveGeminiChain(opts);
+    case "openai":
+      return resolveOpenAiChain(opts);
+    default:
+      throw new LlmError(`askLLMWithTools: no chain resolver for provider "${provider}"`);
+  }
+}
+
+/**
+ * One turn against the active provider, in this file's message vocabulary.
+ *
+ * OpenRouter keeps `openRouterRawChat` because only it carries the server-side
+ * `models[]` fallback chain, the `provider` routing rules, and a reported
+ * `usage.cost`. Everything else goes through its OpenAI-compatible surface,
+ * where only the first model in the chain is used (no server-side fan-out).
+ */
+async function runTurn(
+  provider: LlmProviderName,
+  chain: string[],
+  messages: OpenRouterMessageInput[],
+  opts: AskLlmOptions,
+  timeoutMs: number,
+  toolDefs: OpenRouterToolDef[] | undefined,
+  toolChoice: "required" | undefined,
+): Promise<ToolChatResult> {
+  if (provider === "openrouter") {
+    return openRouterRawChat(messages, chain, opts, timeoutMs, toolDefs, toolChoice);
+  }
+  const model = chain[0] ?? "";
+  return toolChat(provider, model, messages, opts, timeoutMs, toolDefs, toolChoice);
 }

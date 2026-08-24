@@ -2,12 +2,11 @@ import { getConfigValue } from "@bb/config";
 import { logger } from "@bb/logger";
 import { Config } from "@bb/types";
 import { computeCacheKey, getCachedDecision, isCacheEnabled, recordDecision, recordHit } from "./cache.ts";
-import { callOllama, resolveOllamaChain } from "./ollama.ts";
-import { callOpenRouter, resolveOpenRouterChain } from "./openrouter.ts";
+import { resolveProviderEntry } from "./providers.ts";
 
 const DEFAULT_TIMEOUT_MS = 360_000;
 
-export type LlmProviderName = "openrouter" | "ollama";
+export type LlmProviderName = "openrouter" | "ollama" | "anthropic" | "bedrock" | "gemini" | "openai";
 
 export interface AskLlmOptions {
   model?: string;
@@ -15,11 +14,12 @@ export interface AskLlmOptions {
   timeoutMs?: number;
   systemPrompt?: string;
   /**
-   * Per-call override of the OpenRouter API key. When set, takes precedence
-   * over `Config.OpenrouterApiKey`. Used by downstream consumers (e.g. the
-   * enterprise wrapper) that resolve per-org credentials at the enqueue
-   * boundary and pass them through the job payload. Ignored by the Ollama
-   * provider (which is keyless).
+   * Per-call override of the active provider's API key. When set, takes
+   * precedence over that provider's configured key (`Config.OpenrouterApiKey`,
+   * `Config.AnthropicApiKey`, `Config.BedrockApiKey`, `Config.GeminiApiKey`).
+   * Used by downstream consumers (e.g. the enterprise wrapper) that resolve
+   * per-org credentials at the enqueue boundary and pass them through the job
+   * payload. Ignored by the Ollama provider (which is keyless).
    */
   apiKey?: string;
   /**
@@ -62,8 +62,9 @@ export interface AskLlmUsage {
   outputTokens: number;
   /**
    * Provider-reported cost in USD for this single call. Taken directly from
-   * the provider's response — `usage.cost` on OpenRouter, `0` for Ollama,
-   * `0` when the provider omits the field. Never computed client-side.
+   * the provider's response — `usage.cost` on OpenRouter, `0` on every other
+   * backend (Ollama is local; Anthropic, Bedrock, and Gemini report tokens but
+   * not cost). Never computed client-side. See `LlmProviderEntry.reportsCost`.
    */
   costUsd: number;
   /**
@@ -83,7 +84,8 @@ export interface AskLlmResult {
 export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<AskLlmResult> {
   const provider: LlmProviderName = opts.provider ?? (getConfigValue(Config.LlmProvider) as LlmProviderName);
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const chain = provider === "ollama" ? resolveOllamaChain(opts) : resolveOpenRouterChain(opts);
+  const entry = resolveProviderEntry(provider);
+  const chain = entry.resolveChain(opts);
 
   const cacheOn = isCacheEnabled();
   const cacheKey = cacheOn
@@ -108,8 +110,7 @@ export async function askLLM(prompt: string, opts: AskLlmOptions = {}): Promise<
     logger.debug(`llm: cache miss (key=${cacheKey.slice(0, 8)})`);
   }
 
-  const result =
-    provider === "ollama" ? await callOllama(prompt, opts, timeoutMs) : await callOpenRouter(prompt, opts, timeoutMs);
+  const result = await entry.call(prompt, opts, timeoutMs);
 
   if (cacheOn && cacheKey !== null) {
     void recordDecision(cacheKey, {

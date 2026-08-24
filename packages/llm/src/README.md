@@ -7,13 +7,70 @@ package-level contract; this file documents how the source tree is split.
 
 - **[index.ts](index.ts)** — public re-exports. The only entry point other
   packages may import. Exposes `askLLM`, the `AskLlmOptions` type, the
-  `LlmProviderName` union (`"openrouter" | "ollama"`), plus the JSON
+  `LlmProviderName` union (six backends), plus the JSON
   client surface. Anything not re-exported here is internal.
 - **[client.ts](client.ts)** — the `askLLM` orchestrator. Selects the
   active provider via `opts.provider ?? getConfigValue(Config.LlmProvider)`
-  (per-call override beats config), dispatches to `openrouter.ts` or
-  `ollama.ts`. Consults the filesystem decision cache before issuing a
+  (per-call override beats config), then dispatches through the
+  `providers.ts` table. Consults the filesystem decision cache before issuing a
   request. Throws typed errors via `@bb/errors`.
+- **[attempt.ts](attempt.ts)** — per-attempt resilience for the client-side
+  providers. `retryTransient` retries ONE turn in place on a 429 / 5xx /
+  timeout (exponential backoff, 3 attempts); `walkChain` walks a model chain,
+  next model on any failure; `causeMessage` preserves the provider status +
+  message when wrapping, because the failure classifier reads that string.
+  OpenRouter needs none of this — it takes a server-side `models: [...]` array
+  and reroutes internally. Everything else resolves a single-element chain
+  unless the caller passes `opts.fallbackModels`, so without in-place retry one
+  429 is a hard failure for that file, and in a pipeline where any file failure
+  fails the run that discards an hour of work. BullMQ's `attempts: 3` retries
+  the whole job and re-bills the files that already succeeded; this does not.
+- **[providers.ts](providers.ts)** — `LLM_PROVIDER_ENTRIES`, the
+  provider dispatch table. One entry per backend
+  (`resolveChain` / `call` / `reportsCost` / `supportsTools`);
+  `resolveProviderEntry(name)` throws `LlmConfigError` listing every valid
+  name rather than silently falling back, so a typo in `llm_provider` fails
+  loudly instead of billing the wrong account. Adding a backend is one entry
+  here plus one module — `client.ts` never branches on provider identity.
+- **[anthropicMessages.ts](anthropicMessages.ts)** — the Anthropic Messages
+  wire format, used by the direct Anthropic API. (Bedrock shared this module
+  until it moved to Converse — that move is what made Bedrock family-agnostic.)
+  Owns `supportsTemperature()`, which both providers need: current Claude
+  families reject `temperature` on every platform, and the OpenAI families on
+  Bedrock reject it while Anthropic / Nova / Llama / Mistral accept it. Without
+  it the skip-decision gate's `temperature: 0` would hard-fail every scan. Also
+  refusal detection (`stop_reason: "refusal"` is HTTP 200 with empty content)
+  and `thinking`-block filtering.
+- **[anthropic.ts](anthropic.ts)** — `callAnthropic` / `resolveAnthropicChain`.
+  `x-api-key` + `anthropic-version: 2023-06-01`, model in the body.
+- **[bedrock.ts](bedrock.ts)** — `callBedrock` / `resolveBedrockChain` /
+  `resolveBedrockAuth`, over Converse via `@ai-sdk/amazon-bedrock`. The one
+  provider that takes an SDK: Converse has its own request shape and, without a
+  Bedrock API key, SigV4-signed requests — which must not be hand-rolled. The
+  SDK also resolves the AWS default credential chain, so an EC2/EKS deployment
+  authenticates from its instance role. Auth precedence: API key → static SigV4
+  credentials → default chain. Covers every Bedrock family plus inference
+  profiles and ARNs. Clients cached per region + key-prefix, never the secret.
+
+- **[openaiCompatible.ts](openaiCompatible.ts)** — `openAiCompatibleChat`: one
+  attempt against any OpenAI-shaped `/chat/completions`. OpenAI, OpenRouter,
+  Gemini's compatible surface, Bedrock's `/openai/v1` route and every
+  self-hosted gateway speak this format, so a new provider is a base URL and a
+  model chain rather than another hand-copied fetch with its own subtly
+  different error handling.
+- **[openai.ts](openai.ts)** — `callOpenAi` / `resolveOpenAiChain` /
+  `openAiBase`. Direct OpenAI, or any OpenAI-compatible server via
+  `Config.OpenaiBaseUrl` (vLLM / LiteLLM / an internal gateway).
+- **[toolChat.ts](toolChat.ts)** — `toolChat`: one tool-capable turn on any
+  non-OpenRouter provider, through the `openai` SDK pointed at that provider's
+  OpenAI-compatible base URL. Tool use used to be OpenRouter-only and threw
+  everywhere else, which meant `concept-graph` silently vanished on a provider
+  switch — that is a feature disappearing, not a provider switching. Bedrock's
+  route here is bearer-authenticated, so tool use needs the API key even when
+  the main call path uses SigV4.
+- \*\*[gemini.ts](gemini.ts) — `callGemini` / `resolveGeminiChain`.
+  `x-goog-api-key`, `:generateContent`, `systemInstruction` / `contents`
+  mapping, and `promptFeedback.blockReason` surfaced as a typed error.
 - **[openrouter.ts](openrouter.ts)** — `callOpenRouter` and
   `resolveOpenRouterChain`. Resolves the API key (`opts.apiKey
 ?? getConfigValue(Config.OpenrouterApiKey)`) and the model chain

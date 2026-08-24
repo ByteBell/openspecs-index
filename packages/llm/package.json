@@ -12,11 +12,14 @@
     "#src/*": "./src/*"
   },
   "dependencies": {
+    "@ai-sdk/amazon-bedrock": "^5.0.61",
     "@bb/config": "workspace:*",
+    "@bb/db": "workspace:*",
     "@bb/errors": "workspace:*",
     "@bb/logger": "workspace:*",
-    "@bb/db": "workspace:*",
     "@bb/types": "workspace:*",
+    "ai": "^7.0.77",
+    "openai": "^7.5.0",
     "tiktoken": "^1.0.22"
   }
 }
