@@ -1,6 +1,8 @@
-# Bytebell
+# openspecs-index
 
-**[bytebell.ai](https://bytebell.ai)** — a local-first code knowledge engine. Index any repo into a durable graph and query it from your LLM client over MCP, without sending the source anywhere you don't control.
+A local-first code knowledge engine by **[ByteBell](https://bytebell.ai)**. Index any repo into a durable graph and query it from your LLM client over MCP, without sending the source anywhere you don't control.
+
+> The CLI binary, the server, and the config directory are all still named `bytebell` / `bytebell-server` / `~/.bytebell/` — `openspecs-index` is the project, `bytebell` is what you type.
 
 ## Quickstart
 
@@ -9,7 +11,7 @@
 ### Prerequisites
 
 - [Bun](https://bun.sh) ≥ 1.1 — runtime + workspace manager.
-- [Docker](https://www.docker.com/) — for the local Mongo + Neo4j + Redis stack `bytebell boot` brings up. Not needed if you point Bytebell at infrastructure you already run (`bytebell set infra-mode cloud`, see [Bring your own infrastructure](#bring-your-own-infrastructure)).
+- [Docker](https://www.docker.com/) — for the local Mongo + Neo4j + Redis stack `bytebell boot` brings up. Not needed if you point openspecs-index at infrastructure you already run (`bytebell set infra-mode cloud`, see [Bring your own infrastructure](#bring-your-own-infrastructure)).
 - An LLM backend — one of six: [OpenRouter](https://openrouter.ai) (default), [Anthropic](https://console.anthropic.com), [Google Gemini](https://aistudio.google.com/apikey), [OpenAI](https://platform.openai.com) or any OpenAI-compatible gateway, [AWS Bedrock](https://console.aws.amazon.com/bedrock), or a local [Ollama](https://ollama.com) model. Every per-file analysis call goes through the one you pick — full comparison in [docs/llm-providers.md](docs/llm-providers.md).
 
 ### Install
@@ -72,7 +74,7 @@ bytebell boot
 
 What happens, in order:
 
-1. **Pre-flight check** — verifies the infra keys (`mongo`, `neo4j`, `neo4j-user`, `neo4j-password`, `redis`) plus whichever credentials your selected `llm-provider` requires. If anything is blank and you're in an interactive terminal, Bytebell opens a setup form so you can enter it on the spot, then continues. In a non-interactive context (CI, piped input) it prints the exact `bytebell set …` commands and exits.
+1. **Pre-flight check** — verifies the infra keys (`mongo`, `neo4j`, `neo4j-user`, `neo4j-password`, `redis`) plus whichever credentials your selected `llm-provider` requires. If anything is blank and you're in an interactive terminal, openspecs-index opens a setup form so you can enter it on the spot, then continues. In a non-interactive context (CI, piped input) it prints the exact `bytebell set …` commands and exits.
 2. **Auto-fill** — in `infra-mode docker` (the default), fills any missing infra config keys with local-Docker defaults and generates a Neo4j password if one isn't set. In `infra-mode cloud` nothing is auto-filled — your own URIs stand as written.
 3. **Stack up** — docker mode only: `docker compose up -d` brings up `bytebell-mongo`, `bytebell-neo4j`, `bytebell-redis` (named volumes — data persists across reboots).
 4. **Health gate** — docker mode only: polls `docker compose ps` until all three services report `healthy`.
@@ -117,7 +119,7 @@ Or add this under the `mcpServers` key of Claude Desktop's config (or Cursor's `
 
 The server registers four tools — `list_knowledge`, `smart_search`, `keyword_lookup`, `retrieve_file` — plus a bundled skill at `bytebell://skills/index` that the client can fetch and install once per session for the recommended workflow.
 
-## What Bytebell does
+## What openspecs-index does
 
 You point `bytebell` at a repo. It clones the source, walks every file, and for each file calls your configured LLM provider to extract a structured `FileAnalysis`: a one-paragraph **purpose**, a longer **summary** of what the file does and how it fits the architecture, a **business context** line tying it to the product domain, plus the file's classes, functions, keywords, imports, and a set of domain/contract fields (ontology concepts, business entities, system capabilities, side effects, config dependencies, data-flow direction, integration surface, provided/consumed contracts, and a section map).
 
@@ -333,13 +335,13 @@ Settings live in `~/.bytebell/config.json` and are written exclusively by `byteb
 
 A further set of tuning fields (`enrichment.*`, `skip.decision.*`, `context.window.limit`, `neo4j.batch.size`, `openrouter.reasoning.max.tokens`, …) exists in the schema with sensible defaults but has no `bytebell set` key — see [packages/config/src/schema.ts](packages/config/src/schema.ts) for the complete list.
 
-If a required setting is missing, Bytebell either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
+If a required setting is missing, openspecs-index either opens the setup form (interactive terminal) or prints the exact `bytebell set …` command and refuses to boot (non-interactive). It never silently reads `process.env`.
 
 ## Why this design — research grounding
 
-> Comparing Bytebell to PageIndex, GitNexus, GraphRAG, Sourcegraph, or Augment Code? See **[comparison.md](comparison.md)** for a side-by-side feature table and pros / cons of each.
+> Comparing openspecs-index to PageIndex, GitNexus, GraphRAG, Sourcegraph, or Augment Code? See **[comparison.md](comparison.md)** for a side-by-side feature table and pros / cons of each.
 
-Bytebell's shape — _build a code graph at ingest time, enrich every node with LLM-derived structured semantics, then serve retrieval against the joined surface_ — tracks a converging body of recent work showing that purely structural retrieval (AST / call-graph) and purely semantic retrieval (embeddings) each leave large performance on the table, and that combining them at indexing time unlocks the gains.
+openspecs-index's shape — _build a code graph at ingest time, enrich every node with LLM-derived structured semantics, then serve retrieval against the joined surface_ — tracks a converging body of recent work showing that purely structural retrieval (AST / call-graph) and purely semantic retrieval (embeddings) each leave large performance on the table, and that combining them at indexing time unlocks the gains.
 
 **Graphs beat flat retrieval for code.** Repository-level graphs from AST + imports + call structure consistently outperform flat embedding retrieval on real engineering tasks.
 
@@ -355,7 +357,7 @@ Bytebell's shape — _build a code graph at ingest time, enrich every node with 
 - Knowledge-Graph-Based Repo-Level Code Generation ([2505.14394](https://arxiv.org/abs/2505.14394)) — graph captures structure; LLM context fills semantic gaps.
 - Sense and Sensitivity ([2505.13353](https://arxiv.org/abs/2505.13353)) — lexical and semantic recall are different capabilities; supports the `summary` (semantic) vs Mongo raw (lexical) split.
 
-**Structured summaries and hierarchy beat blob summarization.** Explicit fields — purpose, inputs, outputs, business context — aggregated bottom-up let retrieval match at the right level of abstraction. This maps directly onto Bytebell's `purpose` / `summary` / `businessContext` schema.
+**Structured summaries and hierarchy beat blob summarization.** Explicit fields — purpose, inputs, outputs, business context — aggregated bottom-up let retrieval match at the right level of abstraction. This maps directly onto openspecs-index's `purpose` / `summary` / `businessContext` schema.
 
 - Hierarchical Repo-Level Code Summarization for Business Applications ([2501.07857](https://arxiv.org/abs/2501.07857), ICSE LLM4Code 2025) — closest motivational match: structured per-unit summaries aggregated to file/package level, grounded in business context.
 - Beyond Function Level ([2502.16704](https://arxiv.org/abs/2502.16704)) — class/repo context in summaries beats function-only.
@@ -370,7 +372,7 @@ The design choices follow directly: each `:File` node carries LLM-generated sema
 
 ## Enterprise
 
-Bytebell-public is the OSS edition. ByteBell also offers a separately-licensed **Enterprise** edition for organizations that need a commercial-use grant, hardening, and direct support. Enterprise typically includes:
+openspecs-index is the OSS edition. ByteBell also offers a separately-licensed **Enterprise** edition for organizations that need a commercial-use grant, hardening, and direct support. Enterprise typically includes:
 
 - A commercial-use grant covering use by or on behalf of for-profit entities, including SaaS deployments and revenue-generating applications.
 - Hardened multi-tenant deployment patterns, SSO / SCIM, audit logging, and data-isolation guarantees.
@@ -386,4 +388,4 @@ Hooks, commit conventions, and pre-push gates are documented in [contributing.md
 
 ## License
 
-Bytebell is released under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) for the authoritative text. Personal, academic, research, and non-profit use are unrestricted under AGPL-3.0 (network-copyleft applies). **Commercial use** is governed by license terms and is covered by the [Enterprise edition](#enterprise) (`team@bytebell.ai`). The running server itself does **not** verify a license; governance is by license terms, not by code. The server is meant for local single-tenant use — no remote network surface; everything binds to `127.0.0.1`.
+openspecs-index is released under **AGPL-3.0 with an additional non-commercial use clause** — see [LICENSE](LICENSE) for the authoritative text. Personal, academic, research, and non-profit use are unrestricted under AGPL-3.0 (network-copyleft applies). **Commercial use** is governed by license terms and is covered by the [Enterprise edition](#enterprise) (`team@bytebell.ai`). The running server itself does **not** verify a license; governance is by license terms, not by code. The server is meant for local single-tenant use — no remote network surface; everything binds to `127.0.0.1`.
