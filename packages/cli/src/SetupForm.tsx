@@ -18,7 +18,7 @@ interface Row {
   label: string;
   cliKey: string;
   mask?: boolean;
-  /** Infra connection rows — only required/shown in Docker and Cloud (non-embedded) mode. */
+  /** Infra connection rows — only required/shown in Cloud mode. */
   infra?: boolean;
   validate: (raw: string) => string | null;
 }
@@ -80,10 +80,7 @@ const ROWS: Row[] = [
 
 /**
  * The active provider's credential rows, derived from the same catalogue the
- * install wizard renders. Hardcoding OpenRouter's two fields here meant
- * `bytebell set` could not configure any other backend — the provider was
- * switchable by `bytebell set llm-provider …` but its credentials were not
- * reachable from the form.
+ * install wizard renders.
  */
 function providerRows(provider: LlmProviderChoice): Row[] {
   return providerSpec(provider).fields.map((f) => ({
@@ -92,7 +89,10 @@ function providerRows(provider: LlmProviderChoice): Row[] {
     cliKey: f.cliKey,
     ...(f.mask === true ? { mask: true } : {}),
     validate: (s: string) => (s.trim().length > 0 ? null : `required — ${f.hint}`),
-  function isLocalhost(s: string): boolean {
+  }));
+}
+
+function isLocalhost(s: string): boolean {
   return s.includes("localhost") || s.includes("127.0.0.1");
 }
 
@@ -142,22 +142,40 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
   for (const row of visibleRows) {
     errors[row.id] = row.validate(values[row.id] ?? "");
   }
-  const allValid = visibleRows.every((r) => errors[row.id] === null);
+  const allValid = visibleRows.every((r) => errors[r.id] === null);
 
   const handleInfraModeChange = (nextMode: string): void => {
     setValues((prev) => {
-      const updated = { ...prev, "infra-mode": nextMode };
+      const updated: Record<string, string> = { ...prev, "infra-mode": nextMode };
       if (nextMode === "cloud") {
-        if (isLocalhost(prev["mongo"] ?? "")) updated["mongo"] = "";
-        if (isLocalhost(prev["neo4j"] ?? "")) updated["neo4j"] = "";
-        if (isLocalhost(prev["redis"] ?? "")) updated["redis"] = "";
-        if (prev["neo4j-user"] === "neo4j" || isLocalhost(prev["neo4j"] ?? "")) updated["neo4j-user"] = "";
-        if (isLocalhost(prev["neo4j"] ?? "")) updated["neo4j-password"] = "";
+        if (isLocalhost(prev["mongo"] ?? "")) {
+          updated["mongo"] = "";
+        }
+        if (isLocalhost(prev["neo4j"] ?? "")) {
+          updated["neo4j"] = "";
+        }
+        if (isLocalhost(prev["redis"] ?? "")) {
+          updated["redis"] = "";
+        }
+        if (prev["neo4j-user"] === "neo4j" || isLocalhost(prev["neo4j"] ?? "")) {
+          updated["neo4j-user"] = "";
+        }
+        if (isLocalhost(prev["neo4j"] ?? "")) {
+          updated["neo4j-password"] = "";
+        }
       } else if (nextMode === "docker") {
-        if (!updated["mongo"]) updated["mongo"] = "mongodb://127.0.0.1:27017/bytebell";
-        if (!updated["neo4j"]) updated["neo4j"] = "bolt://127.0.0.1:7687";
-        if (!updated["neo4j-user"]) updated["neo4j-user"] = "neo4j";
-        if (!updated["redis"]) updated["redis"] = "redis://127.0.0.1:6379";
+        if (!updated["mongo"]) {
+          updated["mongo"] = "mongodb://127.0.0.1:27017/bytebell";
+        }
+        if (!updated["neo4j"]) {
+          updated["neo4j"] = "bolt://127.0.0.1:7687";
+        }
+        if (!updated["neo4j-user"]) {
+          updated["neo4j-user"] = "neo4j";
+        }
+        if (!updated["redis"]) {
+          updated["redis"] = "redis://127.0.0.1:6379";
+        }
       }
       return updated;
     });
@@ -244,7 +262,5 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
         </Box>
       )}
     </Box>
-  );
-}/Box>
   );
 }

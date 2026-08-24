@@ -10,6 +10,7 @@ export interface SelectFieldProps {
   onChange: (next: string) => void;
   /** Shown dimmed under the row — e.g. what the selected option requires. */
   hint?: string;
+  isFocused?: boolean;
 }
 
 /**
@@ -19,8 +20,17 @@ export interface SelectFieldProps {
  * Distinct from `ToggleField`, which is typed to exactly two options — fine for
  * docker/embedded, but the LLM provider list is six and growing.
  */
-export function SelectField({ id, label, value, options, onChange, hint }: SelectFieldProps): ReactElement {
-  const { isFocused } = useFocus({ id });
+export function SelectField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  hint,
+  isFocused: propFocused,
+}: SelectFieldProps): ReactElement {
+  const { isFocused: hookFocused } = useFocus({ id });
+  const isFocused = propFocused !== undefined ? propFocused : hookFocused;
   const current = Math.max(0, options.indexOf(value));
 
   useInput(

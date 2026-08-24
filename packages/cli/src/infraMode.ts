@@ -32,7 +32,7 @@ export const INFRA_MODE_OPTIONS: readonly InfraModeOption[] = [
   {
     value: "docker",
     label: "Docker",
-    hint: "Mongo + Neo4j + Redis in local Docker containers (auto-configured, Docker must be running)",
+    hint: "Mongo + Neo4j + Redis in local Docker — if instances are not running, run 'bytebell boot' to start them (Docker Desktop required)",
   },
   {
     value: "cloud",
