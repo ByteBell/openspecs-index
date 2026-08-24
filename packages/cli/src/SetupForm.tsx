@@ -115,7 +115,7 @@ function loadInitial(): Record<string, string> {
     "concurrency-github": String(getConfigValue(Config.ConcurrencyGithub)),
     ...initialProviderValues(),
     "llm-provider": getConfigValue(Config.LlmProvider),
-    "infra-mode": currentMode,
+    "infra-mode": currentMode === "cloud" ? "cloud" : "docker",
   };
 }
 
