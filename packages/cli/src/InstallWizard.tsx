@@ -32,7 +32,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
   const { exit } = useApp();
   const [stage, setStage] = useState<Stage>("provider");
   const [providerIdx, setProviderIdx] = useState(0);
-  const [infraMode, setInfraMode] = useState<InfraMode>("embedded");
+  const [infraMode, setInfraMode] = useState<InfraMode>("docker");
   const [values, setValues] = useState<Record<string, string>>(() => initialProviderValues());
   const [indexUrl, setIndexUrl] = useState("");
 

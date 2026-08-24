@@ -25,11 +25,6 @@ export interface InfraModeOption {
  */
 export const INFRA_MODE_OPTIONS: readonly InfraModeOption[] = [
   {
-    value: "embedded",
-    label: "Embedded (recommended)",
-    hint: "SQLite + Ladybug + Honker — no Docker, everything in local files under ~/.bytebell",
-  },
-  {
     value: "docker",
     label: "Docker",
     hint: "Mongo + Neo4j + Redis in local Docker — if instances are not running, run 'bytebell boot' to start them (Docker Desktop required)",
@@ -39,6 +34,12 @@ export const INFRA_MODE_OPTIONS: readonly InfraModeOption[] = [
     label: "Cloud",
     hint: "Mongo + Neo4j + Redis in the cloud — provide your cloud instance URLs below (zero Docker)",
   },
+  // Embedded mode temporarily disabled from TUI
+  // {
+  //   value: "embedded",
+  //   label: "Embedded (recommended)",
+  //   hint: "SQLite + Ladybug + Honker — no Docker, everything in local files under ~/.bytebell",
+  // },
 ];
 
 /** UI metadata for a single infra mode (falls back to the recommended preset). */
@@ -48,7 +49,7 @@ export function infraModeOption(mode: InfraMode): InfraModeOption {
       return option;
     }
   }
-  return INFRA_MODE_OPTIONS[0] ?? { value: "embedded", label: "Embedded", hint: "" };
+  return INFRA_MODE_OPTIONS[0] ?? { value: "docker", label: "Docker", hint: "" };
 }
 
 interface ProviderTriple {

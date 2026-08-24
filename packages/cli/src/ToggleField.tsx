@@ -15,7 +15,14 @@ export interface ToggleFieldProps {
  * focused, ←/→/space cycle between the options. Distinct from the text
  * `Field` so options read as radio toggles rather than free text.
  */
-export function ToggleField({ id, label, value, options, onChange, isFocused: propFocused }: ToggleFieldProps): ReactElement {
+export function ToggleField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  isFocused: propFocused,
+}: ToggleFieldProps): ReactElement {
   const { isFocused: hookFocused } = useFocus({ id });
   const isFocused = propFocused !== undefined ? propFocused : hookFocused;
   const current = Math.max(0, options.indexOf(value));

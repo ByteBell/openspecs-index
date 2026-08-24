@@ -5,9 +5,8 @@ import { Config, DbProviderType, GraphProviderType, QueueProviderType } from "@b
 import { getConfigValue, setConfigValue } from "@bb/config";
 
 describe("infraMode", () => {
-  it("includes embedded, cloud, and docker in INFRA_MODE_OPTIONS", () => {
+  it("includes cloud and docker in active INFRA_MODE_OPTIONS", () => {
     const modes = INFRA_MODE_OPTIONS.map((o) => o.value);
-    expect(modes).toContain("embedded");
     expect(modes).toContain("cloud");
     expect(modes).toContain("docker");
   });

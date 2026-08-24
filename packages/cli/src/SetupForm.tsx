@@ -10,7 +10,7 @@ import { ToggleField } from "./ToggleField.tsx";
 import { SelectField } from "./SelectField.tsx";
 import { LLM_PROVIDER_SPECS, initialProviderValues, providerSpec, type LlmProviderChoice } from "./llmProviders.ts";
 
-const MODE_OPTIONS: readonly string[] = ["docker", "cloud", "embedded"];
+const MODE_OPTIONS: readonly string[] = ["docker", "cloud"];
 const PROVIDER_OPTIONS: readonly string[] = LLM_PROVIDER_SPECS.map((p) => p.value);
 
 interface Row {
