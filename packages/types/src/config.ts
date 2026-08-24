@@ -18,6 +18,21 @@ export enum Config {
   LlmProvider = "llm_provider",
   OllamaUrl = "ollama_url",
   OllamaModel = "ollama_model",
+  AnthropicApiKey = "anthropic_api_key",
+  AnthropicModel = "anthropic_model",
+  BedrockApiKey = "bedrock_api_key",
+  BedrockRegion = "bedrock_region",
+  BedrockModel = "bedrock_model",
+  GeminiApiKey = "gemini_api_key",
+  GeminiModel = "gemini_model",
+  OpenaiApiKey = "openai_api_key",
+  OpenaiModel = "openai_model",
+  /** Override for self-hosted OpenAI-compatible servers (vLLM / LiteLLM / gateway). */
+  OpenaiBaseUrl = "openai_base_url",
+  /** Bedrock SigV4 auth — used when `bedrock_api_key` is unset. */
+  AwsAccessKeyId = "aws_access_key_id",
+  AwsSecretAccessKey = "aws_secret_access_key",
+  AwsSessionToken = "aws_session_token",
   ContextWindowLimit = "context.window.limit",
   MaxTokensPerChunk = "max.tokens.per.chunk",
   BigFileConcurrency = "big.file.concurrency",
@@ -79,6 +94,20 @@ export enum GraphProviderType {
 export enum QueueProviderType {
   Bullmq = "bullmq",
   Honker = "honker",
+}
+
+/**
+ * The PUBLIC LLM backends the open-source engine ships. `llm_provider` is a
+ * free string in the config schema, so a downstream deployment may select a
+ * backend this enum does not enumerate.
+ */
+export enum LlmProviderType {
+  OpenRouter = "openrouter",
+  Ollama = "ollama",
+  Anthropic = "anthropic",
+  Bedrock = "bedrock",
+  Gemini = "gemini",
+  OpenAi = "openai",
 }
 /**
  * The PUBLIC ingestion strategies. `flat-folder` is the historic default that

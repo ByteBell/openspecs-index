@@ -40,7 +40,12 @@ async function tcpReachable(host: string, port: number): Promise<boolean> {
 function parseHostPort(uri: string): { host: string; port: number } | null {
   try {
     const u = new URL(uri);
-    const defaultPort = u.protocol === "bolt:" ? 7687 : u.protocol === "redis:" ? 6379 : 27017;
+    const defaultPort =
+      u.protocol === "bolt:" || u.protocol === "neo4j:" || u.protocol === "neo4j+s:"
+        ? 7687
+        : u.protocol === "redis:"
+          ? 6379
+          : 27017;
     const port = u.port !== "" ? Number.parseInt(u.port, 10) : defaultPort;
     return { host: u.hostname || "127.0.0.1", port };
   } catch {

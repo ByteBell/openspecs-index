@@ -2,9 +2,10 @@
 import React from "react";
 import { render } from "ink";
 import { Command } from "commander";
-import { Config } from "@bb/types";
+import { Config, IngestionStrategyType } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { InstallWizard, type InstallWizardResult } from "./InstallWizard.tsx";
+import { providerSpec } from "./llmProviders.ts";
 import { KEY_MAP } from "./keyMap.ts";
 import { applyInfraMode } from "./infraMode.ts";
 import { runBootSequence } from "./bootConfig.ts";
@@ -88,45 +89,30 @@ function applyConfig(result: InstallWizardResult): void {
   // Infrastructure mode sets the db/graph/queue providers as a single preset.
   applyInfraMode(result.infraMode);
 
-  const providerEntry = KEY_MAP["llm-provider"];
-  if (providerEntry === undefined) {
-    throw new Error("internal: KEY_MAP missing 'llm-provider'");
+  setVia("llm-provider", result.provider);
+  for (const [cliKey, value] of Object.entries(result.providerValues)) {
+    setVia(cliKey, value);
   }
-  providerEntry.setter(result.provider);
 
-  if (result.provider === "openrouter") {
-    const keyEntry = KEY_MAP["openrouter-api-key"];
-    const modelEntry = KEY_MAP["openrouter-model"];
-    if (keyEntry === undefined) {
-      throw new Error("internal: KEY_MAP missing 'openrouter-api-key'");
-    }
-    if (modelEntry === undefined) {
-      throw new Error("internal: KEY_MAP missing 'openrouter-model'");
-    }
-    if (result.openrouterApiKey !== undefined) {
-      keyEntry.setter(result.openrouterApiKey);
-    }
-    if (result.openrouterModel !== undefined) {
-      modelEntry.setter(result.openrouterModel);
-    }
-    success(`OpenRouter configured (model: ${result.openrouterModel ?? "(not set)"})`);
-  } else {
-    const urlEntry = KEY_MAP["ollama-url"];
-    const modelEntry = KEY_MAP["ollama-model"];
-    if (urlEntry === undefined) {
-      throw new Error("internal: KEY_MAP missing 'ollama-url'");
-    }
-    if (modelEntry === undefined) {
-      throw new Error("internal: KEY_MAP missing 'ollama-model'");
-    }
-    if (result.ollamaUrl !== undefined) {
-      urlEntry.setter(result.ollamaUrl);
-    }
-    if (result.ollamaModel !== undefined) {
-      modelEntry.setter(result.ollamaModel);
-    }
-    success(`Ollama configured (model: ${result.ollamaModel ?? "(not set)"})`);
+  const spec = providerSpec(result.provider);
+  const modelField = spec.fields.find((f) => f.label.toLowerCase().includes("model"));
+  const model = modelField === undefined ? undefined : result.providerValues[modelField.cliKey];
+  success(`${spec.label} configured (model: ${model ?? "(not set)"})`);
+
+  // Concept-graph needs tool use, which only OpenRouter provides today. Fail
+  // loudly here rather than mid-ingest, and repair the config so the run works.
+  if (!spec.supportsTools && getConfigValue(Config.IngestionStrategy) === IngestionStrategyType.ConceptGraph) {
+    setVia("ingestion.strategy", IngestionStrategyType.FlatFolder);
+    info(`${spec.label} does not support tool use — switched ingestion.strategy to flat-folder.`);
   }
+}
+
+function setVia(cliKey: string, value: string): void {
+  const entry = KEY_MAP[cliKey];
+  if (entry === undefined) {
+    throw new Error(`internal: KEY_MAP missing "${cliKey}"`);
+  }
+  entry.setter(value);
 }
 
 async function boot(): Promise<boolean> {

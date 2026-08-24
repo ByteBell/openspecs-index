@@ -2,7 +2,7 @@
 import type { ReactElement } from "react";
 import { Box, Text, useInput } from "ink";
 import { Field } from "./Field.tsx";
-import type { LlmProviderChoice } from "./InstallWizard.tsx";
+import { maskSecret, type ProviderSpec } from "./llmProviders.ts";
 import { INFRA_MODE_OPTIONS as INFRA_OPTIONS, type InfraMode } from "./infraMode.ts";
 
 export interface InfraStageProps {
@@ -65,34 +65,15 @@ export function InfraStage({ mode, onMode, onBack, onNext }: InfraStageProps): R
 }
 
 export interface FieldsStageProps {
-  provider: LlmProviderChoice;
-  apiKey: string;
-  onApiKey: (v: string) => void;
-  orModel: string;
-  onOrModel: (v: string) => void;
-  ollamaUrl: string;
-  onOllamaUrl: (v: string) => void;
-  ollamaModel: string;
-  onOllamaModel: (v: string) => void;
+  spec: ProviderSpec;
+  values: Record<string, string>;
+  onChange: (cliKey: string, next: string) => void;
   valid: boolean;
   onBack: () => void;
   onNext: () => void;
 }
 
-export function FieldsStage({
-  provider,
-  apiKey,
-  onApiKey,
-  orModel,
-  onOrModel,
-  ollamaUrl,
-  onOllamaUrl,
-  ollamaModel,
-  onOllamaModel,
-  valid,
-  onBack,
-  onNext,
-}: FieldsStageProps): ReactElement {
+export function FieldsStage({ spec, values, onChange, valid, onBack, onNext }: FieldsStageProps): ReactElement {
   useInput((_input, key) => {
     if (key.escape) {
       onBack();
@@ -106,18 +87,28 @@ export function FieldsStage({
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1} paddingY={0}>
       <Box marginBottom={1}>
-        <Text bold>{provider === "openrouter" ? "OpenRouter configuration" : "Ollama configuration"}</Text>
+        <Text bold>{spec.label} configuration</Text>
       </Box>
-      {provider === "openrouter" ? (
-        <>
-          <Field id="api-key" label="API key" value={apiKey} onChange={onApiKey} mask autoFocus />
-          <Field id="or-model" label="Model" value={orModel} onChange={onOrModel} />
-        </>
-      ) : (
-        <>
-          <Field id="ollama-url" label="Ollama URL" value={ollamaUrl} onChange={onOllamaUrl} autoFocus />
-          <Field id="ollama-model" label="Model name" value={ollamaModel} onChange={onOllamaModel} />
-        </>
+      {spec.fields.map((field, i) => (
+        <Box key={field.cliKey} flexDirection="column">
+          <Field
+            id={field.cliKey}
+            label={field.label}
+            value={values[field.cliKey] ?? ""}
+            onChange={(next) => onChange(field.cliKey, next)}
+            {...(field.mask === true ? { mask: true } : {})}
+            {...(i === 0 ? { autoFocus: true } : {})}
+          />
+          <Text dimColor> {field.hint}</Text>
+        </Box>
+      ))}
+      {!spec.supportsTools && (
+        <Box marginTop={1}>
+          <Text color="yellow">
+            note: {spec.label} does not support tool use — the concept-graph strategy needs OpenRouter. The default
+            flat-folder strategy works on every provider.
+          </Text>
+        </Box>
       )}
       <Box marginTop={1}>
         <Text dimColor>[Tab] next field [Enter] continue{valid ? "" : " (fill all fields)"} [Esc] back</Text>
@@ -158,28 +149,15 @@ export function RepoStage({ indexUrl, onIndexUrl, onBack, onNext }: RepoStagePro
 }
 
 export interface ConfirmStageProps {
-  provider: LlmProviderChoice;
+  spec: ProviderSpec;
+  values: Record<string, string>;
   infraMode: InfraMode;
-  apiKey: string;
-  orModel: string;
-  ollamaUrl: string;
-  ollamaModel: string;
   indexUrl: string;
   onBack: () => void;
   onDone: () => void;
 }
 
-export function ConfirmStage({
-  provider,
-  infraMode,
-  apiKey,
-  orModel,
-  ollamaUrl,
-  ollamaModel,
-  indexUrl,
-  onBack,
-  onDone,
-}: ConfirmStageProps): ReactElement {
+export function ConfirmStage({ spec, values, infraMode, indexUrl, onBack, onDone }: ConfirmStageProps): ReactElement {
   useInput((_input, key) => {
     if (key.escape) {
       onBack();
@@ -190,9 +168,6 @@ export function ConfirmStage({
     }
   });
 
-  const maskedKey =
-    apiKey.length === 0 ? "(none)" : `${"•".repeat(Math.min(apiKey.length, 8))}${apiKey.length > 8 ? "…" : ""}`;
-
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1} paddingY={0}>
       <Box marginBottom={1}>
@@ -201,35 +176,26 @@ export function ConfirmStage({
       <Box flexDirection="column" gap={0}>
         <Text>
           {" "}
-          Provider : <Text color="cyan">{provider}</Text>
+          Provider : <Text color="cyan">{spec.label}</Text>
         </Text>
         <Text>
           {" "}
           Infra : <Text color="cyan">{infraMode === "embedded" ? "embedded (no Docker)" : "docker"}</Text>
         </Text>
-        {provider === "openrouter" ? (
-          <>
-            <Text>
+        {spec.fields.map((field) => {
+          const raw = (values[field.cliKey] ?? "").trim();
+          return (
+            <Text key={field.cliKey}>
               {" "}
-              API key : <Text dimColor>{maskedKey}</Text>
+              {field.label} :{" "}
+              {field.mask === true ? (
+                <Text dimColor>{maskSecret(raw)}</Text>
+              ) : (
+                <Text color="cyan">{raw.length > 0 ? raw : "(not set)"}</Text>
+              )}
             </Text>
-            <Text>
-              {" "}
-              Model : <Text color="cyan">{orModel || "(not set)"}</Text>
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text>
-              {" "}
-              URL : <Text color="cyan">{ollamaUrl || "(not set)"}</Text>
-            </Text>
-            <Text>
-              {" "}
-              Model : <Text color="cyan">{ollamaModel || "(not set)"}</Text>
-            </Text>
-          </>
-        )}
+          );
+        })}
         <Text>
           {" "}
           Index : <Text color="cyan">{indexUrl.trim().length > 0 ? indexUrl : "(skip)"}</Text>

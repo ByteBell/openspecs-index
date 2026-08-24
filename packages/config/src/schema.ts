@@ -6,7 +6,7 @@ export { Config };
 export const LOG_LEVELS = ["error", "warn", "info", "http", "verbose", "debug", "silly"] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
-export const LLM_PROVIDERS = ["openrouter", "ollama"] as const;
+export const LLM_PROVIDERS = ["openrouter", "ollama", "anthropic", "bedrock", "gemini", "openai"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
 // The PUBLIC strategies the open-source engine ships. A downstream deployment
@@ -42,6 +42,22 @@ export const configSchema = z
     llm_provider: z.enum(LLM_PROVIDERS).default("openrouter"),
     ollama_url: z.string().default("http://localhost:11434"),
     ollama_model: z.string().default(""),
+    anthropic_api_key: z.string().default(""),
+    anthropic_model: z.string().default("claude-sonnet-5"),
+    bedrock_api_key: z.string().default(""),
+    // No default. The region is an endpoint locator, not a credential — a
+    // wrong one fails as "model not found" rather than "misconfigured", so an
+    // unset region is caught by the boot gate with a precise hint instead.
+    bedrock_region: z.string().default(""),
+    bedrock_model: z.string().default("anthropic.claude-sonnet-5"),
+    gemini_api_key: z.string().default(""),
+    gemini_model: z.string().default("gemini-2.5-flash"),
+    openai_api_key: z.string().default(""),
+    openai_model: z.string().default(""),
+    openai_base_url: z.string().default(""),
+    aws_access_key_id: z.string().default(""),
+    aws_secret_access_key: z.string().default(""),
+    aws_session_token: z.string().default(""),
     "context.window.limit": z.number().int().positive().default(15000),
     "max.tokens.per.chunk": z.number().int().positive().default(6000),
     "big.file.concurrency": z.number().int().positive().default(25),
@@ -107,6 +123,19 @@ export type ConfigValueMap = {
   [Config.LlmProvider]: LlmProvider;
   [Config.OllamaUrl]: string;
   [Config.OllamaModel]: string;
+  [Config.AnthropicApiKey]: string;
+  [Config.AnthropicModel]: string;
+  [Config.BedrockApiKey]: string;
+  [Config.BedrockRegion]: string;
+  [Config.BedrockModel]: string;
+  [Config.GeminiApiKey]: string;
+  [Config.GeminiModel]: string;
+  [Config.OpenaiApiKey]: string;
+  [Config.OpenaiModel]: string;
+  [Config.OpenaiBaseUrl]: string;
+  [Config.AwsAccessKeyId]: string;
+  [Config.AwsSecretAccessKey]: string;
+  [Config.AwsSessionToken]: string;
   [Config.ContextWindowLimit]: number;
   [Config.MaxTokensPerChunk]: number;
   [Config.BigFileConcurrency]: number;
@@ -155,6 +184,17 @@ export const REQUIRED_KEYS: readonly Config[] = [
 const PROVIDER_REQUIRED_KEYS: Readonly<Record<LlmProvider, readonly Config[]>> = {
   openrouter: [Config.OpenrouterApiKey],
   ollama: [Config.OllamaUrl, Config.OllamaModel],
+  anthropic: [Config.AnthropicApiKey, Config.AnthropicModel],
+  // Bedrock takes EITHER a bearer API key OR SigV4 credentials OR an ambient
+  // instance role, so no single credential key is universally required — the
+  // provider fails with a precise hint when none resolves. Region and model are
+  // always needed.
+  bedrock: [Config.BedrockRegion, Config.BedrockModel],
+  gemini: [Config.GeminiApiKey, Config.GeminiModel],
+  // Bedrock accepts either a bearer API key or SigV4 credentials, so neither is
+  // individually required — `resolveBedrockAuth` fails with a precise hint when
+  // both are absent. Region is always needed.
+  openai: [Config.OpenaiApiKey, Config.OpenaiModel],
 };
 
 export function requiredKeysFor(provider: LlmProvider): readonly Config[] {
@@ -168,7 +208,7 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.Neo4jUser]: "bytebell set neo4j-user <user>",
   [Config.Neo4jPassword]: "bytebell set neo4j-password <pwd>",
   [Config.RedisUrl]: "bytebell set redis <url>",
-  [Config.OpenrouterApiKey]: "bytebell keys set",
+  [Config.OpenrouterApiKey]: "bytebell set openrouter-api-key <key>",
   [Config.OpenrouterModel]: "bytebell models set <model-id>",
   [Config.OpenrouterFallbackModel1]: "bytebell set openrouter-fallback-model-1 <model-id>",
   [Config.OpenrouterFallbackModel2]: "bytebell set openrouter-fallback-model-2 <model-id>",
@@ -178,9 +218,22 @@ export const HINTS: Readonly<Record<Config, string>> = {
   [Config.LogLevel]: "bytebell set log-level <error|warn|info|debug>",
   [Config.LogRetentionDays]: "bytebell set log-retention-days <n>",
   [Config.LlmCacheEnabled]: "bytebell set llm_cache_enabled <true|false>",
-  [Config.LlmProvider]: "bytebell set llm-provider <openrouter|ollama>",
+  [Config.LlmProvider]: "bytebell set llm-provider <openrouter|ollama|anthropic|bedrock|gemini|openai>",
   [Config.OllamaUrl]: "bytebell set ollama-url <url>",
   [Config.OllamaModel]: "bytebell set ollama-model <model>",
+  [Config.AnthropicApiKey]: "bytebell set anthropic-api-key <key>",
+  [Config.AnthropicModel]: "bytebell set anthropic-model <model-id>",
+  [Config.BedrockApiKey]: "bytebell set bedrock-api-key <key>",
+  [Config.BedrockRegion]: "bytebell set bedrock-region <region>",
+  [Config.BedrockModel]: "bytebell set bedrock-model <model-id>",
+  [Config.GeminiApiKey]: "bytebell set gemini-api-key <key>",
+  [Config.GeminiModel]: "bytebell set gemini-model <model-id>",
+  [Config.OpenaiApiKey]: "bytebell set openai-api-key <key>",
+  [Config.OpenaiModel]: "bytebell set openai-model <model-id>",
+  [Config.OpenaiBaseUrl]: "bytebell set openai-base-url <url>",
+  [Config.AwsAccessKeyId]: "bytebell set aws-access-key-id <id>",
+  [Config.AwsSecretAccessKey]: "bytebell set aws-secret-access-key <secret>",
+  [Config.AwsSessionToken]: "bytebell set aws-session-token <token>",
   [Config.ContextWindowLimit]: "bytebell set context.window.limit <n>",
   [Config.MaxTokensPerChunk]: "bytebell set max.tokens.per.chunk <n>",
   [Config.BigFileConcurrency]: "bytebell set big.file.concurrency <n>",

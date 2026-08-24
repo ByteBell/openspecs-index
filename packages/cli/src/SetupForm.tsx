@@ -7,8 +7,11 @@ import { KEY_MAP } from "./keyMap.ts";
 import { applyInfraMode, infraModeOption, isEmbedded, type InfraMode } from "./infraMode.ts";
 import { Field } from "./Field.tsx";
 import { ToggleField } from "./ToggleField.tsx";
+import { SelectField } from "./SelectField.tsx";
+import { LLM_PROVIDER_SPECS, initialProviderValues, providerSpec, type LlmProviderChoice } from "./llmProviders.ts";
 
 const MODE_OPTIONS: readonly [string, string] = ["docker", "embedded"];
+const PROVIDER_OPTIONS: readonly string[] = LLM_PROVIDER_SPECS.map((p) => p.value);
 
 interface Row {
   id: string;
@@ -73,20 +76,24 @@ const ROWS: Row[] = [
     cliKey: "concurrency.github",
     validate: (s) => (/^\d+$/u.test(s) && Number(s) > 0 ? null : "expected positive integer"),
   },
-  {
-    id: "openrouter-api-key",
-    label: "OpenRouter API key",
-    cliKey: "openrouter-api-key",
-    mask: true,
-    validate: (s) => (s.length > 0 ? null : "required — get one at openrouter.ai/keys"),
-  },
-  {
-    id: "openrouter-model",
-    label: "OpenRouter model",
-    cliKey: "openrouter-model",
-    validate: (s) => (s.length > 0 ? null : "required — e.g. deepseek/deepseek-v4-flash"),
-  },
 ];
+
+/**
+ * The active provider's credential rows, derived from the same catalogue the
+ * install wizard renders. Hardcoding OpenRouter's two fields here meant
+ * `bytebell set` could not configure any other backend — the provider was
+ * switchable by `bytebell set llm-provider …` but its credentials were not
+ * reachable from the form.
+ */
+function providerRows(provider: LlmProviderChoice): Row[] {
+  return providerSpec(provider).fields.map((f) => ({
+    id: f.cliKey,
+    label: f.label,
+    cliKey: f.cliKey,
+    ...(f.mask === true ? { mask: true } : {}),
+    validate: (s: string) => (s.trim().length > 0 ? null : `required — ${f.hint}`),
+  }));
+}
 
 function loadInitial(): Record<string, string> {
   return {
@@ -97,8 +104,8 @@ function loadInitial(): Record<string, string> {
     redis: getConfigValue(Config.RedisUrl),
     port: String(getConfigValue(Config.ServerPort)),
     "concurrency-github": String(getConfigValue(Config.ConcurrencyGithub)),
-    "openrouter-api-key": getConfigValue(Config.OpenrouterApiKey),
-    "openrouter-model": getConfigValue(Config.OpenrouterModel),
+    ...initialProviderValues(),
+    "llm-provider": getConfigValue(Config.LlmProvider),
     "infra-mode": isEmbedded() ? "embedded" : "docker",
   };
 }
@@ -113,7 +120,9 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isDocker = (values["infra-mode"] ?? "docker") === "docker";
-  const visibleRows = ROWS.filter((r) => isDocker || r.infra !== true);
+  const provider = (values["llm-provider"] ?? "openrouter") as LlmProviderChoice;
+  const spec = providerSpec(provider);
+  const visibleRows = [...ROWS.filter((r) => isDocker || r.infra !== true), ...providerRows(provider)];
 
   const errors: Record<string, string | null> = {};
   for (const row of visibleRows) {
@@ -130,6 +139,11 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
     if (key.return && allValid && submitError === null) {
       try {
         applyInfraMode((values["infra-mode"] ?? "docker") as InfraMode);
+        const providerEntry = KEY_MAP["llm-provider"];
+        if (providerEntry === undefined) {
+          throw new Error('No KEY_MAP entry for "llm-provider"');
+        }
+        providerEntry.setter(provider);
         for (const row of visibleRows) {
           const entry = KEY_MAP[row.cliKey];
           if (entry === undefined) {
@@ -160,6 +174,15 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
       <Box marginBottom={1}>
         <Text dimColor> {infraModeOption(isDocker ? "docker" : "embedded").hint}</Text>
       </Box>
+      <SelectField
+        id="llm-provider"
+        label="LLM provider"
+        value={provider}
+        options={PROVIDER_OPTIONS}
+        onChange={(next) => setValues((prev) => ({ ...prev, "llm-provider": next }))}
+        hint={spec.hint}
+      />
+      <Box marginBottom={1} />
       {visibleRows.map((row) => (
         <Field
           key={row.id}
