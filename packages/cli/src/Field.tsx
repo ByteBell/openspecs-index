@@ -10,15 +10,26 @@ export interface FieldProps {
   mask?: boolean;
   error?: string;
   autoFocus?: boolean;
+  isFocused?: boolean;
 }
 
-export function Field({ id, label, value, onChange, mask, error, autoFocus }: FieldProps): ReactElement {
-  const { isFocused } = useFocus({ id, autoFocus: autoFocus === true });
+export function Field({
+  id,
+  label,
+  value,
+  onChange,
+  mask,
+  error,
+  autoFocus,
+  isFocused: propFocused,
+}: FieldProps): ReactElement {
+  const { isFocused: hookFocused } = useFocus({ id, autoFocus: autoFocus === true });
+  const isFocused = propFocused !== undefined ? propFocused : hookFocused;
   const indicator = isFocused ? "▶" : " ";
   const labelProps = isFocused ? { color: "cyan" } : {};
   const masked = mask === true;
   const displayValue = masked && value.length > 0 ? "•".repeat(value.length) : value;
-  const inputProps = masked ? { value, onChange, mask: "•" } : { value, onChange };
+  const inputProps = masked ? { value, onChange, mask: "•", focus: isFocused } : { value, onChange, focus: isFocused };
 
   return (
     <Box flexDirection="column">

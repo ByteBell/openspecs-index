@@ -5,23 +5,45 @@ export interface ToggleFieldProps {
   id: string;
   label: string;
   value: string;
-  options: readonly [string, string];
+  options: readonly string[];
   onChange: (next: string) => void;
+  isFocused?: boolean;
 }
 
 /**
- * A two-option switch that joins the form's Tab order via `useFocus`. When
- * focused, ←/→/space flip between the two options. Distinct from the text
- * `Field` so providers read as a toggle rather than free text.
+ * An option switch that joins the form's Tab order via `useFocus`. When
+ * focused, ←/→/space cycle between the options. Distinct from the text
+ * `Field` so options read as radio toggles rather than free text.
  */
-export function ToggleField({ id, label, value, options, onChange }: ToggleFieldProps): ReactElement {
-  const { isFocused } = useFocus({ id });
-  const [a, b] = options;
+export function ToggleField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  isFocused: propFocused,
+}: ToggleFieldProps): ReactElement {
+  const { isFocused: hookFocused } = useFocus({ id });
+  const isFocused = propFocused !== undefined ? propFocused : hookFocused;
+  const current = Math.max(0, options.indexOf(value));
 
   useInput(
     (input, key) => {
-      if (key.leftArrow || key.rightArrow || input === " ") {
-        onChange(value === a ? b : a);
+      if (options.length === 0) {
+        return;
+      }
+      if (key.leftArrow) {
+        const next = options[(current - 1 + options.length) % options.length];
+        if (next !== undefined) {
+          onChange(next);
+        }
+        return;
+      }
+      if (key.rightArrow || input === " ") {
+        const next = options[(current + 1) % options.length];
+        if (next !== undefined) {
+          onChange(next);
+        }
       }
     },
     { isActive: isFocused },
@@ -39,14 +61,17 @@ export function ToggleField({ id, label, value, options, onChange }: ToggleField
         <Text {...labelProps}>{label}</Text>
       </Box>
       <Box>
-        <Text {...(value === a ? { color: "green" } : {})}>
-          {value === a ? "◉" : "○"} {a}
-        </Text>
-        <Text>{"   "}</Text>
-        <Text {...(value === b ? { color: "green" } : {})}>
-          {value === b ? "◉" : "○"} {b}
-        </Text>
-        {isFocused && <Text dimColor>{"   (←/→ to switch)"}</Text>}
+        {options.map((opt) => {
+          const isSelected = value === opt;
+          return (
+            <Box key={opt} marginRight={3}>
+              <Text {...(isSelected ? { color: "green" } : {})}>
+                {isSelected ? "◉" : "○"} {opt}
+              </Text>
+            </Box>
+          );
+        })}
+        {isFocused && <Text dimColor>{"(←/→ to switch)"}</Text>}
       </Box>
     </Box>
   );

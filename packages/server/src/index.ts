@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import express from "express";
 import { Config, DbProviderType, GraphProviderType, QueueProviderType, type Config as ConfigEnum } from "@bb/types";
-import { getBytebellHome, getConfigValue, HINTS } from "@bb/config";
+import { getBytebellHome, getConfigValue, HINTS, requiredKeysFor, type LlmProvider } from "@bb/config";
 import { connectDb } from "@bb/db";
 import { connectGraph, indexesGraph } from "@bb/graph-db";
 import { connectQueue, resumeOrphans } from "@bb/queue";
@@ -32,13 +32,15 @@ import { registerRoutes } from "./routes.ts";
 import { installShutdownHandlers } from "./shutdown.ts";
 import { reconcileLegacyLayout } from "./legacyLayout.ts";
 
+// Infra keys only. The LLM credentials are provider-dependent and come from
+// `requiredKeysFor(llm_provider)` — hardcoding the OpenRouter key here blocked
+// boot for every deployment that deliberately chose a different backend.
 const REQUIRED: ConfigEnum[] = [
   Config.MongoUri,
   Config.RedisUrl,
   Config.Neo4jUri,
   Config.Neo4jUser,
   Config.Neo4jPassword,
-  Config.OpenrouterApiKey,
 ];
 
 function checkRequiredConfig(): void {
@@ -48,7 +50,11 @@ function checkRequiredConfig(): void {
   const graphProvider = getConfigValue(Config.GraphProvider);
   const queueProvider = getConfigValue(Config.QueueProvider);
 
-  const required = [...REQUIRED];
+  const llmProvider = getConfigValue(Config.LlmProvider);
+  // requiredKeysFor() returns the shared infra keys plus the active provider's
+  // credentials; REQUIRED already covers the infra half, so take the delta.
+  const llmKeys = requiredKeysFor(llmProvider as LlmProvider).filter((k) => !REQUIRED.includes(k));
+  const required = [...REQUIRED, ...llmKeys];
   const remove = (key: ConfigEnum): void => {
     const idx = required.indexOf(key);
     if (idx !== -1) {

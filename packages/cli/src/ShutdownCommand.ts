@@ -4,7 +4,7 @@ import { DockerComposeError, DockerNotFoundError, composeFilePath, down } from "
 import { createSpinner, error } from "./output.ts";
 import { promptStopDocker } from "./shutdownPrompts.ts";
 import { stopServer } from "./serverLifecycle.ts";
-import { isEmbedded } from "./infraMode.ts";
+import { isCloud, isEmbedded } from "./infraMode.ts";
 
 const STOP_TIMEOUT_S = 30;
 
@@ -68,8 +68,8 @@ async function runShutdown(opts: ShutdownOptions): Promise<void> {
 }
 
 async function decideStopDocker(opts: ShutdownOptions): Promise<boolean> {
-  // Embedded mode runs no Docker — never prompt or try to tear it down.
-  if (isEmbedded()) {
+  // Embedded and cloud modes run no Docker — never prompt or try to tear it down.
+  if (isEmbedded() || isCloud()) {
     return false;
   }
   if (opts.withDocker === true) {
@@ -104,8 +104,8 @@ async function stopDocker(): Promise<void> {
 }
 
 function dockerHint(): string {
-  // No Docker in embedded mode — nothing to hint about.
-  if (isEmbedded()) {
+  // No Docker in embedded or cloud mode — nothing to hint about.
+  if (isEmbedded() || isCloud()) {
     return "";
   }
   return `\nDocker infra is still running. To stop it:\n  docker compose -f ${composeFilePath()} down\n`;

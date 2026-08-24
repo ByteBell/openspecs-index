@@ -273,10 +273,13 @@ If a piece of infra is missing from `config.json`, the server prints the exact `
 
 ## Rule of LLM Provider
 
-**OpenRouter or local Ollama. No direct vendor SDKs.** No Anthropic / OpenAI / Gemini / Bedrock keys or SDK imports. The active backend is selected by `Config.LlmProvider` (`"openrouter"` default | `"ollama"`) and switched via `bytebell set llm-provider <openrouter|ollama>`. Ollama mode reads `Config.OllamaUrl` (default `http://localhost:11434`) and `Config.OllamaModel` (free-form — any locally-pulled model) and reports `$0` cost. All LLM calls flow through `@bb/llm`, which:
+**Every backend is an entry in `@bb/llm`'s provider table.** Six ship today — `openrouter` (default), `ollama`, `anthropic`, `bedrock`, `gemini`, `openai` — selected by `Config.LlmProvider` and switched via `bytebell set llm-provider <name>`. Adding a backend means one module under `packages/llm/src/` plus one entry in `src/providers.ts`; it must never mean a new branch at a call site.
 
-- Wraps every OpenRouter / Ollama call behind a single `askLLM` surface
-- Computes per-call cost via `estimateCostUsd()` against live OpenRouter pricing for the `bytebell stats` view (short-circuits to `0` when provider is Ollama)
+- **Prefer `fetch`; SDKs only where the wire protocol demands one.** Most providers speak an OpenAI-shaped `/chat/completions`, so they share `openaiCompatible.ts` — a base URL and a bearer token, not another hand-copied request builder. Two exceptions are allowed and are the only ones: `@ai-sdk/amazon-bedrock` + `ai` (Bedrock's Converse shape and SigV4 request signing, which must not be hand-rolled) and `openai` (the tool-use client, pointed at each provider's OpenAI-compatible base URL). Adding a third SDK requires raising the dependency question first.
+- **All calls flow through `askLLM` / `askJsonLLM` / `askLLMWithTools`.** No package outside `@bb/llm` may import a provider module directly, and no business logic may branch on provider identity — ask the provider table for a capability instead.
+- **Capability differences are data, not conditionals.** `LlmProviderEntry` carries `reportsCost` and `supportsTools`. Tool use (`askLLMWithTools`, and therefore `concept-graph`) works on every backend except Ollama, whose tool-format support varies per locally-pulled model and cannot be checked ahead of time.
+- **Cost is provider-reported or zero.** Only OpenRouter returns a real figure. Never reintroduce a client-side pricing table — a hardcoded price that silently rots is worse than an honest `$0`.
+- **Credentials live in `~/.bytebell/config.json`**, one key per provider (Bedrock additionally accepts SigV4 credentials or an ambient instance role), written only by `bytebell set …` or the setup wizard. The wizard renders from `packages/cli/src/llmProviders.ts`; the server's boot gate reads `requiredKeysFor(provider)`. Both are single sources of truth — do not add a second provider list.
 
 LLM outputs are probabilistic. They must be:
 

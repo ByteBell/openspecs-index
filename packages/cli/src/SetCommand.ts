@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import React from "react";
 import { render } from "ink";
+import { Config } from "@bb/types";
 import { HINTS, getConfigValue } from "@bb/config";
 import { KEY_MAP, validKeysList } from "./keyMap.ts";
 import { SetupForm } from "./SetupForm.tsx";
@@ -72,7 +73,17 @@ async function runSet(key?: string, value?: string): Promise<void> {
 
 async function runInteractive(): Promise<void> {
   return new Promise((resolve) => {
-    const onDone = () => resolve();
+    const onDone = (res: { saved: boolean }) => {
+      if (res.saved) {
+        const mode = getConfigValue(Config.InfraMode);
+        if (mode === "docker") {
+          success("Configuration saved. If Docker instances are not running, run 'bytebell boot' to start them.");
+        } else {
+          success("Configuration saved. Run 'bytebell boot' to start the server.");
+        }
+      }
+      resolve();
+    };
     const { waitUntilExit } = render(React.createElement(SetupForm, { onDone }));
     waitUntilExit().catch(() => undefined);
   });

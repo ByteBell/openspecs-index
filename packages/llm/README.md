@@ -11,13 +11,12 @@ imported by Domain (`@bb/ingest-*`, `@bb/mcp`, future
 
 ## Responsibility
 
-Minimal multi-provider LLM call surface for v0. The active backend is
-selected by `Config.LlmProvider` (`"openrouter"` default, or
-`"ollama"`):
+Multi-provider LLM call surface. The active backend is selected by
+`Config.LlmProvider` — one of `openrouter` (default), `ollama`, `anthropic`,
+`bedrock`, `gemini` — and dispatched through the table in `src/providers.ts`:
 
-- `askLLM(prompt, opts?)` — dispatches to either
-  `src/openrouter.ts` or `src/ollama.ts` depending on
-  `Config.LlmProvider`. Returns
+- `askLLM(prompt, opts?)` — resolves the provider entry for
+  `Config.LlmProvider` (or `opts.provider`) and dispatches. Returns
   `{ content, usage: { model, inputTokens, outputTokens, costUsd } }`.
   Caller never sees the provider; the result shape is identical across
   backends. `costUsd` is the provider-reported USD cost for that single
@@ -121,13 +120,20 @@ it. The cost ledger described in [docs/arch.md](../../docs/arch.md) is
 
 ## Invariants
 
-1. **OpenRouter or local Ollama, nothing else.** No direct
-   Anthropic / OpenAI / Gemini / Bedrock SDKs. OpenRouter URL is fixed
-   at `https://openrouter.ai/api/v1/chat/completions`; Ollama URL is
-   user-configured via `Config.OllamaUrl` (default
-   `http://localhost:11434`). Provider is selected by
-   `Config.LlmProvider`, or by `opts.provider` when the caller wants to
-   override on a per-call basis.
+1. **Every backend is an entry in `src/providers.ts`; no vendor SDKs.**
+   Five backends ship: OpenRouter, Ollama, Anthropic, Bedrock, Gemini. Every
+   one is plain `fetch` against a documented HTTP endpoint — no
+   `@anthropic-ai/*`, `@google/*`, or `@aws-sdk/*` dependency, so the Bun
+   binary stays small and the dependency surface auditable. Provider is
+   selected by `Config.LlmProvider`, or by `opts.provider` per call. An
+   unrecognised name throws `LlmConfigError` listing the valid set — it never
+   silently falls back to another backend.
+   1a. **Bedrock auth is a Bedrock API key, not SigV4.** `Authorization:
+Bearer <bedrock_api_key>` against
+   `bedrock-runtime.{region}.amazonaws.com`. Long-term IAM credential signing
+   is deliberately out of scope: it would pull a signing dependency into the
+   binary and turn a one-field signup into four. Operators who need SigV4
+   should front Bedrock with a gateway or use OpenRouter.
 2. **Per-call credential override.** When `opts.apiKey` is set, the
    OpenRouter call uses it directly and skips `Config.OpenrouterApiKey`.
    This is the extension point that lets downstream consumers

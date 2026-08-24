@@ -2,8 +2,15 @@ export class LlmConfigError extends Error {
   override readonly name = "LlmConfigError";
   readonly hint: string;
 
-  constructor(hint: string) {
-    super(`OpenRouter API key is not configured. Run:\n  ${hint}`);
+  /**
+   * `hint` is the exact `bytebell set …` command that fixes the problem.
+   *
+   * The summary is deliberately provider-neutral: this used to hardcode
+   * "OpenRouter API key is not configured", so a missing Gemini key or Bedrock
+   * region reported a provider the operator had never selected.
+   */
+  constructor(hint: string, summary = "LLM provider is not fully configured") {
+    super(`${summary}. Run:\n  ${hint}`);
     this.hint = hint;
   }
 }

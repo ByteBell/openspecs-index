@@ -12,7 +12,7 @@ default.
 ## Prerequisites
 
 - `bytebell-server` running locally with Mongo, Neo4j, and Redis reachable
-- An OpenRouter API key configured (`bytebell keys set`)
+- A tool-capable provider configured (e.g. `bytebell set openrouter-api-key <key>`)
 - A tool-use-capable enrichment model selected (Anthropic Claude Sonnet 4.x
   / Opus 4.x via OpenRouter — confirmed to support OpenAI-style `tool_calls`)
 - A small public repo to index (5–50 files is ideal)

@@ -4,18 +4,21 @@ import { Box, Text, useApp, useInput } from "ink";
 import { Config } from "@bb/types";
 import { getConfigValue } from "@bb/config";
 import { KEY_MAP } from "./keyMap.ts";
-import { applyInfraMode, infraModeOption, isEmbedded, type InfraMode } from "./infraMode.ts";
+import { applyInfraMode, getInfraMode, infraModeOption, type InfraMode } from "./infraMode.ts";
 import { Field } from "./Field.tsx";
 import { ToggleField } from "./ToggleField.tsx";
+import { SelectField } from "./SelectField.tsx";
+import { LLM_PROVIDER_SPECS, initialProviderValues, providerSpec, type LlmProviderChoice } from "./llmProviders.ts";
 
-const MODE_OPTIONS: readonly [string, string] = ["docker", "embedded"];
+const MODE_OPTIONS: readonly string[] = ["docker", "cloud"];
+const PROVIDER_OPTIONS: readonly string[] = LLM_PROVIDER_SPECS.map((p) => p.value);
 
 interface Row {
   id: string;
   label: string;
   cliKey: string;
   mask?: boolean;
-  /** Infra connection rows — only required/shown in Docker (non-embedded) mode. */
+  /** Infra connection rows — only required/shown in Cloud mode. */
   infra?: boolean;
   validate: (raw: string) => string | null;
 }
@@ -73,33 +76,46 @@ const ROWS: Row[] = [
     cliKey: "concurrency.github",
     validate: (s) => (/^\d+$/u.test(s) && Number(s) > 0 ? null : "expected positive integer"),
   },
-  {
-    id: "openrouter-api-key",
-    label: "OpenRouter API key",
-    cliKey: "openrouter-api-key",
-    mask: true,
-    validate: (s) => (s.length > 0 ? null : "required — get one at openrouter.ai/keys"),
-  },
-  {
-    id: "openrouter-model",
-    label: "OpenRouter model",
-    cliKey: "openrouter-model",
-    validate: (s) => (s.length > 0 ? null : "required — e.g. deepseek/deepseek-v4-flash"),
-  },
 ];
 
+/**
+ * The active provider's credential rows, derived from the same catalogue the
+ * install wizard renders.
+ */
+function providerRows(provider: LlmProviderChoice): Row[] {
+  return providerSpec(provider).fields.map((f) => ({
+    id: f.cliKey,
+    label: f.label,
+    cliKey: f.cliKey,
+    ...(f.mask === true ? { mask: true } : {}),
+    validate: (s: string) => (s.trim().length > 0 ? null : `required — ${f.hint}`),
+  }));
+}
+
+function isLocalhost(s: string): boolean {
+  return s.includes("localhost") || s.includes("127.0.0.1");
+}
+
 function loadInitial(): Record<string, string> {
+  const currentMode = getInfraMode();
+  const rawMongo = getConfigValue(Config.MongoUri);
+  const rawNeo4j = getConfigValue(Config.Neo4jUri);
+  const rawRedis = getConfigValue(Config.RedisUrl);
+  const rawNeo4jUser = getConfigValue(Config.Neo4jUser);
+  const rawNeo4jPwd = getConfigValue(Config.Neo4jPassword);
+  const isCloudMode = currentMode === "cloud";
+
   return {
-    mongo: getConfigValue(Config.MongoUri),
-    neo4j: getConfigValue(Config.Neo4jUri),
-    "neo4j-user": getConfigValue(Config.Neo4jUser),
-    "neo4j-password": getConfigValue(Config.Neo4jPassword),
-    redis: getConfigValue(Config.RedisUrl),
+    mongo: isCloudMode && isLocalhost(rawMongo) ? "" : rawMongo,
+    neo4j: isCloudMode && isLocalhost(rawNeo4j) ? "" : rawNeo4j,
+    "neo4j-user": isCloudMode && (rawNeo4jUser === "neo4j" || isLocalhost(rawNeo4j)) ? "" : rawNeo4jUser,
+    "neo4j-password": isCloudMode && isLocalhost(rawNeo4j) ? "" : rawNeo4jPwd,
+    redis: isCloudMode && isLocalhost(rawRedis) ? "" : rawRedis,
     port: String(getConfigValue(Config.ServerPort)),
     "concurrency-github": String(getConfigValue(Config.ConcurrencyGithub)),
-    "openrouter-api-key": getConfigValue(Config.OpenrouterApiKey),
-    "openrouter-model": getConfigValue(Config.OpenrouterModel),
-    "infra-mode": isEmbedded() ? "embedded" : "docker",
+    ...initialProviderValues(),
+    "llm-provider": getConfigValue(Config.LlmProvider),
+    "infra-mode": currentMode === "cloud" ? "cloud" : "docker",
   };
 }
 
@@ -111,9 +127,16 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
   const { exit } = useApp();
   const [values, setValues] = useState<Record<string, string>>(() => loadInitial());
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
-  const isDocker = (values["infra-mode"] ?? "docker") === "docker";
-  const visibleRows = ROWS.filter((r) => isDocker || r.infra !== true);
+  const infraMode = (values["infra-mode"] ?? "docker") as InfraMode;
+  const showInfra = infraMode === "cloud";
+  const provider = (values["llm-provider"] ?? "openrouter") as LlmProviderChoice;
+  const spec = providerSpec(provider);
+  const visibleRows = [...ROWS.filter((r) => showInfra || r.infra !== true), ...providerRows(provider)];
+
+  const focusableIds = ["infra-mode", "llm-provider", ...visibleRows.map((r) => r.id)];
+  const activeIndex = Math.min(focusedIndex, focusableIds.length - 1);
 
   const errors: Record<string, string | null> = {};
   for (const row of visibleRows) {
@@ -121,15 +144,62 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
   }
   const allValid = visibleRows.every((r) => errors[r.id] === null);
 
+  const handleInfraModeChange = (nextMode: string): void => {
+    setValues((prev) => {
+      const updated: Record<string, string> = { ...prev, "infra-mode": nextMode };
+      if (nextMode === "cloud") {
+        if (isLocalhost(prev["mongo"] ?? "")) {
+          updated["mongo"] = "";
+        }
+        if (isLocalhost(prev["neo4j"] ?? "")) {
+          updated["neo4j"] = "";
+        }
+        if (isLocalhost(prev["redis"] ?? "")) {
+          updated["redis"] = "";
+        }
+        if (prev["neo4j-user"] === "neo4j" || isLocalhost(prev["neo4j"] ?? "")) {
+          updated["neo4j-user"] = "";
+        }
+        if (isLocalhost(prev["neo4j"] ?? "")) {
+          updated["neo4j-password"] = "";
+        }
+      } else if (nextMode === "docker") {
+        if (!updated["mongo"]) {
+          updated["mongo"] = "mongodb://127.0.0.1:27017/bytebell";
+        }
+        if (!updated["neo4j"]) {
+          updated["neo4j"] = "bolt://127.0.0.1:7687";
+        }
+        if (!updated["neo4j-user"]) {
+          updated["neo4j-user"] = "neo4j";
+        }
+        if (!updated["redis"]) {
+          updated["redis"] = "redis://127.0.0.1:6379";
+        }
+      }
+      return updated;
+    });
+  };
+
   useInput((_input, key) => {
     if (key.escape) {
       exit();
       onDone({ saved: false });
       return;
     }
+    if (key.tab) {
+      const total = focusableIds.length;
+      setFocusedIndex((prev) => (key.shift ? (prev - 1 + total) % total : (prev + 1) % total));
+      return;
+    }
     if (key.return && allValid && submitError === null) {
       try {
-        applyInfraMode((values["infra-mode"] ?? "docker") as InfraMode);
+        applyInfraMode(infraMode);
+        const providerEntry = KEY_MAP["llm-provider"];
+        if (providerEntry === undefined) {
+          throw new Error('No KEY_MAP entry for "llm-provider"');
+        }
+        providerEntry.setter(provider);
         for (const row of visibleRows) {
           const entry = KEY_MAP[row.cliKey];
           if (entry === undefined) {
@@ -155,12 +225,23 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
         label="Infrastructure"
         value={values["infra-mode"] ?? "docker"}
         options={MODE_OPTIONS}
-        onChange={(next) => setValues((prev) => ({ ...prev, "infra-mode": next }))}
+        onChange={handleInfraModeChange}
+        isFocused={activeIndex === 0}
       />
       <Box marginBottom={1}>
-        <Text dimColor> {infraModeOption(isDocker ? "docker" : "embedded").hint}</Text>
+        <Text dimColor> {infraModeOption(infraMode).hint}</Text>
       </Box>
-      {visibleRows.map((row) => (
+      <SelectField
+        id="llm-provider"
+        label="LLM provider"
+        value={provider}
+        options={PROVIDER_OPTIONS}
+        onChange={(next) => setValues((prev) => ({ ...prev, "llm-provider": next }))}
+        hint={spec.hint}
+        isFocused={activeIndex === 1}
+      />
+      <Box marginBottom={1} />
+      {visibleRows.map((row, idx) => (
         <Field
           key={row.id}
           id={row.id}
@@ -169,6 +250,7 @@ export function SetupForm({ onDone }: SetupFormProps): ReactElement {
           onChange={(next) => setValues((prev) => ({ ...prev, [row.id]: next }))}
           {...(row.mask === true ? { mask: true } : {})}
           {...(errors[row.id] !== null ? { error: errors[row.id] ?? "" } : {})}
+          isFocused={activeIndex === 2 + idx}
         />
       ))}
       <Box marginTop={1}>

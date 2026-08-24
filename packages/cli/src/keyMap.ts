@@ -1,4 +1,12 @@
-import { LLM_PROVIDERS, LOG_LEVELS, setConfigValue, type LlmProvider, type LogLevel } from "@bb/config";
+import {
+  LLM_PROVIDERS,
+  LOG_LEVELS,
+  INFRA_MODES,
+  setConfigValue,
+  type LlmProvider,
+  type LogLevel,
+  type InfraMode,
+} from "@bb/config";
 import { Config, DbProviderType, GraphProviderType, IngestionStrategyType, QueueProviderType } from "@bb/types";
 
 type Setter = (raw: string) => void;
@@ -167,6 +175,71 @@ export const KEY_MAP: Record<string, KeyEntry> = {
     redact: false,
     setter: (s) => setConfigValue(Config.OllamaModel, s),
   },
+  "anthropic-api-key": {
+    configKey: Config.AnthropicApiKey,
+    redact: true,
+    setter: (s) => setConfigValue(Config.AnthropicApiKey, s),
+  },
+  "anthropic-model": {
+    configKey: Config.AnthropicModel,
+    redact: false,
+    setter: (s) => setConfigValue(Config.AnthropicModel, s),
+  },
+  "bedrock-api-key": {
+    configKey: Config.BedrockApiKey,
+    redact: true,
+    setter: (s) => setConfigValue(Config.BedrockApiKey, s),
+  },
+  "bedrock-region": {
+    configKey: Config.BedrockRegion,
+    redact: false,
+    setter: (s) => setConfigValue(Config.BedrockRegion, s),
+  },
+  "bedrock-model": {
+    configKey: Config.BedrockModel,
+    redact: false,
+    setter: (s) => setConfigValue(Config.BedrockModel, s),
+  },
+  "gemini-api-key": {
+    configKey: Config.GeminiApiKey,
+    redact: true,
+    setter: (s) => setConfigValue(Config.GeminiApiKey, s),
+  },
+  "gemini-model": {
+    configKey: Config.GeminiModel,
+    redact: false,
+    setter: (s) => setConfigValue(Config.GeminiModel, s),
+  },
+  "openai-api-key": {
+    configKey: Config.OpenaiApiKey,
+    redact: true,
+    setter: (s) => setConfigValue(Config.OpenaiApiKey, s),
+  },
+  "openai-model": {
+    configKey: Config.OpenaiModel,
+    redact: false,
+    setter: (s) => setConfigValue(Config.OpenaiModel, s),
+  },
+  "openai-base-url": {
+    configKey: Config.OpenaiBaseUrl,
+    redact: false,
+    setter: (s) => setConfigValue(Config.OpenaiBaseUrl, s),
+  },
+  "aws-access-key-id": {
+    configKey: Config.AwsAccessKeyId,
+    redact: true,
+    setter: (s) => setConfigValue(Config.AwsAccessKeyId, s),
+  },
+  "aws-secret-access-key": {
+    configKey: Config.AwsSecretAccessKey,
+    redact: true,
+    setter: (s) => setConfigValue(Config.AwsSecretAccessKey, s),
+  },
+  "aws-session-token": {
+    configKey: Config.AwsSessionToken,
+    redact: true,
+    setter: (s) => setConfigValue(Config.AwsSessionToken, s),
+  },
   "db-provider": {
     configKey: Config.DbProvider,
     redact: false,
@@ -209,6 +282,12 @@ export const KEY_MAP: Record<string, KeyEntry> = {
     configKey: Config.LadybugPath,
     redact: false,
     setter: (s) => setConfigValue(Config.LadybugPath, s),
+  },
+  "infra-mode": {
+    configKey: Config.InfraMode,
+    redact: false,
+    setter: (s) => setConfigValue(Config.InfraMode, parseEnum(s, "infra-mode", INFRA_MODES) as InfraMode),
+    toggleValues: ["docker", "cloud"],
   },
 };
 

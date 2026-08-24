@@ -1,7 +1,7 @@
 import type { BytebellConfig } from "./schema.ts";
 import { Config } from "@bb/types";
 import type { ConfigValue } from "./schema.ts";
-import type { LogLevel, LlmProvider, IngestionStrategy } from "./schema.ts";
+import type { LogLevel, LlmProvider, IngestionStrategy, InfraMode } from "./schema.ts";
 
 export function readField<K extends Config>(cfg: BytebellConfig, key: K): ConfigValue<K> {
   switch (key) {
@@ -43,6 +43,32 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg.ollama_url as ConfigValue<K>;
     case Config.OllamaModel:
       return cfg.ollama_model as ConfigValue<K>;
+    case Config.AnthropicApiKey:
+      return cfg.anthropic_api_key as ConfigValue<K>;
+    case Config.AnthropicModel:
+      return cfg.anthropic_model as ConfigValue<K>;
+    case Config.BedrockApiKey:
+      return cfg.bedrock_api_key as ConfigValue<K>;
+    case Config.BedrockRegion:
+      return cfg.bedrock_region as ConfigValue<K>;
+    case Config.BedrockModel:
+      return cfg.bedrock_model as ConfigValue<K>;
+    case Config.GeminiApiKey:
+      return cfg.gemini_api_key as ConfigValue<K>;
+    case Config.GeminiModel:
+      return cfg.gemini_model as ConfigValue<K>;
+    case Config.OpenaiApiKey:
+      return cfg.openai_api_key as ConfigValue<K>;
+    case Config.OpenaiModel:
+      return cfg.openai_model as ConfigValue<K>;
+    case Config.OpenaiBaseUrl:
+      return cfg.openai_base_url as ConfigValue<K>;
+    case Config.AwsAccessKeyId:
+      return cfg.aws_access_key_id as ConfigValue<K>;
+    case Config.AwsSecretAccessKey:
+      return cfg.aws_secret_access_key as ConfigValue<K>;
+    case Config.AwsSessionToken:
+      return cfg.aws_session_token as ConfigValue<K>;
     case Config.ContextWindowLimit:
       return cfg["context.window.limit"] as ConfigValue<K>;
     case Config.MaxTokensPerChunk:
@@ -83,6 +109,8 @@ export function readField<K extends Config>(cfg: BytebellConfig, key: K): Config
       return cfg.graph_provider as ConfigValue<K>;
     case Config.QueueProvider:
       return cfg.queue_provider as ConfigValue<K>;
+    case Config.InfraMode:
+      return cfg.infra_mode as ConfigValue<K>;
     case Config.QueueDbPath:
       return cfg.queue_db_path as ConfigValue<K>;
     case Config.SqlitePath:
@@ -154,6 +182,32 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, ollama_url: value as string };
     case Config.OllamaModel:
       return { ...cfg, ollama_model: value as string };
+    case Config.AnthropicApiKey:
+      return { ...cfg, anthropic_api_key: value as string };
+    case Config.AnthropicModel:
+      return { ...cfg, anthropic_model: value as string };
+    case Config.BedrockApiKey:
+      return { ...cfg, bedrock_api_key: value as string };
+    case Config.BedrockRegion:
+      return { ...cfg, bedrock_region: value as string };
+    case Config.BedrockModel:
+      return { ...cfg, bedrock_model: value as string };
+    case Config.GeminiApiKey:
+      return { ...cfg, gemini_api_key: value as string };
+    case Config.GeminiModel:
+      return { ...cfg, gemini_model: value as string };
+    case Config.OpenaiApiKey:
+      return { ...cfg, openai_api_key: value as string };
+    case Config.OpenaiModel:
+      return { ...cfg, openai_model: value as string };
+    case Config.OpenaiBaseUrl:
+      return { ...cfg, openai_base_url: value as string };
+    case Config.AwsAccessKeyId:
+      return { ...cfg, aws_access_key_id: value as string };
+    case Config.AwsSecretAccessKey:
+      return { ...cfg, aws_secret_access_key: value as string };
+    case Config.AwsSessionToken:
+      return { ...cfg, aws_session_token: value as string };
     case Config.ContextWindowLimit:
       return { ...cfg, "context.window.limit": value as number };
     case Config.MaxTokensPerChunk:
@@ -194,6 +248,8 @@ export function writeField<K extends Config>(cfg: BytebellConfig, key: K, value:
       return { ...cfg, graph_provider: value as string };
     case Config.QueueProvider:
       return { ...cfg, queue_provider: value as string };
+    case Config.InfraMode:
+      return { ...cfg, infra_mode: value as InfraMode };
     case Config.QueueDbPath:
       return { ...cfg, queue_db_path: value as string };
     case Config.SqlitePath:

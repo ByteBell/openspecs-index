@@ -4,31 +4,25 @@ import type { ReactElement } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { FieldsStage, InfraStage, RepoStage, ConfirmStage } from "./InstallWizardStages.tsx";
 import type { InfraMode } from "./infraMode.ts";
+import {
+  LLM_PROVIDER_SPECS,
+  initialProviderValues,
+  providerFieldsValid,
+  providerSpec,
+  type LlmProviderChoice,
+} from "./llmProviders.ts";
 
-export type LlmProviderChoice = "openrouter" | "ollama";
+export type { LlmProviderChoice } from "./llmProviders.ts";
 
 export interface InstallWizardResult {
   provider: LlmProviderChoice;
   infraMode: InfraMode;
-  openrouterApiKey?: string;
-  openrouterModel?: string;
-  ollamaUrl?: string;
-  ollamaModel?: string;
+  /** Field values keyed by `KEY_MAP` key — only the chosen provider's fields. */
+  providerValues: Record<string, string>;
   indexUrl?: string;
 }
 
 type Stage = "provider" | "infra" | "fields" | "repo" | "confirm";
-
-interface ProviderItem {
-  value: LlmProviderChoice;
-  label: string;
-  hint: string;
-}
-
-const PROVIDERS: ProviderItem[] = [
-  { value: "openrouter", label: "OpenRouter", hint: "API key required — https://openrouter.ai" },
-  { value: "ollama", label: "Ollama", hint: "local, free — must already be running" },
-];
 
 export interface InstallWizardProps {
   onDone: (result: InstallWizardResult) => void;
@@ -38,30 +32,28 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
   const { exit } = useApp();
   const [stage, setStage] = useState<Stage>("provider");
   const [providerIdx, setProviderIdx] = useState(0);
-  const [infraMode, setInfraMode] = useState<InfraMode>("embedded");
-  const [apiKey, setApiKey] = useState("");
-  const [orModel, setOrModel] = useState("");
-  const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
-  const [ollamaModel, setOllamaModel] = useState("");
+  const [infraMode, setInfraMode] = useState<InfraMode>("docker");
+  const [values, setValues] = useState<Record<string, string>>(() => initialProviderValues());
   const [indexUrl, setIndexUrl] = useState("");
 
   useInput((input, key) => {
-    if (stage === "provider") {
-      if (key.escape) {
-        exit();
-        return;
-      }
-      if (key.upArrow || input === "k") {
-        setProviderIdx((i) => Math.max(0, i - 1));
-        return;
-      }
-      if (key.downArrow || input === "j") {
-        setProviderIdx((i) => Math.min(PROVIDERS.length - 1, i + 1));
-        return;
-      }
-      if (key.return) {
-        setStage("infra");
-      }
+    if (stage !== "provider") {
+      return;
+    }
+    if (key.escape) {
+      exit();
+      return;
+    }
+    if (key.upArrow || input === "k") {
+      setProviderIdx((i) => Math.max(0, i - 1));
+      return;
+    }
+    if (key.downArrow || input === "j") {
+      setProviderIdx((i) => Math.min(LLM_PROVIDER_SPECS.length - 1, i + 1));
+      return;
+    }
+    if (key.return) {
+      setStage("infra");
     }
   });
 
@@ -71,7 +63,7 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
         <Box marginBottom={1}>
           <Text bold>Which LLM provider do you want to use?</Text>
         </Box>
-        {PROVIDERS.map((p, i) => {
+        {LLM_PROVIDER_SPECS.map((p, i) => {
           const selected = i === providerIdx;
           return (
             <Box key={p.value} flexDirection="column">
@@ -90,13 +82,10 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
     );
   }
 
-  const p = PROVIDERS[providerIdx];
-  const provider: LlmProviderChoice = p !== undefined ? p.value : "openrouter";
-
-  const fieldsValid =
-    provider === "openrouter"
-      ? apiKey.trim().length > 0 && orModel.trim().length > 0
-      : ollamaUrl.trim().length > 0 && ollamaModel.trim().length > 0;
+  const selected = LLM_PROVIDER_SPECS[providerIdx];
+  const provider: LlmProviderChoice = selected !== undefined ? selected.value : "openrouter";
+  const spec = providerSpec(provider);
+  const fieldsValid = providerFieldsValid(spec, values);
 
   if (stage === "infra") {
     return (
@@ -112,15 +101,9 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
   if (stage === "fields") {
     return (
       <FieldsStage
-        provider={provider}
-        apiKey={apiKey}
-        onApiKey={setApiKey}
-        orModel={orModel}
-        onOrModel={setOrModel}
-        ollamaUrl={ollamaUrl}
-        onOllamaUrl={setOllamaUrl}
-        ollamaModel={ollamaModel}
-        onOllamaModel={setOllamaModel}
+        spec={spec}
+        values={values}
+        onChange={(cliKey, next) => setValues((prev) => ({ ...prev, [cliKey]: next }))}
         valid={fieldsValid}
         onBack={() => setStage("infra")}
         onNext={() => setStage("repo")}
@@ -141,24 +124,18 @@ export function InstallWizard({ onDone }: InstallWizardProps): ReactElement {
 
   return (
     <ConfirmStage
-      provider={provider}
+      spec={spec}
+      values={values}
       infraMode={infraMode}
-      apiKey={apiKey}
-      orModel={orModel}
-      ollamaUrl={ollamaUrl}
-      ollamaModel={ollamaModel}
       indexUrl={indexUrl}
       onBack={() => setStage("repo")}
       onDone={() => {
         exit();
-        const result: InstallWizardResult = { provider, infraMode };
-        if (provider === "openrouter") {
-          result.openrouterApiKey = apiKey.trim();
-          result.openrouterModel = orModel.trim();
-        } else {
-          result.ollamaUrl = ollamaUrl.trim();
-          result.ollamaModel = ollamaModel.trim();
+        const providerValues: Record<string, string> = {};
+        for (const field of spec.fields) {
+          providerValues[field.cliKey] = (values[field.cliKey] ?? "").trim();
         }
+        const result: InstallWizardResult = { provider, infraMode, providerValues };
         if (indexUrl.trim().length > 0) {
           result.indexUrl = indexUrl.trim();
         }

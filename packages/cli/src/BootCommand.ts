@@ -10,7 +10,7 @@ import { applyInfraDefaults, checkPreflight } from "./bootConfig.ts";
 import { SetupForm } from "./SetupForm.tsx";
 import { error, info, success } from "./output.ts";
 import { bringInfraUp, usingHonker } from "./bootInfra.ts";
-import { isEmbedded } from "./infraMode.ts";
+import { isCloud, isEmbedded } from "./infraMode.ts";
 
 export function buildBootCommand(): Command {
   const cmd = new Command("boot");
@@ -63,6 +63,16 @@ async function runBoot(): Promise<void> {
     success(`queue  → honker (sqlite: ${resolvedQueue})`);
     success(`doc    → sqlite`);
     success(`graph  → ladybug`);
+    process.stdout.write("\nNext: bytebell index <git-url>  or  bytebell ingest [path]\n");
+    return;
+  }
+
+  // Cloud mode (external databases) needs no Docker either.
+  if (isCloud()) {
+    info("cloud mode — using external/cloud databases, no Docker required.");
+    success(`queue  → redis (${getConfigValue(Config.RedisUrl)})`);
+    success(`doc    → mongo (${getConfigValue(Config.MongoUri)})`);
+    success(`graph  → neo4j (${getConfigValue(Config.Neo4jUri)})`);
     process.stdout.write("\nNext: bytebell index <git-url>  or  bytebell ingest [path]\n");
     return;
   }
