@@ -23,16 +23,22 @@ const FULLTEXT_INDEXES = [
 ];
 
 export async function ensureFlatFolderIndexes(): Promise<void> {
-  for (const cypher of [...CONSTRAINTS, ...FULLTEXT_INDEXES]) {
-    try {
-      await _runCypher(cypher);
-    } catch (cause: unknown) {
-      const msg = cause instanceof Error ? cause.message : String(cause);
-      if (msg.includes("already exists") || msg.includes("EquivalentSchemaRuleAlreadyExists")) {
-        process.stderr.write(`[neo4j] flat-folder schema already present, skipping: ${cypher.slice(0, 60)}…\n`);
-        continue;
-      }
-      throw cause;
+  const results = await Promise.allSettled(
+    [...CONSTRAINTS, ...FULLTEXT_INDEXES].map((cypher) =>
+      _runCypher(cypher).catch((cause: unknown) => {
+        const msg = cause instanceof Error ? cause.message : String(cause);
+        if (msg.includes("already exists") || msg.includes("EquivalentSchemaRuleAlreadyExists")) {
+          process.stderr.write(`[neo4j] flat-folder schema already present, skipping: ${cypher.slice(0, 60)}…\n`);
+          return;
+        }
+        throw cause;
+      }),
+    ),
+  );
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      throw result.reason;
     }
   }
 }
